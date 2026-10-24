@@ -386,6 +386,10 @@ textarea.saved { border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok-soft); 
 .score-card textarea { min-height: 52px; font-size: 13px; }
 .score-card .sc-total td { border-top: 2px solid var(--border); background: var(--brand-soft); }
 .score-note { background: var(--warn-soft); border-radius: 8px; padding: 8px 10px; font-size: 13px; white-space: pre-wrap; }
+.kpi-day-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.kpi-day-grid .kd { border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; }
+.kpi-day-grid .kd-l { font-size: 12px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-day-grid .kpi-in { width: 100%; }
 
 </style>
 </head>
@@ -476,7 +480,7 @@ window.LESSONS = [
     tip: "Parolni unutsangiz — monitoring bo'limi rahbariga ayting, u tiklab beradi." },
   { id: "kpi-korish", title: "KPI natijamni ko'rish", group: "Natijalar", roles: ["xodim"], added: "2026-10-24", pages: ["kpi", "statistika"],
     desc: "Kunlik, haftalik, bosqich va yillik natijalaringiz.",
-    parts: [{ img: "oqish/x10-kpi.jpg", phone: true, steps: ["Ko'rinishni tanlang: Kunlik, Haftalik, 2 haftalik (bosqich), Yillik.", "Jadvalda har bir mezon bo'yicha ballaringiz. \"Reja\" va \"Hisobot\" avtomatik hisoblanadi.", "Pastdagi <b>Ball kartam</b> — har bir mezon bo'yicha ball, foizdagi taqsimot va rahbaringiz yozgan izoh (💬)."] }],
+    parts: [{ img: "oqish/x10-kpi.jpg", phone: true, steps: ["Ko'rinishni tanlang: Kunlik, Haftalik, 2 haftalik (bosqich), Yillik. Rahbaringiz har kuni ball qo'yadi; haftalik va 2 haftalik ball shundan o'zi chiqadi.", "Jadvalda har bir mezon bo'yicha ballaringiz. \"Reja\" va \"Hisobot\" avtomatik hisoblanadi.", "Pastdagi <b>Ball kartam</b> — har bir mezon bo'yicha ball, foizdagi taqsimot va rahbaringiz yozgan izoh (💬)."] }],
     tip: "Har 2 haftada eng yaxshi natijalar taqdirlanadi. \"Statistika\"da qancha topshiriq bajarilgan/bajarilmaganini ko'rasiz." },
 
   // ---------------- CEO uchun ----------------
@@ -510,10 +514,10 @@ window.LESSONS = [
       { img: "oqish/c14-profil-reja.jpg", steps: ["\"Jamoam\" da xodim ustiga bosing — profili ochiladi.", "Oxirgi faollik — xodim portalga qachon kirgani.", "Joriy bosqich bahosi va darajasi.", "Shu yerdan ham kunlik rejani yozib, <b>\"Rejani saqlash\"</b>ni bosing."] }
     ],
     tip: "Xodim bir kun ko'p yoki kam bajarsa, kunlik hisobot oynasidagi \"Ertangi reja\" ni o'zgartiring — ertangi reja avtomatik yangilanadi." },
-  { id: "kpi-ball", title: "KPI ballarini qo'yish", group: "CEO: jamoani boshqarish", roles: ["ceo", "asoschi"], added: "2026-10-24", pages: ["kpi"],
-    desc: "Har 2 haftada jamoaga ball qo'yish.",
-    parts: [{ img: "oqish/c08-kpi.jpg", steps: ["Ko'rinish: Kunlik, Haftalik, Bosqich, Yillik.", "Bosqichni tanlang.", "Katakka ball yozing. Kulrang raqam — avtomatik qiymat. Ball yonidagi <b>+</b> — shu ballga izoh yozish (💬 — izoh bor).", "<b>Yakuniy</b> natijani tahrirlash. Xodim ismiga bossangiz — <b>ball kartasi</b>: har bir mezon bo'yicha ball, taqsimot va izohlarni bir joyda yozasiz."] }],
-    tip: "Ball va izohni faqat siz va ball egasi (xodimning o'zi) ko'radi. CEO o'z ballarini o'zgartira olmaydi — CEO'ni asoschi baholaydi." },
+  { id: "kpi-kunlik", title: "KPI ballarini har kuni qo'yish", group: "CEO: jamoani boshqarish", roles: ["ceo", "asoschi"], added: "2026-10-25", pages: ["kpi"],
+    desc: "Kunlik ball qo'yiladi — haftalik va 2 haftalik natija o'zi shakllanadi.",
+    parts: [{ img: "oqish/c08-kpi.jpg", steps: ["<b>KPI va reyting → Kunlik</b>. Sanani tanlang (bugun avtomatik).", "Har bir xodim va mezon katagiga ball yozing. \"Reja\" ustuni kunlik hisobotdagi bahodan o'zi qo'yiladi (baho/10 × max) — kerak bo'lsa o'zgartiring.", "Ball yonidagi <b>+</b> — shu ballga izoh (💬 — izoh bor). Xodim ismiga bossangiz — ball kartasi.", "<b>Haftalik</b> va <b>2 haftalik</b> — kunlik ballarning o'rtachasi kulrang bo'lib chiqadi. Katakka yozsangiz, o'zgartirasiz; o'chirsangiz, avtomatikka qaytadi."] }],
+    tip: "Kunlik ballarni hisobot oynasida ham qo'yish mumkin: \"Hisobotlar va baholar\" → \"Hisobot yozish va baholash\" → \"Bugungi KPI ballari\". Ballni faqat siz va ball egasi ko'radi. CEO'ni asoschi baholaydi." },
   { id: "statistika", title: "Statistika", group: "Natijalar", roles: ["ceo", "asoschi"], added: "2026-10-24", pages: ["statistika"],
     desc: "Topshiriqlar bajarildi / bajarilmadi — bo'lim va xodim kesimida.",
     parts: [{ img: "oqish/c09-statistika.jpg", steps: ["Davrni tanlang.", "Umumiy: bajarildi, tekshiruvda, jarayonda, bajarilmadi.", "Xodim qatoriga bosing — bajarilmagan topshiriqlari."] }] }
@@ -836,7 +840,17 @@ window.LESSONS = [
       async setAward(period, user_id) { const d = load(); d.awards = (d.awards || []).filter(r => r.period_start !== period);
         if (user_id) d.awards.push({ period_start: period, user_id }); save(); return true; },
       async listKpiRange(from, to) { const d = load(); const m = me(); const vis = r => m.role === "asoschi" || r.user_id === m.id || isMember(r.user_id);
-        return ok({ scores: (d.kpi || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)), finals: (d.kpiF || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)) }); },
+        return ok({ scores: (d.kpi || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)), finals: (d.kpiF || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)),
+          daily: (d.kpiD || []).filter(r => r.day >= from && r.day <= to && vis(r)), week: (d.kpiW || []).filter(r => r.week_start >= from && r.week_start <= to && vis(r)) }); },
+      async setKpiAt(lvl, date, user_id, criterion, score, note) {
+        if (lvl === "bosqich") return this.setKpiScore(date, user_id, criterion, score, note);
+        const m = me(); if (!(m.role === "asoschi" || (isMember(user_id) && user_id !== m.id))) return fail("Ruxsat yo'q");
+        const d = load(); const key = lvl === "kun" ? "kpiD" : "kpiW", col = lvl === "kun" ? "day" : "week_start"; d[key] = d[key] || [];
+        const ex = d[key].find(r => r[col] === date && r.user_id === user_id && r.criterion === criterion);
+        const nn = note !== undefined ? note : (ex ? ex.note || "" : "");
+        d[key] = d[key].filter(r => r !== ex);
+        if (score !== null || nn) d[key].push({ [col]: date, user_id, criterion, score, note: nn, updated_by: m.id });
+        save(); return true; },
       async listKpi(period) {
         const d = load(); d.kpi = d.kpi || []; d.kpiF = d.kpiF || []; const m = me();
         const vis = r => m.role === "asoschi" || r.user_id === m.id || isMember(r.user_id);
@@ -966,8 +980,16 @@ window.LESSONS = [
         chk(await sb.from("kpi_award").upsert({ period_start: period, user_id }, { onConflict: "period_start" })); return true;
       },
       async listKpiRange(from, to) {
-        const [a, b] = await Promise.all([sb.from("kpi_scores").select("*").gte("period_start", from).lte("period_start", to), sb.from("kpi_final").select("*").gte("period_start", from).lte("period_start", to)]);
-        return { scores: chk(a), finals: chk(b) };
+        const [a, b, c, w] = await Promise.all([sb.from("kpi_scores").select("*").gte("period_start", from).lte("period_start", to), sb.from("kpi_final").select("*").gte("period_start", from).lte("period_start", to),
+          sb.from("kpi_daily").select("*").gte("day", from).lte("day", to), sb.from("kpi_week").select("*").gte("week_start", from).lte("week_start", to)]);
+        return { scores: chk(a), finals: chk(b), daily: c.error ? [] : c.data, week: w.error ? [] : w.data };
+      },
+      async setKpiAt(lvl, date, user_id, criterion, score, note) {
+        if (lvl === "bosqich") return this.setKpiScore(date, user_id, criterion, score, note);
+        const tbl = lvl === "kun" ? "kpi_daily" : "kpi_week", col = lvl === "kun" ? "day" : "week_start";
+        if (score === null && note !== undefined && !note) { chk(await sb.from(tbl).delete().match({ [col]: date, user_id, criterion })); return true; }
+        const body = { [col]: date, user_id, criterion, score }; if (note !== undefined) body.note = note;
+        chk(await sb.from(tbl).upsert(body, { onConflict: col + ",user_id,criterion" })); return true;
       },
       async listKpi(period) {
         const [a, b] = await Promise.all([sb.from("kpi_scores").select("*").eq("period_start", period), sb.from("kpi_final").select("*").eq("period_start", period)]);
@@ -1881,18 +1903,27 @@ window.LESSONS = [
     const nd = nextWorkday(p, date); await ensurePlans(weekOf(nd)); await ensurePlans(weekOf(date));
     const plan = dayPlan(p, date); const tomorrow = dayPlan(p, nd);
     let grade = r && r.grade !== null && r.grade !== undefined ? +r.grade : null;
+    let KD = { daily: [] }; try { KD = await db.listKpiRange(date, date); } catch (e) {}
+    const isA = S.me.role === "asoschi";
+    const kItems = itemsFor(p).filter(it => !it.ceoOnly || isA);
+    const kMan = k => KD.daily.find(x => x.day === date && x.user_id === p.id && x.criterion === k);
+    const rejaAuto = it => grade ? rnd(grade / 10 * it.max) : "—";
     const m = openModal(`${esc(p.full_name)} — ${fmtDate(date)}`, `
       <div class="rc-plan" style="margin-top:0"><b>Shu kungi reja:</b> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
       <form id="srf">
         <div class="field"><label>Bugun bajargan ishlari *</label><textarea name="done" required placeholder="Masalan: 7-A va 8-B sinflarda dars kuzatildi, varaqalar to'ldirildi…">${esc(r?.done)}</textarea></div>
         <div class="field"><label>Kamchilik / muammolar</label><textarea name="problems" rows="2">${esc(r?.problems)}</textarea></div>
         <div class="field"><label>Baho (1–10) *</label><div class="grade-pick">${Array.from({ length: 10 }, (_, i) => `<button type="button" data-g="${i + 1}" class="${grade === i + 1 ? "on" : ""}">${i + 1}</button>`).join("")}</div></div>
+        <div class="field"><label>Bugungi KPI ballari <span class="muted">(mezonlar bo'yicha; "Reja" bahodan o'zi qo'yiladi — kerak bo'lsa o'zgartiring)</span></label>
+          <div class="kpi-day-grid">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
+            <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" data-max="${it.max}" value="${scoreOf(mv) ?? ""}" placeholder="${it.auto === "reja" ? rejaAuto(it) : "—"}"></div>`; }).join("")}</div></div>
         <div class="field staff-band"><label>📌 Xodimga eslatma yoki topshiriq <span class="muted">(xodim bosh sahifasida alohida ko'rinadi)</span></label><textarea name="staff_note" rows="2" placeholder="Masalan: Ertaga 9:00 da 7-A sinfga kiring">${esc(r?.staff_note)}</textarea></div>
         <div class="field"><label>Ertangi reja — ${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)} <span class="muted">(o'zgartirsangiz, haftalik reja ham yangilanadi)</span></label><textarea name="plan" rows="2" placeholder="Ertaga nima qilinadi">${esc(tomorrow || r?.plan || "")}</textarea></div>
         <div class="err-text" id="sr-err"></div>
       </form>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sr-save">Saqlash</button>`);
     $(".modal", $("#modal-root")).style.maxWidth = "700px";
-    $$("[data-g]", m).forEach(b => b.onclick = () => { grade = +b.dataset.g; $$("[data-g]", m).forEach(x => x.classList.toggle("on", x === b)); });
+    $$("[data-g]", m).forEach(b => b.onclick = () => { grade = +b.dataset.g; $$("[data-g]", m).forEach(x => x.classList.toggle("on", x === b));
+      kItems.filter(it => it.auto === "reja").forEach(it => { const i = $(`[data-kd="${it.k}"]`, m); if (i) i.placeholder = rejaAuto(it); }); });
     $("#sr-save", m).onclick = async e => {
       const f = $("#srf", m); const d = Object.fromEntries(new FormData(f));
       d.done = d.done.trim(); d.plan = d.plan.trim(); d.staff_note = d.staff_note.trim();
@@ -1901,6 +1932,10 @@ window.LESSONS = [
       e.target.disabled = true;
       try {
         await db.saveStaffReport(p.id, date, { ...d, grade });
+        for (const it of kItems) {
+          const i = $(`[data-kd="${it.k}"]`, m); const v = i.value === "" ? null : Math.max(0, Math.min(it.max, +i.value));
+          const mv = kMan(it.k); if (v !== scoreOf(mv)) await db.setKpiAt("kun", date, p.id, it.k, v, mv?.note || "");
+        }
         const ch = await saveDay(p, nd, d.plan);
         toast(ch ? "Saqlandi · ertangi reja yangilandi" : "Hisobot va baho saqlandi");
         await refresh(); render();
@@ -2022,18 +2057,18 @@ window.LESSONS = [
   // ---- KPI va reyting
   const KPI_TPL = {
     umumiy: { title: "Umumiy nazorat xodimlari", items: [
-      { k: "reja", l: "Tasdiqlangan kuzatuv rejasini bajarish", s: "Reja", max: 25, auto: "reja", d: "Rejaga nisbatan bajarilgan, jurnalga qayd etilgan kuzatuvlar" },
+      { k: "reja", l: "Tasdiqlangan kuzatuv rejasini bajarish", s: "Reja", max: 25, auto: "reja", d: "Kunlik hisobot bahosidan avtomatik (baho/10 × 25); CEO o'zgartira oladi" },
       { k: "dalil", l: "Muammolar asosliligi va dalillar sifati", s: "Dalil", max: 25, d: "Video/vaqt, holat tavsifi, xolislik va tekshiruvga yaroqlilik" },
       { k: "tasnif", l: "Muammolarni to'g'ri tasniflash va yetkazish", s: "Tasnif", max: 15, hint: "posts", d: "Toifa, mas'ul shaxs va belgilangan muddatda xabar" },
       { k: "filial", l: "Filiallar bo'yicha ijroni kuzatish", s: "Filial", max: 10, hint: "resolved", d: "Ochiq holatlar reyestri va takroriy eslatma/eskalatsiya" },
-      { k: "hisobot", l: "Hisobot aniqligi va muddatlari", s: "Hisobot", max: 10, auto: "hisobot", d: "Rahbar qo'ygan kunlik baholarning o'rtachasi (1–10)" },
+      { k: "hisobot", l: "Hisobot aniqligi va muddatlari", s: "Hisobot", max: 10, d: "Belgilangan shakl, tekshiruvga mos raqam va muddat" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, ichki tartib, xolis aloqa, kiyinish qoidalari" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Tasdiqlangan taklif yoki jarayonni yaxshilashga dalilli hissa" }] },
     akademik: { title: "Akademik kuzatuv xodimlari", items: [
-      { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "Tasdiqlangan kuzatuvlar soni va to'liq varaqalar" },
+      { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "Kunlik hisobot bahosidan avtomatik (baho/10 × 20); CEO o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 30, d: "Rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi" },
       { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 15, d: "Konkret holat, pedagogik xulosa, bajarilishi mumkin bo'lgan tavsiya" },
-      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "hisobot", d: "Rahbar qo'ygan kunlik baholarning o'rtachasi (1–10)" },
+      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, d: "To'liq, tekshiruvga yaroqli va o'z vaqtida hisobot" },
       { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, d: "Belgilangan holatlar bo'yicha taqqoslash va natijani qayd qilish" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, axloq, maxfiylik, kiyinish qoidalari" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] }
@@ -2089,10 +2124,6 @@ window.LESSONS = [
     }
     return { r: null };
   }
-  function autoValue(p, item, ps, reps) {
-    const a = rangeAuto(p, item.auto, ps, addD(ps, 13), reps);
-    return { v: a.r === null ? null : Math.round(item.max * a.r * 10) / 10, why: a.why };
-  }
   function hintFor(p, item, ps) {
     const pe = addD(ps, 13);
     const mine = S.posts.filter(x => x.author_id === p.id && x.created_at && inDays(localOf(x.created_at), ps, pe));
@@ -2101,21 +2132,40 @@ window.LESSONS = [
     if (item.hint === "taklif") return `${mine.filter(x => x.category === "taklif").length} ta taklif`;
     return "";
   }
-  function kpiRow(p, ps, K, awardId, reps) {
+  // ---- KPI darajalari: kunlik -> haftalik -> 2 haftalik (bosqich)
+  const LVL = { kun: "Kunlik", hafta: "Haftalik", bosqich: "2 haftalik" };
+  const rnd = v => Math.round(v * 10) / 10;
+  const avgOf = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? rnd(v.reduce((s, x) => s + x, 0) / v.length) : null; };
+  const manAt = (K, lvl, d, uid, k) => (lvl === "kun" ? K.daily : lvl === "hafta" ? K.week : K.scores).find(r => (r.day || r.week_start || r.period_start) === d && r.user_id === uid && r.criterion === k);
+  const scoreOf = r => r && r.score !== null && r.score !== undefined && r.score !== "" ? +r.score : null;
+  // Kunlik: CEO qo'ygani; bo'lmasa "Reja" — shu kungi hisobot bahosidan
+  function dayAuto(p, it, d, reps) {
+    if (it.auto !== "reja") return null;
+    const r = (reps || S.reports).find(x => x.author_id === p.id && x.report_date === d);
+    return r && r.grade !== null && r.grade !== undefined && r.grade !== "" ? rnd(+r.grade / 10 * it.max) : null;
+  }
+  const dayVal = (p, it, d, K, reps) => scoreOf(manAt(K, "kun", d, p.id, it.k)) ?? dayAuto(p, it, d, reps);
+  function weekAuto(p, it, ws, K, reps) { const v = []; for (let i = 0; i < 7; i++) v.push(dayVal(p, it, addD(ws, i), K, reps)); return avgOf(v); }
+  const weekVal = (p, it, ws, K, reps) => scoreOf(manAt(K, "hafta", ws, p.id, it.k)) ?? weekAuto(p, it, ws, K, reps);
+  const bosqAuto = (p, it, ps, K, reps) => avgOf([weekVal(p, it, ps, K, reps), weekVal(p, it, addD(ps, 7), K, reps)]);
+  function levelAuto(p, it, lvl, d, K, reps) {
+    return lvl === "kun" ? dayAuto(p, it, d, reps) : lvl === "hafta" ? weekAuto(p, it, d, K, reps) : bosqAuto(p, it, d, K, reps);
+  }
+  function kpiRow(p, lvl, d, K, awardId, reps) {
     const items = itemsFor(p);
-    const picked = awardId === p.id;
+    const picked = lvl === "bosqich" && awardId === p.id;
     const cells = items.map(it => {
-      const man = K.scores.find(r => r.period_start === ps && r.user_id === p.id && r.criterion === it.k);
-      const au = it.auto ? autoValue(p, it, ps, reps) : { v: null };
-      const val = picked ? it.max : man && man.score !== null ? +man.score : au.v;
-      return { it, man, au, val };
+      const man = manAt(K, lvl, d, p.id, it.k);
+      const av = levelAuto(p, it, lvl, d, K, reps);
+      const val = picked ? it.max : scoreOf(man) ?? av;
+      return { it, man, au: { v: av }, val };
     });
     const sum = cells.reduce((a, c) => a + (c.val || 0), 0);
     const maxT = items.reduce((a, it) => a + it.max, 0);
-    const pct = Math.round(sum / maxT * 1000) / 10;
-    const fin = K.finals.find(r => r.period_start === ps && r.user_id === p.id);
+    const pct = rnd(sum / maxT * 100);
+    const fin = lvl === "bosqich" ? K.finals.find(r => r.period_start === d && r.user_id === p.id) : null;
     const final = picked ? 100 : fin && fin.final_score !== null ? +fin.final_score : pct;
-    return { p, cells, sum: Math.round(sum * 10) / 10, maxT, pct, final, overridden: !!fin && !picked, picked, has: sum > 0 || !!fin || picked };
+    return { p, cells, sum: rnd(sum), maxT, pct, final, overridden: !!fin && !picked, picked, has: cells.some(c => c.val !== null) || !!fin || picked };
   }
   // G'oliblar: reytingdagi 1-o'rin + asoschi tanlovi (bo'lsa), aks holda eng yaxshi 2 natija
   function winners(rows, awardId) {
@@ -2138,147 +2188,126 @@ window.LESSONS = [
   const rankPool = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && p.role === "xodim") : S.me.role === "ceo" ? members() : [];
 
   PAGES.kpi = async page => {
-    const mode = S.ui.kpiMode || "bosqich";
+    const mode = S.ui.kpiMode || (isManager() ? "kun" : "bosqich");
     const modes = [["kun", "Kunlik"], ["hafta", "Haftalik"], ["bosqich", "2 haftalik (bosqich)"], ["yil", "Yillik"]];
     const modeBar = `<div class="seg">${modes.map(([k, l]) => `<button data-km="${k}" class="${k === mode ? "active" : ""}">${l}</button>`).join("")}</div>`;
     page.innerHTML = head("KPI va reyting", "Har 2 haftada yangi bosqich. Bosqichning 1-o'rini va asoschi tanlovi taqdirlanadi.") + modeBar + `<div id="kpi-body"><div class="card empty">Yuklanmoqda…</div></div>`;
     $$("[data-km]", page).forEach(b => b.onclick = () => { S.ui.kpiMode = b.dataset.km; PAGES.kpi(page); });
     const body = $("#kpi-body", page);
-    try { await ({ bosqich: kpiBosqich, hafta: kpiShort, kun: kpiShort, yil: kpiYear })[mode](body, mode); }
+    try { await (mode === "yil" ? kpiYear(body) : kpiTable(body, mode)); }
     catch (e) { body.innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
   };
   const tabBar = (tabs, tab) => tabs.length > 1 ? `<div class="tabs" style="margin-top:16px">${tabs.map(t => `<button data-kt="${t.id}" class="${t.id === tab.id ? "active" : ""}">${esc(t.l)}</button>`).join("")}</div>` : "";
   const bindTabs = (root, rerun) => $$("[data-kt]", root).forEach(b => b.onclick = () => { S.ui.kpiTab = b.dataset.kt; rerun(); });
 
-  async function kpiBosqich(body) {
-    const ps = S.ui.kpiP || periodOf(today());
-    const [K, aw] = await Promise.all([db.listKpi(ps), db.listAwards(ps, ps)]);
+  async function kpiTable(body, lvl) {
+    const t = today(); const cur = periodOf(t);
+    const d = lvl === "kun" ? (S.ui.kpiDay || t) : lvl === "hafta" ? (S.ui.kpiWeek || weekOf(t)) : (S.ui.kpiP || cur);
+    const to = lvl === "kun" ? d : lvl === "hafta" ? addD(d, 6) : addD(d, 13);
+    const [K, aw, reps] = await Promise.all([db.listKpiRange(d, to), lvl === "bosqich" ? db.listAwards(d, d) : Promise.resolve([]), db.listReports({ from: d, to }).catch(() => S.reports)]);
     const awardId = aw[0]?.user_id || null;
-    const cur = periodOf(today());
-    const periods = []; for (let i = 0; i < 26; i++) { const x = addD(cur, -14 * i); if (x >= KPI_ANCHOR) periods.push(x); }
-    const tabs = kpiTabs(); const tab = tabs.find(t => t.id === S.ui.kpiTab) || tabs[0];
-    const pool = rankPool().map(p => kpiRow(p, ps, K, awardId));
-    const win = winners(pool, awardId);
-    const rows = tab.rows.map(p => kpiRow(p, ps, K, awardId)).sort((a, b) => b.final - a.final);
-    const items = rows.length ? rows[0].cells.map(c => c.it) : (tab.id === "ceo" ? [...KPI_TPL.umumiy.items, CEO_EXTRA] : KPI_TPL[DEPTS[tab.id]?.tpl || DEPTS[deptOf(S.me)].tpl].items);
     const isA = S.me.role === "asoschi";
-    body.innerHTML = `<div class="row" style="margin:14px 0"><select id="kpi-p" style="width:auto">${periods.map(x => `<option value="${x}" ${x === ps ? "selected" : ""}>${bosqichNo(x)}-bosqich: ${periodLabel(x)}${x === cur ? " (joriy)" : ""}</option>`).join("")}</select></div>
-      ${win.length || isA ? `<div class="card top-card"><div class="card-head"><h2>🏆 ${bosqichNo(ps)}-bosqich g'oliblari</h2><span class="spacer"></span>
+    const periods = []; for (let i = 0; i < 26; i++) { const x = addD(cur, -14 * i); if (x >= KPI_ANCHOR) periods.push(x); }
+    const weeks = []; for (let i = -1; i < 12; i++) { const w = addD(weekOf(t), -7 * i); if (w >= KPI_ANCHOR) weeks.push(w); }
+    const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
+    const win = lvl === "bosqich" ? winners(rankPool().map(p => kpiRow(p, lvl, d, K, awardId, reps)), awardId) : [];
+    const rows = tab.rows.map(p => kpiRow(p, lvl, d, K, awardId, reps)).sort((a, b) => b.final - a.final);
+    const items = rows.length ? rows[0].cells.map(c => c.it) : (tab.id === "ceo" ? [...KPI_TPL.umumiy.items, CEO_EXTRA] : KPI_TPL[DEPTS[tab.id]?.tpl || DEPTS[deptOf(S.me)].tpl].items);
+    const label = lvl === "kun" ? `${fmtDate(d)}, ${KUN[dowOf(d)].toLowerCase()}` : lvl === "hafta" ? `${fmtDate(d)} – ${fmtDate(to)}` : `${bosqichNo(d)}-bosqich: ${periodLabel(d)}`;
+    const sel = lvl === "kun" ? `<input type="date" id="kpi-d" value="${d}" max="${t}" min="${KPI_ANCHOR}" style="width:auto">`
+      : lvl === "hafta" ? `<select id="kpi-d" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === d ? "selected" : ""}>${fmtDate(w)} – ${fmtDate(addD(w, 6))}${w === weekOf(t) ? " (joriy)" : w > t ? " (keyingi)" : ""}</option>`).join("")}</select>`
+      : `<select id="kpi-d" style="width:auto">${periods.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${bosqichNo(x)}-bosqich: ${periodLabel(x)}${x === cur ? " (joriy)" : ""}</option>`).join("")}</select>`;
+    const how = { kun: "Har kuni har bir mezonga ball qo'ying. \"Reja\" kunlik hisobot bahosidan o'zi qo'yiladi (o'zgartirsa bo'ladi).",
+      hafta: "Haftalik ball — kunlik ballarning o'rtachasi (kulrang). Kerak bo'lsa katakka yozib, o'zgartirasiz.",
+      bosqich: "2 haftalik ball — ikki haftaning o'rtachasi (kulrang). Kerak bo'lsa o'zgartirasiz. Yakuniy natija reytingga kiradi." }[lvl];
+    const anyEd = rows.some(x => canRate(x.p));
+    body.innerHTML = `<div class="row" style="margin:14px 0">${sel}<span class="small muted">${how}</span></div>
+      ${lvl === "bosqich" && (win.length || isA) ? `<div class="card top-card"><div class="card-head"><h2>🏆 ${bosqichNo(d)}-bosqich g'oliblari</h2><span class="spacer"></span>
         ${isA ? `<label class="small" style="margin:0">Asoschi tanlovi (ixtiyoriy):</label><select id="kpi-award" style="width:auto"><option value="">— yo'q —</option>${rankPool().map(p => `<option value="${p.id}" ${awardId === p.id ? "selected" : ""}>${esc(p.full_name)}</option>`).join("")}</select>` : ""}</div>
-        <div class="row" style="gap:16px">${win.map((x, i) => `<div class="top-item">${avatar(x.p.full_name, photoOf(x.p))}<div><div class="small muted">${x.picked ? "Asoschi tanlovi" : "Reyting 1-o'rni"} · ${esc(DEPTS[deptOf(x.p)].l)}</div><b>${esc(x.p.full_name)}</b><div class="top-score">${x.final}%</div></div></div>`).join("") || `<span class="muted">Hali ballar qo'yilmagan</span>`}</div>
+        <div class="row" style="gap:16px">${win.map(x => `<div class="top-item">${avatar(x.p.full_name, photoOf(x.p))}<div><div class="small muted">${x.picked ? "Asoschi tanlovi" : "Reyting 1-o'rni"} · ${esc(DEPTS[deptOf(x.p)].l)}</div><b>${esc(x.p.full_name)}</b><div class="top-score">${x.final}%</div></div></div>`).join("") || `<span class="muted">Hali ballar qo'yilmagan</span>`}</div>
         ${awardId ? `<p class="small muted" style="margin:10px 0 0">Asoschi tanlagan xodimning bu bosqichdagi barcha ballari 100 qilingan.</p>` : ""}</div>` : ""}
       ${tabBar(tabs, tab)}
-      ${tab.id === "administratsiya" ? `<div class="note" style="margin:0 0 12px">Administratsiya uchun hozircha "Umumiy nazorat" mezonlari ishlatilmoqda.</div>` : ""}
-      ${tab.id === "ceo" ? `<div class="note" style="margin:0 0 12px">CEO'lar o'z bo'limi mezonlari + "Jamoaning faolligi" (20 ball, hozircha siz qo'yasiz) bo'yicha baholanadi. Jami 120 ball, natija foizda.</div>` : ""}
-      <div class="card"><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>
+      ${tab.id === "ceo" ? `<div class="note" style="margin:0 0 12px">CEO'lar o'z bo'limi mezonlari + "Jamoaning faolligi" (20 ball, siz qo'yasiz) bo'yicha baholanadi. Natija foizda.</div>` : ""}
+      <div class="card"><div class="card-head"><h2>${LVL[lvl]} ballar · ${label}</h2></div><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>
           ${items.map(it => `<th title="${esc(it.l + " — " + it.d)}">${esc(it.s)}<div class="kpi-max">${it.max}${it.auto ? " · avto" : ""}</div></th>`).join("")}
-          <th>Jami</th><th>Yakuniy</th></tr></thead><tbody>
+          <th>Jami</th><th>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}</th></tr></thead><tbody>
           ${rows.map(x => `<tr class="${x.picked ? "picked" : ""}"><td><div class="row click" style="gap:8px;flex-wrap:nowrap" data-card="${x.p.id}" title="Ball kartasini ochish">${avatar(x.p.full_name, photoOf(x.p))}<div><b>${esc(x.p.full_name)}</b>${x.picked ? " ⭐" : ""}<div class="small kpi-open">Ball kartasi ›</div></div></div></td>
             ${x.cells.map(c => { const ed = !x.picked && canRate(x.p) && (!c.it.ceoOnly || isA);
-              const tip = esc([c.au.why, hintFor(x.p, c.it, ps)].filter(Boolean).join(" · "));
               const note = c.man && c.man.note ? c.man.note : "";
               const nb = (ed || note) ? `<button type="button" class="kpi-nb ${note ? "has" : ""}" data-nu="${x.p.id}" data-nc="${c.it.k}" title="${note ? esc(note) : "Izoh yozish"}">${note ? "💬" : "+"}</button>` : "";
-              return `<td title="${tip}"><div class="kpi-cell">${ed ? `<input class="kpi-in ${c.man && c.man.score !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${c.man && c.man.score !== null ? c.man.score : ""}" placeholder="${c.au.v ?? "—"}">`
-                : `<span class="${c.it.auto && !(c.man && c.man.score !== null) && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
+              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}">`
+                : `<span class="${scoreOf(c.man) === null && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
             <td><b>${x.sum}</b><span class="small muted">/${x.maxT}</span></td>
-            <td>${canRate(x.p) && !x.picked ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}</td></tr>`).join("")}
+            <td>${lvl === "bosqich" && canRate(x.p) && !x.picked ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}</td></tr>`).join("")}
           </tbody></table>` : `<div class="empty">Bu bo'limda hali xodim yo'q</div>`}</div>
-        ${rows.some(x => canRate(x.p)) ? `<p class="small muted" style="margin:10px 0 0">Har bir ball yonidagi <b>+</b> / <b>💬</b> — shu ball uchun izoh. Izohni faqat siz va ball egasi ko'radi. Xodim ismiga bossangiz, ball kartasi ochiladi.</p>` : ""}
-        ${rows.some(x => canRate(x.p)) ? `<p class="small muted" style="margin:6px 0 0">Kulrang raqam — avtomatik hisoblangan qiymat. Katakka raqam yozsangiz, o'shani qo'yasiz; o'chirsangiz, avtomatikka qaytadi. "Reja" ustuni shaxsiy topshiriqlar va bo'lim eslatmalarining CEO tasdiqlagan bajarilishidan hisoblanadi.</p>` : ""}
+        ${anyEd ? `<p class="small muted" style="margin:10px 0 0">Kulrang raqam — avtomatik (${lvl === "kun" ? "\"Reja\" kunlik hisobot bahosidan" : lvl === "hafta" ? "kunlik ballar o'rtachasi" : "haftalik ballar o'rtachasi"}). Katakka yozsangiz, o'shani qo'yasiz; o'chirsangiz, avtomatikka qaytadi. <b>+</b> / <b>💬</b> — ball uchun izoh (faqat siz va ball egasi ko'radi).</p>` : ""}
       </div>
-      ${tab.id === "me" && rows[0] ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Ball kartam — ${bosqichNo(ps)}-bosqich</h2></div><div id="my-card"></div></div>` : ""}
+      ${tab.id === "me" && rows[0] ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Ball kartam — ${esc(label)}</h2></div><div id="my-card"></div></div>` : ""}
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Mezonlar</h2></div>
         <table class="small"><thead><tr><th>Mezon</th><th>Ball</th><th>Kim qo'yadi</th><th class="hide-sm">Nimani o'lchaydi</th></tr></thead><tbody>
-        ${items.map(it => `<tr><td>${esc(it.l)}</td><td>${it.max}</td><td>${it.auto ? pill("tasdiqlandi", "Avtomatik") : it.ceoOnly ? pill("", "Asoschi") : pill("jarayonda", "CEO")}</td><td class="hide-sm muted">${esc(it.d)}</td></tr>`).join("")}
+        ${items.map(it => `<tr><td>${esc(it.l)}</td><td>${it.max}</td><td>${it.auto ? pill("tasdiqlandi", "Avtomatik + CEO") : it.ceoOnly ? pill("", "Asoschi") : pill("jarayonda", "CEO, har kuni")}</td><td class="hide-sm muted">${esc(it.d)}</td></tr>`).join("")}
         </tbody></table></div>`;
-    const rerun = () => kpiBosqich(body);
-    $("#kpi-p", body).onchange = e => { S.ui.kpiP = e.target.value; rerun(); };
+    const rerun = () => kpiTable(body, lvl);
+    $("#kpi-d", body).onchange = e => { S.ui[lvl === "kun" ? "kpiDay" : lvl === "hafta" ? "kpiWeek" : "kpiP"] = e.target.value; rerun(); };
     bindTabs(body, rerun);
-    if ($("#kpi-award", body)) $("#kpi-award", body).onchange = async e => { await act(() => db.setAward(ps, e.target.value || null), e.target.value ? "Asoschi tanlovi belgilandi" : "Tanlov olib tashlandi"); rerun(); };
-    const manOf = (u, c) => K.scores.find(r => r.period_start === ps && r.user_id === u && r.criterion === c);
+    if ($("#kpi-award", body)) $("#kpi-award", body).onchange = async e => { await act(() => db.setAward(d, e.target.value || null), e.target.value ? "Asoschi tanlovi belgilandi" : "Tanlov olib tashlandi"); rerun(); };
     $$("[data-c]", body).forEach(inp => inp.onchange = async () => {
       const v = inp.value === "" ? null : Math.max(0, Math.min(+inp.dataset.max, +inp.value));
-      await act(() => db.setKpiScore(ps, inp.dataset.u, inp.dataset.c, v, manOf(inp.dataset.u, inp.dataset.c)?.note || ""), "Saqlandi"); rerun();
+      await act(() => db.setKpiAt(lvl, d, inp.dataset.u, inp.dataset.c, v, manAt(K, lvl, d, inp.dataset.u, inp.dataset.c)?.note || ""), "Saqlandi"); rerun();
     });
-    $$("[data-nu]", body).forEach(b => b.onclick = e => { e.stopPropagation(); scoreNote(person(b.dataset.nu), ps, b.dataset.nc, K, awardId, rerun); });
-    $$("[data-card]", body).forEach(el => el.onclick = () => scoreCard(person(el.dataset.card), ps, K, awardId, rerun));
-    const mc = $("#my-card", body); if (mc) mc.innerHTML = scoreCardHtml(rows[0], ps, false);
     $$("[data-fu]", body).forEach(inp => inp.onchange = async () => {
       const v = inp.value === "" ? null : Math.max(0, Math.min(100, +inp.value));
-      await act(() => db.setKpiFinal(ps, inp.dataset.fu, v), "Yakuniy natija saqlandi"); rerun();
+      await act(() => db.setKpiFinal(d, inp.dataset.fu, v), "Yakuniy natija saqlandi"); rerun();
     });
+    $$("[data-nu]", body).forEach(b => b.onclick = e => { e.stopPropagation(); scoreNote(person(b.dataset.nu), lvl, d, b.dataset.nc, K, awardId, rerun); });
+    $$("[data-card]", body).forEach(el => el.onclick = () => scoreCard(person(el.dataset.card), lvl, d, label, K, awardId, rerun));
+    const mc = $("#my-card", body); if (mc) mc.innerHTML = scoreCardHtml(rows[0], false, lvl);
   }
 
   const barMini = (v, max) => v === null || v === undefined ? "" : `<div class="kpi-bar"><i style="width:${Math.max(0, Math.min(100, v / max * 100))}%"></i></div>`;
   // Ball kartasi: mezonlar bo'yicha ball taqsimoti va izohlar
-  function scoreCardHtml(x, ps, edit) {
+  function scoreCardHtml(x, edit, lvl) {
     const isA = S.me.role === "asoschi";
+    const autoL = lvl === "kun" ? "Hisobot bahosidan" : lvl === "hafta" ? "Kunlik o'rtacha" : "Haftalik o'rtacha";
     return `<div class="table-wrap"><table class="score-card"><thead><tr><th>Mezon</th><th>Ball</th><th style="min-width:140px">Taqsimot</th><th>Izoh</th></tr></thead><tbody>
       ${x.cells.map(c => { const ed = edit && (!c.it.ceoOnly || isA); const note = c.man?.note || "";
-        const src = x.picked ? "Asoschi tanlovi" : c.man && c.man.score !== null ? "Rahbar qo'ygan" : c.it.auto ? "Avtomatik" : "Qo'yilmagan";
+        const src = x.picked ? "Asoschi tanlovi" : scoreOf(c.man) !== null ? "Rahbar qo'ygan" : c.au.v !== null ? autoL : "Qo'yilmagan";
         return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(c.it.d)}</div></td>
-          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${c.man && c.man.score !== null ? c.man.score : ""}" placeholder="${c.au.v ?? "—"}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
+          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
           <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
           <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}
-      <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>Yakuniy: ${x.final}%</b></td></tr>
+      <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b></td></tr>
       </tbody></table></div>`;
   }
-  function scoreCard(p, ps, K, awardId, rerun) {
+  async function saveCardInputs(root, p, lvl, d, cells) {
+    for (const c of cells) {
+      const inp = $(`[data-sc="${c.it.k}"]`, root), ta = $(`[data-sn="${c.it.k}"]`, root); if (!inp) continue;
+      const v = inp.value === "" ? null : Math.max(0, Math.min(c.it.max, +inp.value)); const n = ta ? ta.value.trim() : (c.man?.note || "");
+      if (v !== scoreOf(c.man) || n !== (c.man?.note || "")) await db.setKpiAt(lvl, d, p.id, c.it.k, v, n);
+    }
+  }
+  function scoreCard(p, lvl, d, label, K, awardId, rerun) {
     if (!p) return;
-    const x = kpiRow(p, ps, K, awardId); const edit = canRate(p) && !x.picked;
-    const m = openModal(`${esc(p.full_name)} — ${bosqichNo(ps)}-bosqich ball kartasi`, `<p class="small muted" style="margin-top:0">${periodLabel(ps)} · ${esc(DEPTS[deptOf(p)].l)}. Bu kartani faqat ${edit ? "siz va xodimning o'zi" : "xodim va uning rahbari"} ko'radi.</p>${scoreCardHtml(x, ps, edit)}`,
+    const x = kpiRow(p, lvl, d, K, awardId); const edit = canRate(p) && !x.picked;
+    const m = openModal(`${esc(p.full_name)} — ${LVL[lvl].toLowerCase()} ball kartasi`, `<p class="small muted" style="margin-top:0">${esc(label)} · ${esc(DEPTS[deptOf(p)].l)}. Bu kartani faqat ${edit ? "siz va xodimning o'zi" : "xodim va uning rahbari"} ko'radi.</p>${scoreCardHtml(x, edit, lvl)}`,
       edit ? `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sc-save">Saqlash</button>` : "");
     $(".modal", $("#modal-root")).style.maxWidth = "900px";
     const sv = $("#sc-save", m); if (!sv) return;
     sv.onclick = async () => {
       sv.disabled = true;
-      try {
-        for (const c of x.cells) {
-          const inp = $(`[data-sc="${c.it.k}"]`, m), ta = $(`[data-sn="${c.it.k}"]`, m); if (!inp) continue;
-          const v = inp.value === "" ? null : Math.max(0, Math.min(c.it.max, +inp.value)); const n = ta.value.trim();
-          const ov = c.man && c.man.score !== null ? +c.man.score : null, on = c.man?.note || "";
-          if (v !== ov || n !== on) await db.setKpiScore(ps, p.id, c.it.k, v, n);
-        }
-        toast("Ballar va izohlar saqlandi"); closeModal(); rerun();
-      } catch (e) { sv.disabled = false; toast(e.message, true); }
+      try { await saveCardInputs(m, p, lvl, d, x.cells); toast("Ballar va izohlar saqlandi"); closeModal(); rerun(); }
+      catch (e) { sv.disabled = false; toast(e.message, true); }
     };
   }
-  function scoreNote(p, ps, k, K, awardId, rerun) {
-    const x = kpiRow(p, ps, K, awardId); const c = x.cells.find(c => c.it.k === k); if (!c) return;
+  function scoreNote(p, lvl, d, k, K, awardId, rerun) {
+    const x = kpiRow(p, lvl, d, K, awardId); const c = x.cells.find(c => c.it.k === k); if (!c) return;
     const edit = canRate(p) && !x.picked && (!c.it.ceoOnly || S.me.role === "asoschi"); const note = c.man?.note || "";
-    const m = openModal(`${esc(c.it.l)}`, `<p class="small muted" style="margin-top:0">${esc(p.full_name)} · ball: <b>${c.val ?? "—"}</b> / ${c.it.max}</p>
+    const m = openModal(`${esc(c.it.l)}`, `<p class="small muted" style="margin-top:0">${esc(p.full_name)} · ${LVL[lvl].toLowerCase()} ball: <b>${c.val ?? "—"}</b> / ${c.it.max}</p>
       ${edit ? `<div class="field"><label>Izoh (xodim va siz ko'rasiz)</label><textarea id="sn-t" rows="4" placeholder="Nima uchun shu ball, nimani yaxshilash kerak…">${esc(note)}</textarea></div>` : `<div class="score-note">${esc(note) || "Izoh yo'q"}</div>`}`,
       edit ? `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sn-s">Saqlash</button>` : "");
     const sb = $("#sn-s", m); if (sb) sb.onclick = async () => {
-      await act(() => db.setKpiScore(ps, p.id, k, c.man && c.man.score !== null ? +c.man.score : null, $("#sn-t", m).value.trim()), "Izoh saqlandi"); closeModal(); rerun();
+      await act(() => db.setKpiAt(lvl, d, p.id, k, scoreOf(c.man), $("#sn-t", m).value.trim()), "Izoh saqlandi"); closeModal(); rerun();
     };
-  }
-
-  async function kpiShort(body, mode) {
-    const t = today();
-    const from = mode === "kun" ? (S.ui.kpiDay || t) : (S.ui.kpiWeek || weekOf(t));
-    const to = mode === "kun" ? from : addD(from, 6);
-    const weeks = []; for (let i = 0; i < 12; i++) weeks.push(addD(weekOf(t), -7 * i));
-    const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
-    const pct = a => a.r === null ? null : Math.round(a.r * 1000) / 10;
-    const rows = tab.rows.map(p => {
-      const rj = rangeAuto(p, "reja", from, to), hs = rangeAuto(p, "hisobot", from, to), es = rangeAuto(p, "eslatma", from, to);
-      const vals = [pct(rj), pct(hs), pct(es)].filter(v => v !== null);
-      return { p, rj, hs, es, avg: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null };
-    }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-    const cell = a => a.r === null ? `<span class="muted">—</span>` : `<span title="${esc(a.why)}">${pct(a)}%</span>`;
-    body.innerHTML = `<div class="row" style="margin:14px 0">${mode === "kun"
-        ? `<input type="date" id="kpi-day" value="${from}" max="${t}" style="width:auto">`
-        : `<select id="kpi-week" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === from ? "selected" : ""}>${fmtDate(w)} – ${fmtDate(addD(w, 6))}${w === weekOf(t) ? " (joriy hafta)" : ""}</option>`).join("")}</select>`}
-      <span class="small muted">Avtomatik ko'rsatkichlar: topshiriqlar, rahbar qo'ygan kunlik baho va bo'lim eslatmalari. To'liq KPI 2 haftalik bosqichda chiqadi.</span></div>
-      ${tabBar(tabs, tab)}
-      <div class="card"><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th><th>Reja / topshiriqlar</th><th>Kunlik baho</th><th>Eslatmalar</th><th>O'rtacha</th></tr></thead><tbody>
-        ${rows.map(x => `<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(x.p.full_name, photoOf(x.p))}<b>${esc(x.p.full_name)}</b></div></td><td>${cell(x.rj)}</td><td>${cell(x.hs)}</td><td>${cell(x.es)}</td><td><b>${x.avg ?? "—"}${x.avg !== null ? "%" : ""}</b></td></tr>`).join("")}
-        </tbody></table>` : `<div class="empty">Xodim yo'q</div>`}</div></div>`;
-    const rerun = () => kpiShort(body, mode);
-    if ($("#kpi-day", body)) $("#kpi-day", body).onchange = e => { S.ui.kpiDay = e.target.value; rerun(); };
-    if ($("#kpi-week", body)) $("#kpi-week", body).onchange = e => { S.ui.kpiWeek = e.target.value; rerun(); };
-    bindTabs(body, rerun);
   }
 
   async function kpiYear(body) {
@@ -2289,9 +2318,9 @@ window.LESSONS = [
     const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
     const wins = {};
     periods.forEach(ps => { const awardId = aw.find(a => a.period_start === ps)?.user_id;
-      winners(rankPool().map(p => kpiRow(p, ps, K, awardId, reps)), awardId).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
+      winners(rankPool().map(p => kpiRow(p, "bosqich", ps, K, awardId, reps)), awardId).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
     const rows = tab.rows.map(p => {
-      const per = periods.map(ps => kpiRow(p, ps, K, aw.find(a => a.period_start === ps)?.user_id, reps));
+      const per = periods.map(ps => kpiRow(p, "bosqich", ps, K, aw.find(a => a.period_start === ps)?.user_id, reps));
       const has = per.filter(x => x.has);
       return { p, per, avg: has.length ? Math.round(has.reduce((a, x) => a + x.final, 0) / has.length * 10) / 10 : null };
     }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
