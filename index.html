@@ -373,6 +373,19 @@ textarea.saved { border-color: var(--ok); box-shadow: 0 0 0 2px var(--ok-soft); 
 .due-banner .btn + .btn { margin-left: 0; }
 .rep-grid > .card { margin: 0 !important; align-self: start; }
 .plan-grid td:first-child { min-width: 150px; } .plan-grid th, .plan-grid td { padding-left: 6px; padding-right: 6px; }
+/* ---- KPI ball izohlari va taqsimot ---- */
+.kpi-cell { display: flex; align-items: center; gap: 4px; justify-content: center; }
+.kpi-nb { border: 1px dashed var(--border); background: transparent; color: var(--muted); border-radius: 6px; width: 22px; height: 22px; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; flex: none; }
+.kpi-nb:hover { border-color: var(--brand); color: var(--brand); }
+.kpi-nb.has { border: 0; background: var(--warn-soft); }
+.kpi-bar { height: 4px; border-radius: 4px; background: var(--border); margin-top: 5px; overflow: hidden; min-width: 40px; }
+.kpi-bar i { display: block; height: 100%; background: var(--brand); border-radius: 4px; }
+.kpi-bar.big { height: 10px; }
+.kpi-open { color: var(--brand); }
+.score-card td { vertical-align: top; }
+.score-card textarea { min-height: 52px; font-size: 13px; }
+.score-card .sc-total td { border-top: 2px solid var(--border); background: var(--brand-soft); }
+.score-note { background: var(--warn-soft); border-radius: 8px; padding: 8px 10px; font-size: 13px; white-space: pre-wrap; }
 
 </style>
 </head>
@@ -463,7 +476,7 @@ window.LESSONS = [
     tip: "Parolni unutsangiz — monitoring bo'limi rahbariga ayting, u tiklab beradi." },
   { id: "kpi-korish", title: "KPI natijamni ko'rish", group: "Natijalar", roles: ["xodim"], added: "2026-10-24", pages: ["kpi", "statistika"],
     desc: "Kunlik, haftalik, bosqich va yillik natijalaringiz.",
-    parts: [{ img: "oqish/x10-kpi.jpg", phone: true, steps: ["Ko'rinishni tanlang: Kunlik, Haftalik, 2 haftalik (bosqich), Yillik.", "Jadvalda har bir mezon bo'yicha ballaringiz. \"Reja\" va \"Hisobot\" avtomatik hisoblanadi."] }],
+    parts: [{ img: "oqish/x10-kpi.jpg", phone: true, steps: ["Ko'rinishni tanlang: Kunlik, Haftalik, 2 haftalik (bosqich), Yillik.", "Jadvalda har bir mezon bo'yicha ballaringiz. \"Reja\" va \"Hisobot\" avtomatik hisoblanadi.", "Pastdagi <b>Ball kartam</b> — har bir mezon bo'yicha ball, foizdagi taqsimot va rahbaringiz yozgan izoh (💬)."] }],
     tip: "Har 2 haftada eng yaxshi natijalar taqdirlanadi. \"Statistika\"da qancha topshiriq bajarilgan/bajarilmaganini ko'rasiz." },
 
   // ---------------- CEO uchun ----------------
@@ -499,8 +512,8 @@ window.LESSONS = [
     tip: "Xodim bir kun ko'p yoki kam bajarsa, kunlik hisobot oynasidagi \"Ertangi reja\" ni o'zgartiring — ertangi reja avtomatik yangilanadi." },
   { id: "kpi-ball", title: "KPI ballarini qo'yish", group: "CEO: jamoani boshqarish", roles: ["ceo", "asoschi"], added: "2026-10-24", pages: ["kpi"],
     desc: "Har 2 haftada jamoaga ball qo'yish.",
-    parts: [{ img: "oqish/c08-kpi.jpg", steps: ["Ko'rinish: Kunlik, Haftalik, Bosqich, Yillik.", "Bosqichni tanlang.", "Katakka ball yozing. Kulrang raqam — avtomatik qiymat.", "<b>Yakuniy</b> natijani tahrirlash."] }],
-    tip: "CEO o'z ballarini o'zgartira olmaydi — CEO'ni asoschi baholaydi." },
+    parts: [{ img: "oqish/c08-kpi.jpg", steps: ["Ko'rinish: Kunlik, Haftalik, Bosqich, Yillik.", "Bosqichni tanlang.", "Katakka ball yozing. Kulrang raqam — avtomatik qiymat. Ball yonidagi <b>+</b> — shu ballga izoh yozish (💬 — izoh bor).", "<b>Yakuniy</b> natijani tahrirlash. Xodim ismiga bossangiz — <b>ball kartasi</b>: har bir mezon bo'yicha ball, taqsimot va izohlarni bir joyda yozasiz."] }],
+    tip: "Ball va izohni faqat siz va ball egasi (xodimning o'zi) ko'radi. CEO o'z ballarini o'zgartira olmaydi — CEO'ni asoschi baholaydi." },
   { id: "statistika", title: "Statistika", group: "Natijalar", roles: ["ceo", "asoschi"], added: "2026-10-24", pages: ["statistika"],
     desc: "Topshiriqlar bajarildi / bajarilmadi — bo'lim va xodim kesimida.",
     parts: [{ img: "oqish/c09-statistika.jpg", steps: ["Davrni tanlang.", "Umumiy: bajarildi, tekshiruvda, jarayonda, bajarilmadi.", "Xodim qatoriga bosing — bajarilmagan topshiriqlari."] }] }
@@ -829,10 +842,13 @@ window.LESSONS = [
         const vis = r => m.role === "asoschi" || r.user_id === m.id || isMember(r.user_id);
         return ok({ scores: d.kpi.filter(r => r.period_start === period && vis(r)), finals: d.kpiF.filter(r => r.period_start === period && vis(r)) });
       },
-      async setKpiScore(period, user_id, criterion, score) {
+      async setKpiScore(period, user_id, criterion, score, note) {
         const m = me(); if (!(m.role === "asoschi" || (isMember(user_id) && user_id !== m.id))) return fail("Ruxsat yo'q");
-        const d = load(); d.kpi = (d.kpi || []).filter(r => !(r.period_start === period && r.user_id === user_id && r.criterion === criterion));
-        if (score !== null) d.kpi.push({ period_start: period, user_id, criterion, score, updated_by: m.id });
+        const d = load(); d.kpi = d.kpi || [];
+        const ex = d.kpi.find(r => r.period_start === period && r.user_id === user_id && r.criterion === criterion);
+        const nn = note !== undefined ? note : (ex ? ex.note || "" : "");
+        d.kpi = d.kpi.filter(r => r !== ex);
+        if (score !== null || nn) d.kpi.push({ period_start: period, user_id, criterion, score, note: nn, updated_by: m.id, updated_at: new Date().toISOString() });
         save(); return true;
       },
       async setKpiFinal(period, user_id, final_score) {
@@ -957,9 +973,10 @@ window.LESSONS = [
         const [a, b] = await Promise.all([sb.from("kpi_scores").select("*").eq("period_start", period), sb.from("kpi_final").select("*").eq("period_start", period)]);
         return { scores: chk(a), finals: chk(b) };
       },
-      async setKpiScore(period, user_id, criterion, score) {
-        if (score === null) { chk(await sb.from("kpi_scores").delete().match({ period_start: period, user_id, criterion })); return true; }
-        chk(await sb.from("kpi_scores").upsert({ period_start: period, user_id, criterion, score }, { onConflict: "period_start,user_id,criterion" })); return true;
+      async setKpiScore(period, user_id, criterion, score, note) {
+        if (score === null && note !== undefined && !note) { chk(await sb.from("kpi_scores").delete().match({ period_start: period, user_id, criterion })); return true; }
+        const body = { period_start: period, user_id, criterion, score }; if (note !== undefined) body.note = note;
+        chk(await sb.from("kpi_scores").upsert(body, { onConflict: "period_start,user_id,criterion" })); return true;
       },
       async setKpiFinal(period, user_id, final_score) {
         if (final_score === null) { chk(await sb.from("kpi_final").delete().match({ period_start: period, user_id })); return true; }
@@ -2156,16 +2173,20 @@ window.LESSONS = [
       <div class="card"><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>
           ${items.map(it => `<th title="${esc(it.l + " — " + it.d)}">${esc(it.s)}<div class="kpi-max">${it.max}${it.auto ? " · avto" : ""}</div></th>`).join("")}
           <th>Jami</th><th>Yakuniy</th></tr></thead><tbody>
-          ${rows.map(x => `<tr class="${x.picked ? "picked" : ""}"><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(x.p.full_name, photoOf(x.p))}<b>${esc(x.p.full_name)}</b>${x.picked ? " ⭐" : ""}</div></td>
+          ${rows.map(x => `<tr class="${x.picked ? "picked" : ""}"><td><div class="row click" style="gap:8px;flex-wrap:nowrap" data-card="${x.p.id}" title="Ball kartasini ochish">${avatar(x.p.full_name, photoOf(x.p))}<div><b>${esc(x.p.full_name)}</b>${x.picked ? " ⭐" : ""}<div class="small kpi-open">Ball kartasi ›</div></div></div></td>
             ${x.cells.map(c => { const ed = !x.picked && canRate(x.p) && (!c.it.ceoOnly || isA);
               const tip = esc([c.au.why, hintFor(x.p, c.it, ps)].filter(Boolean).join(" · "));
-              return `<td title="${tip}">${ed ? `<input class="kpi-in ${c.man ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${c.man && c.man.score !== null ? c.man.score : ""}" placeholder="${c.au.v ?? "—"}">`
-                : `<span class="${c.it.auto && !c.man && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}</td>`; }).join("")}
+              const note = c.man && c.man.note ? c.man.note : "";
+              const nb = (ed || note) ? `<button type="button" class="kpi-nb ${note ? "has" : ""}" data-nu="${x.p.id}" data-nc="${c.it.k}" title="${note ? esc(note) : "Izoh yozish"}">${note ? "💬" : "+"}</button>` : "";
+              return `<td title="${tip}"><div class="kpi-cell">${ed ? `<input class="kpi-in ${c.man && c.man.score !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${c.man && c.man.score !== null ? c.man.score : ""}" placeholder="${c.au.v ?? "—"}">`
+                : `<span class="${c.it.auto && !(c.man && c.man.score !== null) && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
             <td><b>${x.sum}</b><span class="small muted">/${x.maxT}</span></td>
             <td>${canRate(x.p) && !x.picked ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}</td></tr>`).join("")}
           </tbody></table>` : `<div class="empty">Bu bo'limda hali xodim yo'q</div>`}</div>
-        ${rows.some(x => canRate(x.p)) ? `<p class="small muted" style="margin:10px 0 0">Kulrang raqam — avtomatik hisoblangan qiymat. Katakka raqam yozsangiz, o'shani qo'yasiz; o'chirsangiz, avtomatikka qaytadi. "Reja" ustuni shaxsiy topshiriqlar va bo'lim eslatmalarining CEO tasdiqlagan bajarilishidan hisoblanadi.</p>` : ""}
+        ${rows.some(x => canRate(x.p)) ? `<p class="small muted" style="margin:10px 0 0">Har bir ball yonidagi <b>+</b> / <b>💬</b> — shu ball uchun izoh. Izohni faqat siz va ball egasi ko'radi. Xodim ismiga bossangiz, ball kartasi ochiladi.</p>` : ""}
+        ${rows.some(x => canRate(x.p)) ? `<p class="small muted" style="margin:6px 0 0">Kulrang raqam — avtomatik hisoblangan qiymat. Katakka raqam yozsangiz, o'shani qo'yasiz; o'chirsangiz, avtomatikka qaytadi. "Reja" ustuni shaxsiy topshiriqlar va bo'lim eslatmalarining CEO tasdiqlagan bajarilishidan hisoblanadi.</p>` : ""}
       </div>
+      ${tab.id === "me" && rows[0] ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Ball kartam — ${bosqichNo(ps)}-bosqich</h2></div><div id="my-card"></div></div>` : ""}
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Mezonlar</h2></div>
         <table class="small"><thead><tr><th>Mezon</th><th>Ball</th><th>Kim qo'yadi</th><th class="hide-sm">Nimani o'lchaydi</th></tr></thead><tbody>
         ${items.map(it => `<tr><td>${esc(it.l)}</td><td>${it.max}</td><td>${it.auto ? pill("tasdiqlandi", "Avtomatik") : it.ceoOnly ? pill("", "Asoschi") : pill("jarayonda", "CEO")}</td><td class="hide-sm muted">${esc(it.d)}</td></tr>`).join("")}
@@ -2174,14 +2195,63 @@ window.LESSONS = [
     $("#kpi-p", body).onchange = e => { S.ui.kpiP = e.target.value; rerun(); };
     bindTabs(body, rerun);
     if ($("#kpi-award", body)) $("#kpi-award", body).onchange = async e => { await act(() => db.setAward(ps, e.target.value || null), e.target.value ? "Asoschi tanlovi belgilandi" : "Tanlov olib tashlandi"); rerun(); };
+    const manOf = (u, c) => K.scores.find(r => r.period_start === ps && r.user_id === u && r.criterion === c);
     $$("[data-c]", body).forEach(inp => inp.onchange = async () => {
       const v = inp.value === "" ? null : Math.max(0, Math.min(+inp.dataset.max, +inp.value));
-      await act(() => db.setKpiScore(ps, inp.dataset.u, inp.dataset.c, v), "Saqlandi"); rerun();
+      await act(() => db.setKpiScore(ps, inp.dataset.u, inp.dataset.c, v, manOf(inp.dataset.u, inp.dataset.c)?.note || ""), "Saqlandi"); rerun();
     });
+    $$("[data-nu]", body).forEach(b => b.onclick = e => { e.stopPropagation(); scoreNote(person(b.dataset.nu), ps, b.dataset.nc, K, awardId, rerun); });
+    $$("[data-card]", body).forEach(el => el.onclick = () => scoreCard(person(el.dataset.card), ps, K, awardId, rerun));
+    const mc = $("#my-card", body); if (mc) mc.innerHTML = scoreCardHtml(rows[0], ps, false);
     $$("[data-fu]", body).forEach(inp => inp.onchange = async () => {
       const v = inp.value === "" ? null : Math.max(0, Math.min(100, +inp.value));
       await act(() => db.setKpiFinal(ps, inp.dataset.fu, v), "Yakuniy natija saqlandi"); rerun();
     });
+  }
+
+  const barMini = (v, max) => v === null || v === undefined ? "" : `<div class="kpi-bar"><i style="width:${Math.max(0, Math.min(100, v / max * 100))}%"></i></div>`;
+  // Ball kartasi: mezonlar bo'yicha ball taqsimoti va izohlar
+  function scoreCardHtml(x, ps, edit) {
+    const isA = S.me.role === "asoschi";
+    return `<div class="table-wrap"><table class="score-card"><thead><tr><th>Mezon</th><th>Ball</th><th style="min-width:140px">Taqsimot</th><th>Izoh</th></tr></thead><tbody>
+      ${x.cells.map(c => { const ed = edit && (!c.it.ceoOnly || isA); const note = c.man?.note || "";
+        const src = x.picked ? "Asoschi tanlovi" : c.man && c.man.score !== null ? "Rahbar qo'ygan" : c.it.auto ? "Avtomatik" : "Qo'yilmagan";
+        return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(c.it.d)}</div></td>
+          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${c.man && c.man.score !== null ? c.man.score : ""}" placeholder="${c.au.v ?? "—"}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
+          <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
+          <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}
+      <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>Yakuniy: ${x.final}%</b></td></tr>
+      </tbody></table></div>`;
+  }
+  function scoreCard(p, ps, K, awardId, rerun) {
+    if (!p) return;
+    const x = kpiRow(p, ps, K, awardId); const edit = canRate(p) && !x.picked;
+    const m = openModal(`${esc(p.full_name)} — ${bosqichNo(ps)}-bosqich ball kartasi`, `<p class="small muted" style="margin-top:0">${periodLabel(ps)} · ${esc(DEPTS[deptOf(p)].l)}. Bu kartani faqat ${edit ? "siz va xodimning o'zi" : "xodim va uning rahbari"} ko'radi.</p>${scoreCardHtml(x, ps, edit)}`,
+      edit ? `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sc-save">Saqlash</button>` : "");
+    $(".modal", $("#modal-root")).style.maxWidth = "900px";
+    const sv = $("#sc-save", m); if (!sv) return;
+    sv.onclick = async () => {
+      sv.disabled = true;
+      try {
+        for (const c of x.cells) {
+          const inp = $(`[data-sc="${c.it.k}"]`, m), ta = $(`[data-sn="${c.it.k}"]`, m); if (!inp) continue;
+          const v = inp.value === "" ? null : Math.max(0, Math.min(c.it.max, +inp.value)); const n = ta.value.trim();
+          const ov = c.man && c.man.score !== null ? +c.man.score : null, on = c.man?.note || "";
+          if (v !== ov || n !== on) await db.setKpiScore(ps, p.id, c.it.k, v, n);
+        }
+        toast("Ballar va izohlar saqlandi"); closeModal(); rerun();
+      } catch (e) { sv.disabled = false; toast(e.message, true); }
+    };
+  }
+  function scoreNote(p, ps, k, K, awardId, rerun) {
+    const x = kpiRow(p, ps, K, awardId); const c = x.cells.find(c => c.it.k === k); if (!c) return;
+    const edit = canRate(p) && !x.picked && (!c.it.ceoOnly || S.me.role === "asoschi"); const note = c.man?.note || "";
+    const m = openModal(`${esc(c.it.l)}`, `<p class="small muted" style="margin-top:0">${esc(p.full_name)} · ball: <b>${c.val ?? "—"}</b> / ${c.it.max}</p>
+      ${edit ? `<div class="field"><label>Izoh (xodim va siz ko'rasiz)</label><textarea id="sn-t" rows="4" placeholder="Nima uchun shu ball, nimani yaxshilash kerak…">${esc(note)}</textarea></div>` : `<div class="score-note">${esc(note) || "Izoh yo'q"}</div>`}`,
+      edit ? `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sn-s">Saqlash</button>` : "");
+    const sb = $("#sn-s", m); if (sb) sb.onclick = async () => {
+      await act(() => db.setKpiScore(ps, p.id, k, c.man && c.man.score !== null ? +c.man.score : null, $("#sn-t", m).value.trim()), "Izoh saqlandi"); closeModal(); rerun();
+    };
   }
 
   async function kpiShort(body, mode) {
