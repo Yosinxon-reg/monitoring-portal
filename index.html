@@ -1105,7 +1105,8 @@ window.LESSONS = [
       },
       async listVideos() {
         const m = me(); if (!m) return []; const d = load(); d.videos = d.videos || [];
-        return ok(d.videos.filter(v => m.role === "asoschi" || v.audience.includes(m.role)).sort((a, b) => a.created_at < b.created_at ? 1 : -1));
+        const c = m.ceo_id ? d.profiles.find(x => x.id === m.ceo_id) : null; const dept = "dept:" + ((m.role === "ceo" ? m.bolim : c && c.bolim) || "");
+        return ok(d.videos.filter(v => m.role === "asoschi" || v.audience.includes(m.role) || v.audience.includes(dept)).sort((a, b) => a.created_at < b.created_at ? 1 : -1));
       },
       async createVideo(v) {
         const m = me(); if (m.role !== "asoschi") return fail("Ruxsat yo'q");
@@ -3821,7 +3822,7 @@ window.LESSONS = [
       <p style="margin-bottom:0">${txt}</p></div>`;
   };
   // ---- Videolar
-  const AUD = { rahbar: "Rahbarlar", oqituvchi: "O'qituvchilar", xodim: "Xodimlar", ceo: "CEO'lar" };
+  const AUD = { rahbar: "Rahbarlar", oqituvchi: "O'qituvchilar", xodim: "Barcha xodimlar", ceo: "CEO'lar", "dept:akademik": "Akademik bo'lim (rahbari va xodimlari)", "dept:intizomiy": "Intizomiy bo'lim (rahbari va xodimlari)" };
   const ytId = u => { const m = String(u || "").match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/); return m ? m[1] : null; };
   function videoCard(v) {
     const yt = v.kind === "youtube" && ytId(v.url);
