@@ -689,6 +689,10 @@ tr.unseen td { background: var(--brand-soft); }
 .vw { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .vw .avatar { width: 28px; height: 28px; font-size: 11px; flex: 0 0 28px; }
 .due-banner.newitems { background: var(--brand-soft); color: var(--text); }
+/* ---- Shaxsiy bo'lim: bugun nima qildim ---- */
+.sl-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.sl-item:last-child { border-bottom: 0; }
+.sl-clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
 
 </style>
 </head>
@@ -1155,6 +1159,10 @@ window.LESSONS = [
       async listAwards(from, to) { return ok((load().awards || []).filter(r => r.period_start >= from && r.period_start <= to)); },
       async setAward(period, user_id) { const d = load(); d.awards = (d.awards || []).filter(r => r.period_start !== period);
         if (user_id) d.awards.push({ period_start: period, user_id }); save(); return true; },
+      async listSelfLogs(from, to, uid) { const d = load(); const m = me();
+        return ok((d.slogs || []).filter(r => r.log_date >= from && r.log_date <= to && (!uid || r.user_id === uid) && (m.role === "asoschi" || r.user_id === m.id)).sort((a, b) => a.log_date < b.log_date ? 1 : -1)); },
+      async saveSelfLog(date, body) { const d = load(); const m = me(); d.slogs = d.slogs || []; const now = new Date().toISOString();
+        const ex = d.slogs.find(r => r.user_id === m.id && r.log_date === date); if (ex) Object.assign(ex, { body, updated_at: now }); else d.slogs.push({ user_id: m.id, log_date: date, body, created_at: now, updated_at: now }); save(); return ok(true); },
       async listCeoReports(from, to) { const d = load(); const m = me();
         return ok((d.ceoReps || []).filter(r => r.report_date >= from && r.report_date <= to && (m.role === "asoschi" || r.ceo_id === m.id))); },
       async saveCeoReport(date, kind, data, summary) {
@@ -1311,6 +1319,8 @@ window.LESSONS = [
         if (!user_id) { chk(await sb.from("kpi_award").delete().eq("period_start", period)); return true; }
         chk(await sb.from("kpi_award").upsert({ period_start: period, user_id }, { onConflict: "period_start" })); return true;
       },
+      async listSelfLogs(from, to, uid) { let q = sb.from("self_logs").select("*").gte("log_date", from).lte("log_date", to).order("log_date", { ascending: false }); if (uid) q = q.eq("user_id", uid); return chk(await q); },
+      async saveSelfLog(date, body) { chk(await sb.from("self_logs").upsert({ user_id: meCache.id, log_date: date, body }, { onConflict: "user_id,log_date" })); return true; },
       async listCeoReports(from, to) { return chk(await sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date")); },
       async saveCeoReport(date, kind, data, summary) {
         chk(await sb.from("ceo_reports").upsert({ report_date: date, ceo_id: meCache.id, kind, data, summary }, { onConflict: "report_date,ceo_id" })); return true;
@@ -1448,6 +1458,7 @@ window.LESSONS = [
         <h3 style="margin-top:18px">Haftalik reja</h3><div id="im-plan"></div>` : ""}`);
     $(".modal", $("#modal-root")).style.maxWidth = "760px";
     const pb = $("#im-plan", m); if (pb) planEditor(pb, p);
+    if (isPersonal(p) && S.me.role === "asoschi") { const box = document.createElement("div"); box.className = "self-log"; box.innerHTML = `<h3 style="margin-top:18px">Bugun nima qildi</h3><div class="sl-list">Yuklanmoqda…</div>`; $(".modal-body", $("#modal-root")).appendChild(box); selfLogList($(".sl-list", box), p.id, 14); }
     const rb = $("#im-rep", m); if (rb) rb.onclick = () => openStaffReport(p, today());
   }
 
@@ -1568,6 +1579,11 @@ window.LESSONS = [
       out.push(`<div class="due-banner newitems">📬 <span><b>Sizga yangi ${[nt && nt + " ta topshiriq", ne && ne + " ta eslatma"].filter(Boolean).join(" va ")} keldi.</b> Ochib ko'ring — yuborgan rahbar ko'rganingizni biladi.</span><a class="btn sm primary" href="#/masalalar" data-gote="${nt ? "t" : "e"}">Ko'rish</a></div>`);
     }
     nw.forEach(({ kind, x }) => notifyOnce("item_" + kind + "_" + x.id, kind === "task" ? "Yangi topshiriq" : "Yangi eslatma", `${x.title} — ${nameOf(x.created_by)}`));
+    // 0b) Shaxsiy bo'lim: "Bugun nima qildim" eslatmasi (ish tugashidan 1 soat oldin)
+    if (isPersonal(S.me) && ["due", "late"].includes(dueState(S.me)) && !(S.slogs || []).some(x => x.user_id === S.me.id && x.log_date === today())) {
+      out.push(`<div class="due-banner due">📝 <span><b>Bugun nima qildingiz?</b> Ish kuni oxirida bajargan ishlaringizni yozing.</span><a class="btn sm" href="#/profil">Yozish</a></div>`);
+      if (dueState(S.me) === "due") notifyOnce("slog", "Bugun nima qildingiz?", "Profilingizda bugungi ishlaringizni yozing.");
+    }
     // 1) Ish boshlanishida bugungi reja (xodim va CEO uchun)
     if (["xodim", "ceo"].includes(S.me.role) && isWorkday(S.me)) {
       const now = tashNow().mins, st = toMins(sched(S.me).start), en = toMins(sched(S.me).end);
@@ -1742,6 +1758,7 @@ window.LESSONS = [
       const w0 = weekOf(today());
       try { S.plans = await db.listPlans(addD(w0, -7), addD(w0, 7)); } catch (e) { S.plans = []; }
       if (isManager()) { try { S.creps = await db.listCeoReports(today(), today()); } catch (e) { S.creps = []; } }
+      if ((S.me.role === "asoschi" || isPersonal(S.me)) && db.listSelfLogs) { try { S.slogs = await db.listSelfLogs(addD(today(), -7), today()); } catch (e) { S.slogs = []; } }
       touchSeen();
     }
   }
@@ -1775,7 +1792,7 @@ window.LESSONS = [
       }
       items.push({ id: "reja", label: "Haftalik reja", icon: "meet" });
       items.push({ id: "statistika", label: "Statistika", icon: "pie", sec: "Tahlil" });
-      items.push({ id: "kpi", label: "KPI va reyting", icon: "trophy" });
+      if (!isPersonal(S.me)) items.push({ id: "kpi", label: "KPI va reyting", icon: "trophy" });
     }
     if (r === "asoschi") items.push({ id: "xodimlar", label: "Foydalanuvchilar", icon: "users", sec: "Jamoa" });
     if (r === "ceo") items.push({ id: "xodimlar", label: "Jamoam", icon: "users", sec: "Jamoa" });
@@ -2008,7 +2025,7 @@ window.LESSONS = [
         ${stat("Qabul qilinishi kerak topshiriq", toAccept.length)}
         ${stat("Muddati o'tgan topshiriq", overdue.length, overdue.length ? "bad" : "ok")}
       </div>
-      ${ceoRepCard()}
+      ${ceoRepCard()}${S.me.role === "asoschi" ? selfLogCard() : ""}
       <div class="cols">
         <div class="card"><div class="card-head"><h2>${r() === "asoschi" ? "Jamoalar holati" : "Jamoam holati"}</h2></div><div class="table-wrap">${teamTable}</div></div>
         <div class="stack">
@@ -2020,7 +2037,7 @@ window.LESSONS = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -2036,7 +2053,9 @@ window.LESSONS = [
     const plan = dayPlan(S.me, t); const note = lastNote(S.me);
     const ws = weekOf(t); const pl = planOf(S.me.id, ws); const days = (pl && pl.days) || {};
     const boss = S.me.ceo_id ? nameOf(S.me.ceo_id) : (S.profiles.find(p => p.role === "asoschi")?.full_name || "Monitoring bo'limi rahbari");
-    page.innerHTML = lessonNotice() + head(`Xush kelibsiz, ${esc((S.me.full_name || "").split(" ")[0])}`, `${esc(titleOf(S.me))} · Bugun: ${fmtDate(t)} · Rahbaringiz: ${esc(boss)}`) + `
+    const myLog = (S.slogs || []).find(x => x.user_id === S.me.id && x.log_date === t);
+    page.innerHTML = lessonNotice() + head(`Xush kelibsiz, ${esc((S.me.full_name || "").split(" ")[0])}`, `${esc(titleOf(S.me))} · Bugun: ${fmtDate(t)} · Rahbaringiz: ${esc(boss)}`) +
+      (isPersonal(S.me) ? `<a class="card list-item click" href="#/profil" style="margin-bottom:16px;text-decoration:none;color:inherit"><span class="feat-ic">${ic("report", 18)}</span><div style="flex:1"><b>Bugun nima qildim</b><div class="small muted">${myLog ? "Yozilgan · " + tmOf(myLog.updated_at) : "Ish kuni oxirida bajargan ishlaringizni profilingizda yozing"}</div></div>${myLog ? pill("tasdiqlandi", "Yozildi") : pill("missing", "Yozilmagan")}</a>` : "") + `
       <div class="stats">
         ${stat("Joriy darajangiz", levelOf(g.avg) ? levelOf(g.avg)[1] : "—", g.avg === null ? "" : g.avg >= 7.5 ? "ok" : g.avg >= 6 ? "warn" : "bad")}
         ${stat(`${bosqichNo(ps)}-bosqich o'rtacha bahosi`, g.avg === null ? "—" : g.avg + "/10")}
@@ -2289,11 +2308,12 @@ window.LESSONS = [
       <form id="srf">
         <div class="field"><label>Bugun bajargan ishlari *</label><textarea name="done" required placeholder="Masalan: 7-A va 8-B sinflarda dars kuzatildi, varaqalar to'ldirildi…">${esc(r?.done)}</textarea></div>
         <div class="field"><label>Kamchilik / muammolar</label><textarea name="problems" rows="2">${esc(r?.problems)}</textarea></div>
-        ${isA && byFounder(p) ? `<div class="max-band"><div><b>Tezkor baholash</b><div class="small muted">Bitta bosishda: baho 10, umumiy ball 100.</div></div><button type="button" class="btn max-btn" id="sr-max">★ Maksimal ball</button></div>` : ""}
+        ${isA && byFounder(p) ? `<div class="max-band"><div><b>Tezkor baholash</b><div class="small muted">${isPersonal(p) ? "Bitta bosishda: baho 10." : "Bitta bosishda: baho 10, umumiy ball 100."}</div></div><button type="button" class="btn max-btn" id="sr-max">★ Maksimal ball</button></div>` : ""}
         <div class="field"><label>Baho (1–10) *</label><div class="grade-pick">${Array.from({ length: 10 }, (_, i) => `<button type="button" data-g="${i + 1}" class="${grade === i + 1 ? "on" : ""}">${i + 1}</button>`).join("")}</div></div>
-        <div class="field"><label>Bugungi KPI ballari <span class="muted">(mezonlar bo'yicha; «avto» belgili mezon bahodan o'zi qo'yiladi — kerak bo'lsa o'zgartiring)</span></label>
+        ${kItems.length ? `<div class="field"><label>Bugungi KPI ballari <span class="muted">(mezonlar bo'yicha; «avto» belgili mezon bahodan o'zi qo'yiladi — kerak bo'lsa o'zgartiring)</span></label>
           <div class="kpi-day-grid">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
-            <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" data-max="${it.max}" value="${scoreOf(mv) ?? ""}" placeholder="${it.auto === "reja" ? rejaAuto(it) : "—"}"></div>`; }).join("")}</div></div>
+            <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" data-max="${it.max}" value="${scoreOf(mv) ?? ""}" placeholder="${it.auto === "reja" ? rejaAuto(it) : "—"}"></div>`; }).join("")}</div></div>` : ""}
+        ${isPersonal(p) ? selfLogBox(p, date) : ""}
         <div class="field staff-band"><label>📌 Xodimga eslatma yoki topshiriq <span class="muted">(xodim bosh sahifasida alohida ko'rinadi)</span></label><textarea name="staff_note" rows="2" placeholder="Masalan: Ertaga 9:00 da 7-A sinfga kiring">${esc(r?.staff_note)}</textarea></div>
         <div class="field"><label>Ertangi reja — ${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)} <span class="muted">(o'zgartirsangiz, haftalik reja ham yangilanadi)</span></label><textarea name="plan" rows="2" placeholder="Ertaga nima qilinadi">${esc(tomorrow || r?.plan || "")}</textarea></div>
         <div class="err-text" id="sr-err"></div>
@@ -2540,6 +2560,8 @@ window.LESSONS = [
   }
   // Monitoring bo'limi rahbari (asoschi) o'zi baholaydiganlar: bo'lim rahbarlari va shaxsiy bo'lim
   const byFounder = p => !!p && (p.role === "ceo" || (p.role === "xodim" && !p.ceo_id));
+  // Shaxsiy bo'lim (Monitoring bo'limi rahbariga to'g'ridan-to'g'ri bo'ysunadi) — KPI'da qatnashmaydi
+  const isPersonal = p => !!p && p.role === "xodim" && !p.ceo_id;
   const SIMPLE = { k: "umumiy", l: "Umumiy natija", s: "Ball", max: 100, auto: "reja", d: "Monitoring bo'limi rahbari qo'yadi. Qo'yilmasa — kunlik hisobot bahosidan (baho × 10)" };
   function deptOf(p) {
     if (!p) return "administratsiya";
@@ -2548,7 +2570,7 @@ window.LESSONS = [
     const c = p.ceo_id && person(p.ceo_id);
     return c ? deptOf(c) : (DEPTS[p.bolim] ? p.bolim : "administratsiya");
   }
-  const itemsFor = p => byFounder(p) ? [SIMPLE] : KPI_TPL[DEPTS[deptOf(p)].tpl].items;
+  const itemsFor = p => isPersonal(p) ? [] : byFounder(p) ? [SIMPLE] : KPI_TPL[DEPTS[deptOf(p)].tpl].items;
   const KPI_ANCHOR = "2026-10-19";
   const addD = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return window.dateUtil.localDate(d); };
   const dayDiff = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
@@ -2643,12 +2665,11 @@ window.LESSONS = [
     const r = S.me.role;
     const staffAll = S.profiles.filter(p => p.active && ["xodim", "ceo"].includes(p.role));
     if (r === "asoschi") return [...["intizomiy", "akademik"].map(k => ({ id: k, l: DEPTS[k].l, rows: staffAll.filter(p => p.role === "xodim" && p.ceo_id && deptOf(p) === k) })),
-      { id: "ceo", l: "Bo'lim rahbarlari", rows: staffAll.filter(p => p.role === "ceo"), simple: true },
-      { id: "administratsiya", l: "Shaxsiy bo'limim", rows: staffAll.filter(p => p.role === "xodim" && !p.ceo_id), simple: true }].filter(t => t.rows.length || t.id !== "administratsiya");
+      { id: "ceo", l: "Bo'lim rahbarlari", rows: staffAll.filter(p => p.role === "ceo"), simple: true }];
     if (r === "ceo") return [{ id: "team", l: "Jamoam — " + DEPTS[deptOf(S.me)].l, rows: members() }, { id: "me", l: "Mening natijam", rows: [S.me] }];
     return [{ id: "me", l: "Mening natijam", rows: [S.me] }];
   }
-  const rankPool = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && p.role === "xodim") : S.me.role === "ceo" ? members() : [];
+  const rankPool = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && p.role === "xodim" && !isPersonal(p)) : S.me.role === "ceo" ? members() : [];
 
   PAGES.kpi = async page => {
     const mode = S.ui.kpiMode || (isManager() ? "kun" : "bosqich");
@@ -3325,7 +3346,7 @@ window.LESSONS = [
 
   // ---- O'rganish bo'limi
   const LESSONS = window.LESSONS || [];
-  const lessonsFor = p => p ? LESSONS.filter(l => l.roles.includes(p.role)) : [];
+  const lessonsFor = p => p ? LESSONS.filter(l => l.roles.includes(p.role) && !(isPersonal(p) && (l.pages || []).length && l.pages.every(x => x === "kpi"))) : [];
   const lessonSeen = (p, id) => S.lviews.some(v => v.user_id === p.id && v.lesson_id === id);
   const isNewLesson = l => l.added && dayDiff(l.added, today()) <= 14;
 
@@ -3714,9 +3735,11 @@ window.LESSONS = [
           <div class="field"><label>Yangi parolni takrorlang</label><input type="password" name="p2" minlength="6" required autocomplete="new-password"></div>
           <div class="pw-hint small muted" id="pw-hint">Kamida 6 belgi. Harf va raqam aralash bo'lsa, xavfsizroq.</div>
           <button class="btn" style="margin-top:10px">Parolni yangilash</button></form></div></div>
+      ${isPersonal(me) ? `<div class="card self-log" style="margin-top:16px" id="slog"></div>` : ""}
       ${inf ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Mening ma'lumotnomam</h2><span class="spacer"></span><span class="small muted">Faqat siz${me.role === "asoschi" ? "" : " va rahbaringiz"} ko'rasiz</span></div>
         <div class="about-full">${photoOf(me) ? `<img class="staff-photo" src="${photoOf(me)}" alt="">` : ""}<div style="flex:1;min-width:0"><div class="info-lines">${esc(inf.details)}</div></div></div>
         ${inf.bio ? `<h3 style="margin-top:16px">Umumiy ma'lumot</h3><p style="white-space:pre-wrap;margin-top:6px">${esc(inf.bio)}</p>` : ""}</div>` : ""}`;
+    if ($("#slog", page)) selfLogEditor($("#slog", page));
     $("#pf").onsubmit = async e => {
       e.preventDefault(); const d = Object.fromEntries(new FormData(e.target)); d.full_name = d.full_name.trim();
       if (d.full_name.split(/\s+/).length < 2) return toast("Ism va familiyani to'liq yozing", true);
@@ -3733,6 +3756,48 @@ window.LESSONS = [
       await act(() => db.changePassword(a), "Parol yangilandi").catch(() => {}); e.target.reset();
     };
   };
+
+  // ---- Shaxsiy bo'lim: "Bugun nima qildim" (xodim o'zi yozadi, Monitoring bo'limi rahbari ko'radi)
+  const slText = (l) => esc(l.body);
+  async function selfLogEditor(root, d0) {
+    const t = today(); const d = d0 || S.ui.slDate || t;
+    let rows = []; try { rows = await db.listSelfLogs(addD(t, -30), t, S.me.id); } catch (e) {}
+    const cur = rows.find(r => r.log_date === d);
+    root.innerHTML = `<div class="card-head"><span class="feat-ic">${ic("report", 18)}</span><h2>Bugun nima qildim</h2><span class="spacer"></span>
+        <input type="date" id="sl-d" value="${d}" max="${t}" style="width:auto"></div>
+      <p class="small muted" style="margin-top:0">Har kuni ish oxirida bajargan ishlaringizni yozing — Monitoring bo'limi rahbariga avtomatik yetib boradi.</p>
+      <textarea id="sl-t" rows="5" placeholder="Masalan: 3 ta hujjat tayyorlandi, Chilonzor filialidagi uchrashuvda qatnashdim, ertangi yig'ilish uchun ma'lumot to'plandi…">${esc(cur?.body || "")}</textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="sl-save">${cur ? "Yangilash" : "Saqlash va yuborish"}</button>
+        ${cur ? `<span class="small muted">✓ Yozilgan: ${fmtDate(cur.updated_at)} ${tmOf(cur.updated_at)}</span>` : `<span class="small muted">${d === t ? "Bugun hali yozilmagan" : "Bu kun uchun yozilmagan"}</span>`}</div>
+      <h3 style="margin-top:20px">Oldingi kunlar</h3>
+      <div class="sl-list">${rows.filter(r => r.log_date !== d).slice(0, 10).map(slLine).join("") || `<div class="small muted">Hali yozuv yo'q</div>`}</div>`;
+    $("#sl-d", root).onchange = e => { S.ui.slDate = e.target.value; selfLogEditor(root); };
+    $("#sl-save", root).onclick = async e => {
+      const v = $("#sl-t", root).value.trim(); if (!v) return toast("Bugun nima qilganingizni yozing", true);
+      e.target.disabled = true;
+      try { await db.saveSelfLog(d, v); toast("Saqlandi — rahbaringizga yetib bordi"); try { S.slogs = await db.listSelfLogs(addD(today(), -7), today()); } catch (e2) {} dueBanner(); selfLogEditor(root); }
+      catch (err) { e.target.disabled = false; toast(err.message, true); }
+    };
+  }
+  const slLine = r => `<div class="sl-item"><div class="small muted">${fmtDate(r.log_date)}, ${KUN[dowOf(r.log_date)].toLowerCase()}</div><div style="white-space:pre-wrap">${slText(r)}</div></div>`;
+  async function selfLogList(root, uid, days) {
+    try { const rows = await db.listSelfLogs(addD(today(), -days), today(), uid);
+      root.innerHTML = rows.map(slLine).join("") || `<div class="small muted">Hali yozuv yo'q</div>`; }
+    catch (e) { root.innerHTML = `<div class="small muted">${esc(e.message)}</div>`; }
+  }
+  function selfLogBox(p, date) {
+    const r = (S.slogs || []).find(x => x.user_id === p.id && x.log_date === date);
+    return `<div class="field"><label>Xodimning o'zi yozgan: «Bugun nima qildim»</label>${r ? `<div class="note" style="margin-top:0">${slText(r)}</div>` : `<div class="small muted">Bu kun uchun yozmagan</div>`}</div>`;
+  }
+  function selfLogCard() {
+    const team = S.profiles.filter(p => p.active && isPersonal(p)); if (!team.length) return "";
+    const t = today();
+    return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Shaxsiy bo'limim — bugun nima qildi</h2><span class="spacer"></span><span class="small muted">${(S.slogs || []).filter(x => x.log_date === t).length}/${team.length} yozdi</span></div>
+      ${team.map(p => { const r = (S.slogs || []).find(x => x.user_id === p.id && x.log_date === t);
+        return `<div class="list-item click" data-slp="${p.id}">${avatar(p.full_name, photoOf(p))}<div style="flex:1;min-width:0"><div class="t">${esc(p.full_name)}</div>
+          ${r ? `<div class="small sl-clip">${slText(r)}</div><div class="small muted">${tmOf(r.updated_at)} da yozilgan</div>` : `<div class="small muted">Bugun hali yozmagan</div>`}</div>${r ? pill("tasdiqlandi", "Yozdi") : pill("missing", "Kutilmoqda")}</div>`; }).join("")}</div>`;
+  }
+  function bindSelfLogCard(root) { $$("[data-slp]", root).forEach(el => el.onclick = () => infoModal(person(el.dataset.slp))); }
 
   // ---- Xodimlar darajasi (faqat Monitoring bo'limi rahbari uchun): infografikalar
   const LV_C = { "A'lo": "ok", "Yaxshi": "brand", "O'rtacha": "warn", "Past": "bad" };
