@@ -705,6 +705,23 @@ tr.unseen td { background: var(--brand-soft); }
 .img-th { display: block; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
 .img-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .assign-band { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--brand-soft); }
+/* ---- Xodimning o'z hisoboti ---- */
+.rep-in input { min-width: 90px; padding: 8px 10px; }
+.rep-in td:nth-child(2) input { min-width: 170px; }
+.rep-in input.num, .rep-topic input.num { max-width: 110px; min-width: 80px; text-align: center; }
+.rep-in td { padding: 4px; vertical-align: middle; }
+.rep-tbl { width: 100%; margin: 4px 0 8px; }
+.rep-note { white-space: pre-wrap; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
+.rep-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.rep-kv > div { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.rep-kv span { display: block; font-size: 12px; color: var(--muted); } .rep-kv b { font-size: 16px; }
+.rep-topic { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.rep-topic input:first-child { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-btn { border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+.chip-btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.rep-box { background: var(--surface-2); box-shadow: none; }
+.rv-kpi summary { cursor: pointer; font-weight: 600; font-size: 14px; margin: 6px 0; }
 
 </style>
 </head>
@@ -846,6 +863,13 @@ window.LESSONS = [
       { steps: ["Menyudan <b>Masalalar</b> ni oching. Chap tomonda birinchi qator — <b>Topshiriqlar va eslatmalar</b>, pastda masalalar bo'limlari.", "Sizga yangi topshiriq yoki eslatma kelsa — menyuda qizil raqam va sahifa tepasida 📬 yozuv chiqadi. Yangilari ko'k chiziq va «Yangi» belgisi bilan ajralib turadi.", "Topshiriq yoki eslatmani <b>ochishingiz bilan</b> u «ko'rildi» bo'ladi — yuborgan rahbar qachon ko'rganingizni ko'radi.", "Rahbar uchun: ro'yxatda «👁 7/9 ko'rdi», ichida esa har bir xodim ko'rgan vaqt yoki «Ko'rmagan» yozuvi chiqadi. Masalalar ichida «👁 N kishi ko'rdi» ni bossangiz — kimlar ko'rgani."] }
     ],
     tip: "Brauzerda 🔔 eslatmalarni yoqsangiz, yangi topshiriq kelganda telefon/kompyuteringizga xabar ham chiqadi." },
+  { id: "oz-hisobot", title: "Kunlik hisobotni o'zim yozaman", group: "Har kungi ish", roles: ["xodim", "ceo"], added: "2026-10-27", pages: ["hisobotlar"],
+    desc: "Endi kunlik hisobotni xodimning o'zi yozadi, bo'lim rahbari izoh qoldirib baholaydi.",
+    parts: [
+      { steps: ["Ish tugashidan <b>30 daqiqa oldin</b> portal eslatadi: menyuda <b>Kunlik hisobotim</b> ni oching.", "<b>Akademik bo'lim:</b> har bir baholangan dars uchun qator: o'qituvchining I/F, fan, filial, intizomiy ball, akademik ball, sana. Pastda kunlik ishlar bo'yicha izoh (ixtiyoriy).", "<b>Intizomiy bo'lim:</b> qaysi filialni kuzatganingizni tanlang, mavzular bo'yicha nechta post yuborganingizni yozing, rahbariyat nechtasiga javob berganini va qanday ishlaganini belgilang, oxirida ish kuni haqida izoh.", "<b>Hisobotni yuborish</b> ni bosing. Rahbaringiz baholaguncha o'zgartirishingiz mumkin."] },
+      { steps: ["<b>Bo'lim rahbari:</b> «Hisobotlar va baholar» da xodim kartasidagi <b>Ko'rish va baholash</b> ni bosing.", "Hisobotni o'qing, izoh yozing va 1–10 baho qo'ying — baho KPI'ga avtomatik o'tadi."] }
+    ],
+    tip: "Baholangan hisobotda rahbaringiz izohi chiqadi: «Kunlik hisobotim → Hisobotlarim va baholarim»." },
   { id: "statistika", title: "Statistika", group: "Natijalar", roles: ["ceo", "asoschi"], added: "2026-10-24", pages: ["statistika"],
     desc: "Topshiriqlar bajarildi / bajarilmadi — bo'lim va xodim kesimida.",
     parts: [{ img: "oqish/c09-statistika.jpg", steps: ["Davrni tanlang.", "Umumiy: bajarildi, tekshiruvda, jarayonda, bajarilmadi.", "Xodim qatoriga bosing — bajarilmagan topshiriqlari."] }] }
@@ -1064,13 +1088,21 @@ window.LESSONS = [
         if (!["xodim", "ceo", "asoschi"].includes(m.role)) return fail("Ruxsat yo'q");
         let ex = d.reports.find(x => x.author_id === m.id && x.report_date === r.report_date);
         if (ex) {
-          if (ex.status === "tasdiqlandi") return fail("Tasdiqlangan hisobotni o'zgartirib bo'lmaydi");
-          Object.assign(ex, { done: r.done, problems: r.problems, plan: r.plan, hours: r.hours, status: "yuborildi" });
+          if (ex.grade !== null && ex.grade !== undefined && ex.grade !== "") return fail("Baholangan hisobotni o'zgartirib bo'lmaydi");
+          Object.assign(ex, { done: r.done, problems: r.problems, plan: r.plan, hours: r.hours, data: r.data || {}, status: "yuborildi", written_by: m.id, updated_at: new Date().toISOString() });
         } else {
-          ex = { id: d.nextReport++, author_id: m.id, report_date: r.report_date, done: r.done, problems: r.problems,
-            plan: r.plan, hours: r.hours, status: "yuborildi", reviewer_note: "", reviewed_by: null };
+          ex = { id: d.nextReport++, author_id: m.id, report_date: r.report_date, done: r.done, problems: r.problems, data: r.data || {}, grade: null, staff_note: "",
+            plan: r.plan, hours: r.hours, status: "yuborildi", reviewer_note: "", reviewed_by: null, written_by: m.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
           d.reports.push(ex);
         }
+        save(); return ok(ex);
+      },
+      async gradeReport(author_id, report_date, f) {
+        const m = me(); const d = load();
+        if (!(m.role === "asoschi" ? author_id !== m.id : isMember(author_id))) return fail("Ruxsat yo'q");
+        let ex = d.reports.find(x => x.author_id === author_id && x.report_date === report_date);
+        if (!ex) { ex = { id: d.nextReport++, author_id, report_date, done: "", problems: "", plan: "", hours: 0, data: {}, written_by: m.id, created_at: new Date().toISOString() }; d.reports.push(ex); }
+        Object.assign(ex, { grade: f.grade, staff_note: f.staff_note || "", status: "tasdiqlandi", reviewed_by: m.id, reviewed_at: new Date().toISOString() });
         save(); return ok(ex);
       },
       async saveStaffReport(author_id, report_date, f) {
@@ -1299,13 +1331,19 @@ window.LESSONS = [
         return chk(await q);
       },
       async saveMyReport(r) {
-        const ex = chk(await sb.from("daily_reports").select("id,status").eq("author_id", meCache.id).eq("report_date", r.report_date).maybeSingle());
-        const body = { done: r.done, problems: r.problems, plan: r.plan, hours: r.hours };
+        const ex = chk(await sb.from("daily_reports").select("id,status,grade").eq("author_id", meCache.id).eq("report_date", r.report_date).maybeSingle());
+        const body = { done: r.done, problems: r.problems, plan: r.plan, hours: r.hours, data: r.data || {} };
         if (ex) {
-          if (ex.status === "tasdiqlandi") throw new Error("Tasdiqlangan hisobotni o'zgartirib bo'lmaydi");
+          if (ex.grade !== null && ex.grade !== undefined) throw new Error("Baholangan hisobotni o'zgartirib bo'lmaydi");
           return chk(await sb.from("daily_reports").update(body).eq("id", ex.id).select().single());
         }
         return chk(await sb.from("daily_reports").insert({ ...body, author_id: meCache.id, report_date: r.report_date }).select().single());
+      },
+      async gradeReport(author_id, report_date, f) {
+        const ex = chk(await sb.from("daily_reports").select("id").eq("author_id", author_id).eq("report_date", report_date).maybeSingle());
+        const body = { grade: f.grade, staff_note: f.staff_note || "", status: "tasdiqlandi" };
+        if (ex) return chk(await sb.from("daily_reports").update(body).eq("id", ex.id).select().single());
+        return chk(await sb.from("daily_reports").insert({ ...body, author_id, report_date }).select().single());
       },
       async saveStaffReport(author_id, report_date, f) {
         const body = { author_id, report_date, done: f.done || "", problems: f.problems || "", plan: f.plan || "", grade: f.grade ?? null,
@@ -1557,7 +1595,14 @@ window.LESSONS = [
   const seenPill = p => { const [c, l] = seenLabel(p); return `<span class="seen ${c}" title="Oxirgi faollik">${c === "on" ? "" : "Oxirgi faollik: "}${esc(l)}</span>`; };
   const canSeeSeen = p => S.me.role === "asoschi" || (S.me.role === "ceo" && p.ceo_id === S.me.id);
   // Asoschi o'zi yozadiganlar: CEO'lar va shaxsiy bo'lim; CEO — o'z jamoasi
-  const writeFor = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && (p.role === "ceo" || (p.role === "xodim" && !p.ceo_id))) : S.me.role === "ceo" ? members() : [];
+  const writeFor = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && (p.role === "ceo" || (p.role === "xodim" && !p.ceo_id))) : [];
+  // Hisobotni o'zi yozadigan xodimlar (Akademik va Intizomiy bo'lim xodimlari)
+  const isSelfReporter = p => !!p && p.role === "xodim" && !!p.ceo_id && ["akademik", "intizomiy"].includes(deptOf(p));
+  const repOf = (p, d) => S.reports.find(x => x.author_id === p.id && x.report_date === d);
+  const isGraded = r => !!r && r.grade !== null && r.grade !== undefined && r.grade !== "";
+  const isWritten = r => !!r && (r.written_by === r.author_id || (r.data && Object.keys(r.data).length > 0) || (!r.written_by && r.status === "yuborildi"));
+  // Rahbar baholashi kerak bo'lgan (xodim yozgan, hali baholanmagan) hisobotlar
+  const toGrade = () => S.me.role === "ceo" ? S.reports.filter(r => { const a = person(r.author_id); return a && a.ceo_id === S.me.id && isSelfReporter(a) && isWritten(r) && !isGraded(r) && r.report_date >= addD(today(), -7); }) : [];
   // ---- Ish jadvali va hisobot so'rovi (Toshkent vaqti bo'yicha)
   function sched(p) {
     const w = String(p?.work_hours || "");
@@ -1579,9 +1624,10 @@ window.LESSONS = [
   function dueState(p) {
     if (!isWorkday(p)) return "off";
     const end = toMins(sched(p).end), now = tashNow().mins;
-    return now < end - 60 ? "early" : now <= end ? "due" : "late";
+    const lead = isSelfReporter(p) ? 30 : 60;
+    return now < end - lead ? "early" : now <= end ? "due" : "late";
   }
-  const askTime = p => minsToHM(Math.max(0, toMins(sched(p).end) - 60));
+  const askTime = p => minsToHM(Math.max(0, toMins(sched(p).end) - (isSelfReporter(p) ? 30 : 60)));
   const hasReportToday = p => S.reports.some(x => x.author_id === p.id && x.report_date === today());
   function notifyOnce(tag, title, body) {
     const key = "mp_notified_" + tag + "_" + today() + "_" + S.me.id;
@@ -1617,6 +1663,16 @@ window.LESSONS = [
         out.push(`<div class="due-banner plan">🌅 <span><b>Bugungi rejangiz:</b> ${esc(plan.length > 160 ? plan.slice(0, 160) + "…" : plan)}</span><a class="btn sm" href="#/bosh">Batafsil</a><button class="btn sm ghost" id="pb-x" title="Yopish">✕</button></div>`);
         if (now >= st - 15 && now <= st + 120) notifyOnce("plan", "Ish kuni boshlandi — bugungi reja", plan);
       }
+    }
+    // 1b) Xodim: o'z kunlik hisobotini yozish (ish tugashidan 30 daqiqa oldin)
+    if (isSelfReporter(S.me) && isWorkday(S.me) && ["due", "late"].includes(dueState(S.me)) && !isWritten(repOf(S.me, today()))) {
+      const st = dueState(S.me);
+      out.push(`<div class="due-banner ${st}">${st === "due" ? "⏰" : "⚠️"} <span><b>Kunlik hisobotingizni yozing.</b> ${st === "due" ? `Ish kuni ${sched(S.me).end} da tugaydi.` : "Ish kuni tugadi — hisobot hali yuborilmagan."}</span><a class="btn sm primary" href="#/hisobotlar">Hisobot yozish</a></div>`);
+      notifyOnce("myrep", "Kunlik hisobot vaqti", `Ish kuni ${sched(S.me).end} da tugaydi — bugungi hisobotingizni yozing.`);
+    }
+    // 1c) Bo'lim rahbari: xodimlar yuborgan, hali baholanmagan hisobotlar
+    if (S.me.role === "ceo" && toGrade().length) {
+      out.push(`<div class="due-banner due">📝 <span><b>${toGrade().length} ta</b> xodim hisobot yubordi — izoh qoldirib baholang.</span><a class="btn sm" href="#/hisobotlar">Baholash</a></div>`);
     }
     // 2) Rahbar: jamoa hisobotlarini yozish vaqti (ish tugashidan 1 soat oldin)
     if (["ceo", "asoschi"].includes(S.me.role) && S.me.work_hours) {
@@ -1809,7 +1865,9 @@ window.LESSONS = [
       const toConf = isManager() ? S.dtasks.reduce((a, t) => a + recipientsOf(t).filter(p => canRate(p) && dtStatus(t, p).status === "kutilmoqda" && dtStatus(t, p).self_done).length, 0) : 0;
       const toAcc = isManager() ? S.tasks.filter(x => x.status === "bajarildi" && canManageTask(x)).length : 0;
       items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: (unseenMine().length + toConf + toAcc) || "" });
-      items.push({ id: "hisobotlar", label: r === "xodim" ? "Kunlik baholarim" : "Hisobotlar va baholar", icon: "report", badge: toReview || "" });
+      const myRepDue = isSelfReporter(S.me) && isWorkday(S.me) && ["due", "late"].includes(dueState(S.me)) && !isWritten(repOf(S.me, today()));
+      items.push({ id: "hisobotlar", label: isSelfReporter(S.me) ? "Kunlik hisobotim" : r === "xodim" ? "Kunlik baholarim" : "Hisobotlar va baholar", icon: "report",
+        badge: myRepDue ? "!" : r === "ceo" ? (toGrade().length || "") : (toReview || "") });
       if (r === "asoschi" || rhKindOf(S.me)) {
         const tdy = today(); const mineRh = (S.creps || []).filter(x => x.report_date === tdy);
         items.push({ id: "rahbar-hisobot", label: r === "asoschi" ? "Rahbarlar hisoboti" : "Rahbarga hisobot", icon: "report",
@@ -2080,6 +2138,7 @@ window.LESSONS = [
     const boss = S.me.ceo_id ? nameOf(S.me.ceo_id) : (S.profiles.find(p => p.role === "asoschi")?.full_name || "Monitoring bo'limi rahbari");
     const myLog = (S.slogs || []).find(x => x.user_id === S.me.id && x.log_date === t);
     page.innerHTML = lessonNotice() + head(`Xush kelibsiz, ${esc((S.me.full_name || "").split(" ")[0])}`, `${esc(titleOf(S.me))} · Bugun: ${fmtDate(t)} · Rahbaringiz: ${esc(boss)}`) +
+      (isSelfReporter(S.me) ? (() => { const rr = repOf(S.me, t); return `<a class="card list-item click" href="#/hisobotlar" style="margin-bottom:16px;text-decoration:none;color:inherit"><span class="feat-ic">${ic("report", 18)}</span><div style="flex:1"><b>Bugungi kunlik hisobotim</b><div class="small muted">${isGraded(rr) ? "Rahbaringiz baholadi" + (rr.staff_note ? ": " + esc(rr.staff_note.slice(0, 80)) : "") : isWritten(rr) ? "Yuborilgan · rahbar baholashi kutilmoqda" : `Ish kuni oxirida yozing · eslatma ${askTime(S.me)} da`}</div></div>${isGraded(rr) ? gradePill(rr.grade) : isWritten(rr) ? pill("yangi", "Yuborildi") : pill("missing", "Yozilmagan")}</a>`; })() : "") +
       (isPersonal(S.me) ? `<a class="card list-item click" href="#/profil" style="margin-bottom:16px;text-decoration:none;color:inherit"><span class="feat-ic">${ic("report", 18)}</span><div style="flex:1"><b>Bugun nima qildim</b><div class="small muted">${myLog ? "Yozilgan · " + tmOf(myLog.updated_at) : "Ish kuni oxirida bajargan ishlaringizni profilingizda yozing"}</div></div>${myLog ? pill("tasdiqlandi", "Yozildi") : pill("missing", "Yozilmagan")}</a>` : "") + `
       <div class="stats">
         ${stat("Joriy darajangiz", levelOf(g.avg) ? levelOf(g.avg)[1] : "—", g.avg === null ? "" : g.avg >= 7.5 ? "ok" : g.avg >= 6 ? "warn" : "bad")}
@@ -2268,11 +2327,18 @@ window.LESSONS = [
   // ---- Hisobotlar: kunlik hisobotni rahbar yozadi va baholaydi
   PAGES.hisobotlar = page => {
     const r = S.me.role;
+    if (r === "xodim" && isSelfReporter(S.me)) {
+      const tb = S.ui.mytab || "yozish";
+      page.innerHTML = head("Kunlik hisobotim", `Har kuni ish oxirida hisobotni o'zingiz yozasiz — rahbaringiz izoh qoldirib baholaydi, baho KPI'ga avtomatik o'tadi. Eslatma ${askTime(S.me)} da chiqadi.`) +
+        `<div class="tabs"><button data-mt="yozish" class="${tb === "yozish" ? "active" : ""}">Hisobot yozish</button><button data-mt="baho" class="${tb === "baho" ? "active" : ""}">Hisobotlarim va baholarim</button></div><div id="rbody"></div>`;
+      $$("[data-mt]", page).forEach(b => b.onclick = () => { S.ui.mytab = b.dataset.mt; PAGES.hisobotlar(page); });
+      return tb === "yozish" ? myReportForm($("#rbody", page)) : myGrades($("#rbody", page), S.me);
+    }
     if (r === "xodim") { page.innerHTML = head("Kunlik baholarim", "Kunlik hisobotingizni rahbaringiz yozadi va baholaydi. Bu yerda darajangiz va rahbar eslatmalarini ko'rasiz.") + `<div id="rbody"></div>`; return myGrades($("#rbody", page), S.me); }
     const tabs = r === "ceo" ? ["team", "mine"] : ["team"];
     const tab = S.ui.rtab && tabs.includes(S.ui.rtab) ? S.ui.rtab : tabs[0];
     const labels = { team: r === "asoschi" ? "Xodimlar hisobotlari" : "Jamoam hisobotlari", mine: "Mening baholarim" };
-    page.innerHTML = head("Hisobotlar va baholar", "Har bir xodimning kunlik bajargan ishlarini yozing, 1–10 ball bilan baholang va kerak bo'lsa xodimga eslatma qoldiring.") +
+    page.innerHTML = head("Hisobotlar va baholar", r === "ceo" ? "Xodimlar kunlik hisobotni o'zlari yozadi. Siz hisobotni ko'rib, izoh qoldirasiz va 1–10 ball bilan baholaysiz — baho KPI'ga avtomatik o'tadi." : "Bo'lim rahbarlari va shaxsiy bo'lim uchun kunlik hisobot va baho. Bo'lim xodimlari hisobotni o'zlari yozadi, rahbarlari baholaydi.") +
       (tabs.length > 1 ? `<div class="tabs">${tabs.map(k => `<button data-tab="${k}" class="${k === tab ? "active" : ""}">${labels[k]}</button>`).join("")}</div>` : "") + `<div id="rbody"></div>`;
     $$("[data-tab]", page).forEach(b => b.onclick = () => { S.ui.rtab = b.dataset.tab; PAGES.hisobotlar(page); });
     tab === "mine" ? myGrades($("#rbody", page), S.me) : teamReports($("#rbody", page));
@@ -2303,10 +2369,12 @@ window.LESSONS = [
         return `<div class="card rep-card ${r ? "done" : off ? "off" : "todo"}">
           <div class="row" style="gap:10px;flex-wrap:nowrap">${avatar(p.full_name, photoOf(p))}<div style="flex:1;min-width:0"><b>${esc(p.full_name)}</b>
             <div class="small muted">${esc(titleOf(p))}</div>${canSeeSeen(p) ? `<div class="small">${seenPill(p)}</div>` : ""}</div>
-            <div style="text-align:right">${r ? gradePill(r.grade) : off ? `<span class="small muted">Dam olish</span>` : pill("missing", "Yozilmagan")}<div class="small muted" style="margin-top:4px">Bosqich: ${g.avg ?? "—"} ${levelOf(g.avg) ? "· " + levelOf(g.avg)[1] : ""}</div></div></div>
+            <div style="text-align:right">${isGraded(r) ? gradePill(r.grade) : isSelfReporter(p) && isWritten(r) ? pill("yangi", "Baholanmagan") : r ? gradePill(r.grade) : off ? `<span class="small muted">Dam olish</span>` : pill("missing", isSelfReporter(p) ? "Yubormagan" : "Yozilmagan")}<div class="small muted" style="margin-top:4px">Bosqich: ${g.avg ?? "—"} ${levelOf(g.avg) ? "· " + levelOf(g.avg)[1] : ""}</div></div></div>
           <div class="rc-plan"><span class="small muted">Reja:</span> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
           ${r ? `<div class="rc-done">${esc((r.done || "").slice(0, 180))}${(r.done || "").length > 180 ? "…" : ""}</div>${r.staff_note ? `<div class="rc-note">📌 ${esc(r.staff_note)}</div>` : ""}` : ""}
-          <div class="row" style="margin-top:10px">${canRate(p) ? `<button class="btn sm ${r ? "" : "primary"}" data-wrep="${p.id}">${r ? "Tahrirlash" : "Hisobot yozish va baholash"}</button>` : ""}
+          <div class="row" style="margin-top:10px">${canRate(p) ? (isSelfReporter(p)
+              ? `<button class="btn sm ${isWritten(r) && !isGraded(r) ? "primary" : ""}" data-wrep="${p.id}">${isGraded(r) ? "Ko'rish va tahrirlash" : isWritten(r) ? "Ko'rish va baholash" : "Baholash"}</button>`
+              : `<button class="btn sm ${r ? "" : "primary"}" data-wrep="${p.id}">${r ? "Tahrirlash" : "Hisobot yozish va baholash"}</button>`) : ""}
             ${isA && byFounder(p) && !off && !(r && +r.grade === 10) ? `<button class="btn sm max-btn" data-qmax="${p.id}" title="Baho 10, umumiy ball 100">★ Maksimal ball</button>` : ""}
             <button class="btn sm ghost" data-info="${p.id}">Profil va reja</button></div></div>`; }).join("") || `<div class="empty">Xodimlar yo'q</div>`}</div>`;
     $("#td", root).onchange = e => { S.ui.tdate = e.target.value; teamReports(root); };
@@ -2331,6 +2399,7 @@ window.LESSONS = [
   // Rahbar xodim haqida kunlik hisobot yozadi va baholaydi
   async function openStaffReport(p, date) {
     if (!p) return;
+    if (isSelfReporter(p)) return reviewReport(p, date);
     const r = S.reports.find(x => x.author_id === p.id && x.report_date === date);
     const nd = nextWorkday(p, date); await ensurePlans(weekOf(nd)); await ensurePlans(weekOf(date));
     const plan = dayPlan(p, date); const tomorrow = dayPlan(p, nd);
@@ -2381,6 +2450,165 @@ window.LESSONS = [
   }
 
   // Xodim (yoki CEO) o'z baholarini ko'radi — kiritmaydi
+  // ================= Xodimning o'z kunlik hisoboti =================
+  const RLEV = ["A'lo", "Yaxshi", "Qoniqarli", "Sust"];
+  const fnum = v => v === "" || v === null || v === undefined || isNaN(+v) ? null : +v;
+  function reportSummary(kind, d) {
+    if (kind === "akademik") {
+      const rows = d.rows || [];
+      return `${rows.length} ta dars baholandi${rows.length ? ": " + rows.map(r => `${r.teacher} (${[r.subject, r.filial].filter(Boolean).join(", ")}) — I: ${r.ib ?? "—"}, A: ${r.ab ?? "—"}`).join("; ") : ""}.${d.note ? "\n" + d.note : ""}`;
+    }
+    const tot = (d.topics || []).reduce((a, t) => a + (+t.posts || 0), 0);
+    return `Filial: ${(d.filials || []).join(", ") || "—"}. ${tot} ta post (${(d.topics || []).map(t => `${t.topic}: ${t.posts}`).join("; ") || "—"}). Rahbariyat javob berdi: ${d.answered ?? 0}/${tot}${d.mgmt ? ", ishlashi: " + d.mgmt : ""}.${d.note ? "\n" + d.note : ""}`;
+  }
+  // Hisobot mazmunini chiroyli ko'rsatish
+  function reportView(r, compact) {
+    const d = r.data || {};
+    if (d.kind === "akademik") {
+      const rows = d.rows || [];
+      return `${rows.length ? `<div class="table-wrap"><table class="rep-tbl ${compact ? "small" : ""}"><thead><tr><th>#</th><th>O'qituvchining I/F</th><th>Fan</th><th>Filial</th><th>Intizomiy ball</th><th>Akademik ball</th><th>Sana</th></tr></thead><tbody>
+        ${rows.map((x, i) => `<tr><td>${i + 1}</td><td><b>${esc(x.teacher)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.filial)}</td><td>${x.ib ?? "—"}</td><td>${x.ab ?? "—"}</td><td style="white-space:nowrap">${x.date ? fmtDate(x.date) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="small muted">Dars baholanmagan</div>`}
+        ${d.note ? `<div class="rep-note"><b>Kunlik ishlar bo'yicha izoh:</b>\n${esc(d.note)}</div>` : ""}`;
+    }
+    if (d.kind === "intizomiy") {
+      const tot = (d.topics || []).reduce((a, t) => a + (+t.posts || 0), 0);
+      return `<div class="rep-kv"><div><span>Kuzatilgan filial</span><b>${(d.filials || []).map(esc).join(", ") || "—"}</b></div>
+          <div><span>Yuborilgan postlar</span><b>${tot} ta</b></div>
+          <div><span>Rahbariyat javob berdi</span><b>${d.answered ?? 0} / ${tot}</b></div>
+          <div><span>Rahbariyat qanday ishladi</span><b>${esc(d.mgmt || "—")}</b></div></div>
+        ${(d.topics || []).length ? `<table class="rep-tbl ${compact ? "small" : ""}"><thead><tr><th>Mavzu</th><th>Postlar soni</th></tr></thead><tbody>${d.topics.map(t => `<tr><td>${esc(t.topic)}</td><td><b>${t.posts}</b></td></tr>`).join("")}</tbody></table>` : ""}
+        ${d.mgmt_note ? `<div class="rep-note"><b>Rahbariyat munosabati:</b>\n${esc(d.mgmt_note)}</div>` : ""}
+        ${d.note ? `<div class="rep-note"><b>Bugungi ish kuni haqida:</b>\n${esc(d.note)}</div>` : ""}`;
+    }
+    return `<div style="white-space:pre-wrap">${esc(r.done || "")}</div>${r.problems ? `<div class="small muted" style="white-space:pre-wrap">Kamchilik: ${esc(r.problems)}</div>` : ""}`;
+  }
+  function myReportForm(root) {
+    const t = today(); const date = S.ui.myDate && S.ui.myDate <= t ? S.ui.myDate : t;
+    const kind = deptOf(S.me); const r = repOf(S.me, date); const locked = isGraded(r);
+    const d0 = (r && r.data && r.data.kind === kind) ? JSON.parse(JSON.stringify(r.data)) : {};
+    const F = kind === "akademik"
+      ? { rows: d0.rows && d0.rows.length ? d0.rows : [{ teacher: "", subject: "", filial: "", ib: "", ab: "", date }], note: d0.note || "" }
+      : { filials: d0.filials || [], topics: d0.topics && d0.topics.length ? d0.topics : [{ topic: "", posts: "" }], answered: d0.answered ?? "", mgmt: d0.mgmt || "", mgmt_note: d0.mgmt_note || "", note: d0.note || "" };
+    const head2 = `<div class="row" style="margin:4px 0 14px;gap:10px"><label class="small muted" style="margin:0">Sana:</label><input type="date" id="mr-d" value="${date}" max="${t}" style="width:auto">
+      ${locked ? `${gradePill(r.grade)} <span class="small muted">Rahbaringiz baholagan — o'zgartirib bo'lmaydi</span>` : isWritten(r) ? pill("yangi", `Yuborilgan · ${tmOf(r.updated_at || r.created_at)} — baholanguncha o'zgartirsa bo'ladi`) : pill("missing", "Hali yuborilmagan")}</div>`;
+    if (locked) {
+      root.innerHTML = head2 + `<div class="card">${reportView(r)}${r.staff_note ? `<div class="rc-note" style="margin-top:12px">💬 <b>Rahbar izohi:</b> ${esc(r.staff_note)}</div>` : ""}</div>`;
+      $("#mr-d", root).onchange = e => { S.ui.myDate = e.target.value; myReportForm(root); }; return;
+    }
+    const subs = [...new Set(["Matematika", "Ona tili", "Ingliz tili", "Rus tili", "Fizika", "Kimyo", "Biologiya", "Tarix", "Geografiya", "Informatika", "Adabiyot"])];
+    const draw = () => {
+      let body;
+      if (kind === "akademik") {
+        body = `<div class="card"><div class="card-head"><h2>Akademik baholash</h2><span class="spacer"></span><span class="small muted">Har bir baholangan dars — alohida qator</span></div>
+          <div class="table-wrap"><table class="rep-in"><thead><tr><th>#</th><th>O'qituvchining I/F *</th><th>Fan</th><th>Filial</th><th>Intizomiy ball</th><th>Akademik ball</th><th>Sana</th><th></th></tr></thead><tbody>
+          ${F.rows.map((x, i) => `<tr><td>${i + 1}</td>
+            <td><input data-r="${i}" data-f="teacher" value="${esc(x.teacher)}" placeholder="Familiya Ism"></td>
+            <td><input data-r="${i}" data-f="subject" value="${esc(x.subject)}" list="mr-subs" placeholder="Fan"></td>
+            <td><input data-r="${i}" data-f="filial" value="${esc(x.filial)}" list="mr-fil" placeholder="Filial"></td>
+            <td><input data-r="${i}" data-f="ib" type="number" step="0.5" min="0" value="${esc(x.ib ?? "")}" class="num"></td>
+            <td><input data-r="${i}" data-f="ab" type="number" step="0.5" min="0" value="${esc(x.ab ?? "")}" class="num"></td>
+            <td><input data-r="${i}" data-f="date" type="date" value="${esc(x.date || date)}" max="${t}"></td>
+            <td>${F.rows.length > 1 ? `<button type="button" class="x" data-rdel="${i}" title="O'chirish">×</button>` : ""}</td></tr>`).join("")}</tbody></table></div>
+          <datalist id="mr-subs">${subs.map(x => `<option value="${esc(x)}">`).join("")}</datalist><datalist id="mr-fil">${FILIALLAR.map(x => `<option value="${esc(x)}">`).join("")}</datalist>
+          <button type="button" class="btn sm" id="mr-add" style="margin-top:10px">+ Qator qo'shish</button></div>
+          <div class="card" style="margin-top:16px"><div class="card-head"><h2>Kunlik ishlar bo'yicha izoh</h2><span class="spacer"></span><span class="small muted">ixtiyoriy</span></div>
+            <textarea id="mr-note" rows="4" placeholder="Bugun yana nimalar qildingiz, qanday muammolar bo'ldi…">${esc(F.note)}</textarea></div>`;
+      } else {
+        const tot = F.topics.reduce((a, x) => a + (+x.posts || 0), 0);
+        body = `<div class="card"><div class="card-head"><h2>Qaysi filialni kuzatdingiz? *</h2></div>
+            <div class="chips">${FILIALLAR.map(f => `<button type="button" class="chip-btn ${F.filials.includes(f) ? "on" : ""}" data-fil="${esc(f)}">${esc(f)}</button>`).join("")}</div></div>
+          <div class="card" style="margin-top:16px"><div class="card-head"><h2>Nechta mavzuda nechta post yubordingiz?</h2><span class="spacer"></span><b>Jami: ${tot} ta post</b></div>
+            ${F.topics.map((x, i) => `<div class="rep-topic"><input data-t="${i}" data-f="topic" value="${esc(x.topic)}" list="mr-top" placeholder="Mavzu (masalan: darsga kechikish)"><input data-t="${i}" data-f="posts" type="number" min="0" step="1" value="${esc(x.posts)}" placeholder="Post soni" class="num">${F.topics.length > 1 ? `<button type="button" class="x" data-tdel="${i}">×</button>` : ""}</div>`).join("")}
+            <datalist id="mr-top">${["Darsga kechikish", "O'qituvchi davomati", "Navbatchilik", "Sinf xonasi holati", "Kiyinish qoidalari", "Tozalik", "Xavfsizlik", "Texnik nosozlik"].map(x => `<option value="${x}">`).join("")}</datalist>
+            <button type="button" class="btn sm" id="mr-tadd">+ Mavzu qo'shish</button></div>
+          <div class="card" style="margin-top:16px"><div class="card-head"><h2>Yuborilgan masalalar yuzasidan rahbariyatning munosabati</h2></div>
+            <div class="grid2"><div class="field"><label>Bugun yuborilgan masalalar</label><input value="${tot} ta" disabled></div>
+              <div class="field"><label>Nechtasiga javob berildi? *</label><input id="mr-ans" type="number" min="0" step="1" value="${esc(F.answered)}"></div></div>
+            <div class="field"><label>Rahbariyat qanday ishladi? *</label><div class="seg">${RLEV.map(l => `<button type="button" data-mg="${l}" class="${F.mgmt === l ? "active" : ""}">${l}</button>`).join("")}</div></div>
+            <div class="field"><label>Qisqacha <span class="muted">(ixtiyoriy)</span></label><input id="mr-mn" value="${esc(F.mgmt_note)}" placeholder="Masalan: filial rahbari 2 ta masalani darhol hal qildi"></div></div>
+          <div class="card" style="margin-top:16px"><div class="card-head"><h2>Bugungi ish kuni haqida izoh *</h2></div>
+            <textarea id="mr-note" rows="4" placeholder="Bugun qayerda bo'ldingiz, nimalarni kuzatdingiz, qanday natija…">${esc(F.note)}</textarea></div>`;
+      }
+      root.innerHTML = head2 + body + `<div class="err-text" id="mr-err"></div><div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn primary" id="mr-save">${isWritten(r) ? "Hisobotni yangilash" : "Hisobotni yuborish"}</button></div>`;
+      bind();
+    };
+    const bind = () => {
+      $("#mr-d", root).onchange = e => { S.ui.myDate = e.target.value; myReportForm(root); };
+      $$("[data-r]", root).forEach(i => i.oninput = () => { F.rows[+i.dataset.r][i.dataset.f] = i.value; });
+      $$("[data-rdel]", root).forEach(b => b.onclick = () => { F.rows.splice(+b.dataset.rdel, 1); draw(); });
+      const ad = $("#mr-add", root); if (ad) ad.onclick = () => { F.rows.push({ teacher: "", subject: "", filial: F.rows[F.rows.length - 1]?.filial || "", ib: "", ab: "", date }); draw(); $(`[data-r="${F.rows.length - 1}"][data-f=teacher]`, root).focus(); };
+      $$("[data-fil]", root).forEach(b => b.onclick = () => { const f = b.dataset.fil; F.filials = F.filials.includes(f) ? F.filials.filter(x => x !== f) : [...F.filials, f]; draw(); });
+      $$("[data-t]", root).forEach(i => { i.oninput = () => { F.topics[+i.dataset.t][i.dataset.f] = i.value; }; if (i.dataset.f === "posts") i.onchange = () => draw(); });
+      $$("[data-tdel]", root).forEach(b => b.onclick = () => { F.topics.splice(+b.dataset.tdel, 1); draw(); });
+      const ta = $("#mr-tadd", root); if (ta) ta.onclick = () => { F.topics.push({ topic: "", posts: "" }); draw(); };
+      const an = $("#mr-ans", root); if (an) an.oninput = () => F.answered = an.value;
+      $$("[data-mg]", root).forEach(b => b.onclick = () => { F.mgmt = b.dataset.mg; draw(); });
+      const mn = $("#mr-mn", root); if (mn) mn.oninput = () => F.mgmt_note = mn.value;
+      $("#mr-note", root).oninput = e => F.note = e.target.value;
+      $("#mr-save", root).onclick = save;
+    };
+    const fail = (m, sel) => { $("#mr-err", root).textContent = m; const el = sel && $(sel, root); if (el) { el.focus(); el.scrollIntoView({ block: "center" }); } };
+    async function save(e) {
+      $("#mr-err", root).textContent = "";
+      let data;
+      if (kind === "akademik") {
+        const rows = F.rows.map(x => ({ teacher: x.teacher.trim(), subject: (x.subject || "").trim(), filial: (x.filial || "").trim(), ib: fnum(x.ib), ab: fnum(x.ab), date: x.date || date }))
+          .filter(x => x.teacher || x.subject || x.ib !== null || x.ab !== null);
+        const bad = rows.findIndex(x => !x.teacher); if (bad >= 0) return fail(`${bad + 1}-qatorda o'qituvchining ism-familiyasini yozing`, `[data-r="${bad}"][data-f=teacher]`);
+        if (!rows.length && !F.note.trim()) return fail("Kamida bitta baholangan darsni kiriting yoki izoh yozing");
+        data = { kind, rows, note: F.note.trim() };
+      } else {
+        if (!F.filials.length) return fail("Qaysi filialni kuzatganingizni tanlang");
+        const topics = F.topics.map(x => ({ topic: (x.topic || "").trim(), posts: Math.max(0, Math.floor(+x.posts || 0)) })).filter(x => x.topic || x.posts);
+        const bt = topics.findIndex(x => !x.topic); if (bt >= 0) return fail(`${bt + 1}-mavzu nomini yozing`);
+        const tot = topics.reduce((a, x) => a + x.posts, 0);
+        const ans = fnum(F.answered); if (ans === null) return fail("Nechta masalaga javob berilganini kiriting", "#mr-ans");
+        if (ans > tot) return fail(`Javob berilganlar soni yuborilgan postlardan (${tot}) ko'p bo'lishi mumkin emas`, "#mr-ans");
+        if (!F.mgmt) return fail("Rahbariyat qanday ishlaganini belgilang");
+        if (!F.note.trim()) return fail("Bugungi ish kuni haqida izoh yozing", "#mr-note");
+        data = { kind, filials: F.filials, topics, answered: ans, mgmt: F.mgmt, mgmt_note: F.mgmt_note.trim(), note: F.note.trim() };
+      }
+      e.target.disabled = true;
+      try { await db.saveMyReport({ report_date: date, done: reportSummary(kind, data), problems: "", plan: "", hours: 0, data });
+        toast("Hisobot yuborildi — rahbaringiz baholaydi"); await refresh(); render(); }
+      catch (err) { e.target.disabled = false; fail(err.message); }
+    }
+    draw();
+  }
+  // Bo'lim rahbari: xodim hisobotini ko'rib, izoh qoldirib baholaydi
+  async function reviewReport(p, date) {
+    const r = repOf(p, date);
+    const nd = nextWorkday(p, date); await ensurePlans(weekOf(nd));
+    const tomorrow = dayPlan(p, nd); const plan = dayPlan(p, date);
+    let grade = isGraded(r) ? +r.grade : null;
+    let KD = { daily: [] }; try { KD = await db.listKpiRange(date, date); } catch (e) {}
+    const kItems = itemsFor(p).filter(it => !it.ceoOnly || S.me.role === "asoschi");
+    const kMan = k => KD.daily.find(x => x.day === date && x.user_id === p.id && x.criterion === k);
+    const autoV = it => grade ? rnd(grade / 10 * it.max) : "—";
+    const m = openModal(`${esc(p.full_name)} — ${fmtDate(date)}`, `
+      <div class="rc-plan" style="margin-top:0"><b>Shu kungi reja:</b> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
+      <div class="card rep-box">${isWritten(r) ? `<div class="small muted" style="margin-bottom:8px">Xodim yozgan · ${fmtDate(r.updated_at || r.created_at)} ${tmOf(r.updated_at || r.created_at)}</div>${reportView(r)}` : `<div class="empty" style="padding:14px">Xodim bu kun uchun hisobot yubormagan</div>`}</div>
+      <div class="field" style="margin-top:14px"><label>Baho (1–10) * <span class="muted">— KPI'ga avtomatik o'tadi</span></label><div class="grade-pick">${Array.from({ length: 10 }, (_, i) => `<button type="button" data-g="${i + 1}" class="${grade === i + 1 ? "on" : ""}">${i + 1}</button>`).join("")}</div></div>
+      <div class="field staff-band"><label>💬 Izoh <span class="muted">(xodim ko'radi)</span></label><textarea id="rv-note" rows="3" placeholder="Masalan: 7-A sinf baholashida dalil yetarli emas, keyingi safar izoh yozing">${esc(r?.staff_note || "")}</textarea></div>
+      ${kItems.length ? `<details class="rv-kpi"><summary>Bugungi KPI ballari <span class="muted">(«avto» mezon bahodan o'zi qo'yiladi)</span></summary><div class="kpi-day-grid" style="margin-top:8px">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
+        <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" value="${scoreOf(mv) ?? ""}" placeholder="${it.auto === "reja" ? autoV(it) : "—"}"></div>`; }).join("")}</div></details>` : ""}
+      <div class="field"><label>Ertangi reja — ${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)} <span class="muted">(ixtiyoriy)</span></label><textarea id="rv-plan" rows="2">${esc(tomorrow || "")}</textarea></div>
+      <div class="err-text" id="rv-err"></div>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="rv-save">Baholash</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "900px";
+    $$("[data-g]", m).forEach(b => b.onclick = () => { grade = +b.dataset.g; $$("[data-g]", m).forEach(x => x.classList.toggle("on", x === b));
+      kItems.filter(it => it.auto === "reja").forEach(it => { const i = $(`[data-kd="${it.k}"]`, m); if (i) i.placeholder = autoV(it); }); });
+    $("#rv-save", m).onclick = async e => {
+      if (!grade) return ($("#rv-err", m).textContent = "Bahoni tanlang (1–10)");
+      e.target.disabled = true;
+      try {
+        await db.gradeReport(p.id, date, { grade, staff_note: $("#rv-note", m).value.trim() });
+        for (const it of kItems) { const i = $(`[data-kd="${it.k}"]`, m); if (!i) continue; const v = i.value === "" ? null : Math.max(0, Math.min(it.max, +i.value)); const mv = kMan(it.k); if (v !== scoreOf(mv)) await db.setKpiAt("kun", date, p.id, it.k, v, mv?.note || ""); }
+        const ch = await saveDay(p, nd, $("#rv-plan", m).value.trim());
+        toast("Baholandi — KPI'ga o'tdi" + (ch ? " · ertangi reja yangilandi" : "")); await refresh(); render();
+      } catch (err) { e.target.disabled = false; $("#rv-err", m).textContent = err.message; }
+    };
+  }
+
   function myGrades(root, p) {
     const t = today(); const ps = periodOf(t);
     const g = avgGrade(p, ps, addD(ps, 13));
@@ -2397,7 +2625,7 @@ window.LESSONS = [
       </div>
       <div class="card"><div class="card-head"><h2>Kunlik hisobot va baholar</h2></div>
         ${reps.length ? reps.slice(0, 40).map(x => `<div class="list-item" style="align-items:flex-start">${gradePill(x.grade)}<div style="flex:1;min-width:0"><div class="row"><b>${fmtDate(x.report_date)}</b><span class="small muted">${esc(KUN[dowOf(x.report_date)])}</span></div>
-          <div class="small" style="white-space:pre-wrap;margin-top:2px">${esc(x.done)}</div>${x.problems ? `<div class="small muted" style="white-space:pre-wrap">Kamchilik: ${esc(x.problems)}</div>` : ""}
+          ${x.data && x.data.kind ? `<div style="margin-top:6px">${reportView(x, true)}</div>` : `<div class="small" style="white-space:pre-wrap;margin-top:2px">${esc(x.done)}</div>`}${x.problems ? `<div class="small muted" style="white-space:pre-wrap">Kamchilik: ${esc(x.problems)}</div>` : ""}
           ${x.staff_note ? `<div class="rc-note">📌 ${esc(x.staff_note)}</div>` : ""}</div></div>`).join("") : `<div class="empty">Hali hisobot yozilmagan</div>`}
       </div></div>`;
   }
