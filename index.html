@@ -668,6 +668,10 @@ th:first-child { border-top-left-radius: 8px; } th:last-child { border-top-right
   .rh-big { font-size: 28px; }
   .rh-nav { width: 100%; justify-content: space-between; }
 }
+.dt-author { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; flex-wrap: wrap; }
+.dt-author .avatar.sm, .dt-author .avatar { width: 24px; height: 24px; font-size: 10px; flex: 0 0 24px; }
+.dt-author.big { margin: 0 0 6px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; font-size: 14px; }
+.dt-author.big .avatar { width: 32px; height: 32px; flex-basis: 32px; font-size: 12px; }
 
 </style>
 </head>
@@ -3079,13 +3083,20 @@ window.LESSONS = [
         const toConfirm = rec.filter(p => canRate(p) && dtStatus(t, p).status === "kutilmoqda" && dtStatus(t, p).self_done).length;
         return `<div class="list-item click" data-dt="${t.id}"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div>
           <div class="row" style="gap:4px;margin-top:4px">${(t.depts.length === Object.keys(DEPTS).length ? [pill("", "Barcha bo'limlar")] : t.depts.map(d => pill("", DEPTS[d]?.l || d))).join("")}
-          <span class="small muted">muddat: ${fmtDue(t.due_date, t.due_time)}</span></div></div>
+          <span class="small muted">muddat: ${fmtDue(t.due_date, t.due_time)}</span></div>
+          ${dtAuthor(t)}</div>
           <div style="text-align:right">${mgr ? `<div class="small"><b>${done}/${rec.length}</b> bajardi</div>${toConfirm ? pill("jarayonda", toConfirm + " ta tasdiq kutilmoqda") : ""}` : ""}
           ${isMine ? `<div style="margin-top:4px">${pill(DTS_CLS[my.status], my.status === "kutilmoqda" ? (my.self_done ? "Bajardim · tasdiq kutilmoqda" : "Bajarilmagan") : DTS[my.status])}</div>` : ""}</div></div>`;
       }).join("") : `<div class="empty">Hozircha eslatma yo'q</div>`}</div>`;
     if ($("#new-dt", page)) $("#new-dt", page).onclick = () => dtForm();
     $$("[data-dt]", page).forEach(el => el.onclick = () => openDt(+el.dataset.dt || el.dataset.dt));
   };
+
+  // Eslatmani kim yozgani: rasm, ism, lavozim va yuborilgan vaqt
+  function dtAuthor(t, big) {
+    const p = person(t.created_by) || { full_name: nameOf(t.created_by) };
+    return `<div class="dt-author ${big ? "big" : ""}">${avatar(p.full_name, photoOf(p), "sm")}<span><span class="muted">Yozgan:</span> <b>${esc(p.full_name)}</b>${titleOf(p) ? ` <span class="muted">· ${esc(titleOf(p))}</span>` : ""}${t.created_at ? ` <span class="muted">· ${fmtDate(t.created_at)} ${tmOf(t.created_at)}</span>` : ""}</span></div>`;
+  }
 
   function dtForm() {
     const isA = S.me.role === "asoschi";
@@ -3116,7 +3127,8 @@ window.LESSONS = [
     const my = dtStatus(t, S.me);
     const m = openModal(esc(t.title), `
       ${t.description ? `<p style="white-space:pre-wrap;margin-top:0">${esc(t.description)}</p>` : ""}
-      <p class="small muted">Muddat: ${fmtDue(t.due_date, t.due_time)} · Yuborgan: ${esc(nameOf(t.created_by))}</p>
+      ${dtAuthor(t, true)}
+      <p class="small muted">Muddat: ${fmtDue(t.due_date, t.due_time)}</p>
       ${isMine ? `<div class="card" style="margin-bottom:14px;padding:12px"><b>Mening holatim:</b> ${pill(DTS_CLS[my.status], my.status === "kutilmoqda" ? (my.self_done ? "Bajardim · tasdiq kutilmoqda" : "Bajarilmagan") : DTS[my.status])}
         ${my.status !== "bajarildi" ? `<div class="field" style="margin:10px 0 6px"><textarea id="dt-note" placeholder="Qisqa izoh (ixtiyoriy)" style="min-height:50px">${esc(my.self_note || "")}</textarea></div>
         <button class="btn primary sm" id="dt-self">${my.self_done ? "Izohni yangilash" : "Bajardim"}</button>` : ""}</div>` : ""}
