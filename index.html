@@ -792,6 +792,15 @@ tr.unseen td { background: var(--brand-soft); }
   .met-top .spacer { display: none; }
 }
 
+/* ---- Yuqori paneldagi soat */
+.tb-clock { display: flex; flex-direction: column; line-height: 1.15; padding: 4px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.tbc-t { font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.tbc-t small { font-size: 13px; font-weight: 700; color: var(--muted); }
+.tbc-d { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.btn.bad { color: var(--bad); border-color: var(--bad); }
+.btn.primary.bad { background: var(--bad); color: #fff; border-color: var(--bad); }
+@media (max-width: 760px) { .tb-clock { padding: 3px 8px; } .tbc-t { font-size: 16px; } .tbc-d { font-size: 10.5px; } }
+
 </style>
 </head>
 <body>
@@ -1286,6 +1295,12 @@ window.LESSONS = [
         d.ceoReps = d.ceoReps || []; const ex = d.ceoReps.find(r => r.report_date === date && r.ceo_id === m.id); const now = new Date().toISOString();
         if (ex) Object.assign(ex, { kind, data, summary, updated_at: now }); else d.ceoReps.push({ report_date: date, ceo_id: m.id, kind, data, summary, created_at: now, updated_at: now });
         save(); return ok(true); },
+      // ---- Ta'til kunlari va avtomatik bo'sh kompyuter qoidalari (demo)
+      async listLeaves(from, to) { const d = load(); return ok((d.leaves || []).filter(l => l.to_day >= from && l.from_day <= to)); },
+      async addLeaves(rows) { const d = load(); const m = me(); if (m.role !== "asoschi") return fail("Faqat Monitoring bo'limi rahbari belgilaydi");
+        d.leaves = d.leaves || []; rows.forEach(r => d.leaves.push({ ...r, id: "lv" + Date.now() + Math.random().toString(36).slice(2, 6), created_by: m.id, created_at: new Date().toISOString() })); save(); return ok(true); },
+      async delLeave(id) { const d = load(); d.leaves = (d.leaves || []).filter(l => l.id !== id); save(); return ok(true); },
+      async listMetRules() { return ok(load().mrules || []); },
       // ---- Metodistlar vaqti (demo)
       async listMetPcs(from, to) { const d = load(); return ok((d.mpcs || []).filter(r => r.day >= from && r.day <= to)); },
       async openMetPc(day, owner_id, from_time) { const d = load(); const m = me(); const adm = m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik");
@@ -1296,7 +1311,7 @@ window.LESSONS = [
       async listMetBookings(from, to) { const d = load(); return ok((d.mbook || []).filter(r => r.day >= from && r.day <= to)); },
       async bookMet(row) { const d = load(); const m = me(); d.mbook = d.mbook || [];
         if (row.end_t <= row.start_t) return fail("Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak");
-        if (row.pc_id !== "asosiy") { const pc = (d.mpcs || []).find(x => x.id === row.pc_id); if (!pc) return fail("Bu kompyuter topilmadi yoki yopilgan"); if (row.start_t < pc.from_time) return fail("Bu kompyuter soat " + pc.from_time + " dan ochiq"); }
+        if (row.pc_id !== "asosiy" && !String(row.pc_id).startsWith("auto:")) { const pc = (d.mpcs || []).find(x => x.id === row.pc_id); if (!pc) return fail("Bu kompyuter topilmadi yoki yopilgan"); if (row.start_t < pc.from_time) return fail("Bu kompyuter soat " + pc.from_time + " dan ochiq"); }
         if (d.mbook.some(b => b.day === row.day && b.pc_id === row.pc_id && b.status === "faol" && b.start_t < row.end_t && row.start_t < b.end_t)) return fail("Bu vaqtda kompyuter band. Boshqa vaqt yoki kompyuterni tanlang");
         const r = { ...row, id: "mb" + Date.now(), booked_by: m.id, status: "faol", fb_done: false, created_at: new Date().toISOString() }; d.mbook.push(r); save(); return ok(r); },
       async cancelMet(id) { const d = load(); const b = (d.mbook || []).find(x => x.id === id); if (b) b.status = "bekor"; save(); return ok(true); },
@@ -1466,6 +1481,11 @@ window.LESSONS = [
       async saveCeoReport(date, kind, data, summary) {
         chk(await sb.from("ceo_reports").upsert({ report_date: date, ceo_id: meCache.id, kind, data, summary }, { onConflict: "report_date,ceo_id" })); return true;
       },
+      // ---- Ta'til kunlari va avtomatik bo'sh kompyuter qoidalari
+      async listLeaves(from, to) { return chk(await sb.from("staff_leaves").select("*").gte("to_day", from).lte("from_day", to).order("from_day")); },
+      async addLeaves(rows) { chk(await sb.from("staff_leaves").insert(rows)); return true; },
+      async delLeave(id) { chk(await sb.from("staff_leaves").delete().eq("id", id)); return true; },
+      async listMetRules() { const r = await sb.from("metod_pc_rules").select("*"); return r.error ? [] : r.data; },
       // ---- Metodistlar vaqti
       async listMetPcs(from, to) { return chk(await sb.from("metod_pcs").select("*").gte("day", from).lte("day", to)); },
       async openMetPc(day, owner_id, from_time) { const r = chk(await sb.from("metod_pcs").insert({ day, owner_id, from_time }).select().single()); return r; },
@@ -1622,7 +1642,7 @@ window.METODISTLAR = [
     return;
   }
   const { today } = window.dateUtil;
-  const S = { me: null, about: {}, creps: [], mpcs: [], mbook: [], views: [], profiles: [], tasks: [], reports: [], posts: [], videos: [], info: {}, dtasks: [], dstatus: [], lviews: [], plans: [], navOpen: false, ui: {} };
+  const S = { me: null, about: {}, creps: [], mpcs: [], mbook: [], leaves: [], mrules: [], views: [], profiles: [], tasks: [], reports: [], posts: [], videos: [], info: {}, dtasks: [], dstatus: [], lviews: [], plans: [], navOpen: false, ui: {} };
   const app = document.getElementById("app");
 
   // ---------------------------------------------------------- constants
@@ -1765,7 +1785,10 @@ window.METODISTLAR = [
   }
   const toMins = hm => { const [h, m] = hm.split(":"); return +h * 60 + +m; };
   const minsToHM = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
-  const isWorkday = p => sched(p).days.includes(tashNow().dow);
+  // Ish kuni: yakshanba — hamma uchun dam; 5 kunlik jadvalda — shanba ham; navbatdan tashqari ta'til kunlari
+  const onLeave = (p, iso) => !!p && (S.leaves || []).find(l => l.user_id === p.id && l.from_day <= (iso || today()) && (iso || today()) <= l.to_day);
+  const isWorkdayOn = (p, iso) => sched(p).days.includes(dowOf(iso)) && !onLeave(p, iso);
+  const isWorkday = p => isWorkdayOn(p, today());
   function dueState(p) {
     if (!isWorkday(p)) return "off";
     const end = toMins(sched(p).end), now = tashNow().mins;
@@ -1838,6 +1861,14 @@ window.METODISTLAR = [
     const x = $("#pb-x", el); if (x) x.onclick = () => { S.ui.planBannerHidden = true; dueBanner(); };
   }
   setInterval(dueBanner, 60000);
+  // ---- Real vaqt (Toshkent)
+  function clockHtml() {
+    const x = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tashkent", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+      .formatToParts(new Date()).map(p => [p.type, p.value]));
+    const iso = `${x.year}-${String(x.month).padStart(2, "0")}-${String(x.day).padStart(2, "0")}`;
+    return `<span class="tbc-t">${x.hour}:${x.minute}<small>:${x.second}</small></span><span class="tbc-d">${KUN[dowOf(iso)]}, ${+x.day}-${OYLAR[+x.month - 1]}</span>`;
+  }
+  setInterval(() => { const c = document.getElementById("tb-clock"); if (c) c.innerHTML = clockHtml(); }, 1000);
   const isStaff = () => ["asoschi", "ceo", "xodim"].includes(S.me?.role);
 
   const ICON = {
@@ -1990,6 +2021,8 @@ window.METODISTLAR = [
       const w0 = weekOf(today());
       try { S.plans = await db.listPlans(addD(w0, -7), addD(w0, 7)); } catch (e) { S.plans = []; }
       if (isManager()) { try { S.creps = await db.listCeoReports(today(), today()); } catch (e) { S.creps = []; } }
+      if (db.listLeaves) { try { S.leaves = await db.listLeaves(addD(today(), -62), addD(today(), 120)); } catch (e) { S.leaves = S.leaves || []; } }
+      if (db.listMetRules) { try { S.mrules = await db.listMetRules(); } catch (e) { S.mrules = S.mrules || []; } }
       if (db.listMetBookings) { try { await metReload(); } catch (e) { S.mpcs = S.mpcs || []; S.mbook = S.mbook || []; } }
       if ((S.me.role === "asoschi" || isPersonal(S.me)) && db.listSelfLogs) { try { S.slogs = await db.listSelfLogs(addD(today(), -7), today()); } catch (e) { S.slogs = []; } }
       touchSeen();
@@ -2066,8 +2099,9 @@ window.METODISTLAR = [
           ${db.mode === "demo" ? `<div class="demo-banner"><b>DEMO rejim.</b> Ma'lumotlar faqat shu brauzerda saqlanadi. <button class="btn sm" id="reset-demo">Demo ma'lumotlarni tiklash</button></div>` : ""}
           <header class="topbar">
             <button class="btn sm menu-btn" id="menu-btn" aria-label="Menyu">${ic("menu")}</button>
+            <div class="tb-clock" id="tb-clock" title="Toshkent vaqti">${clockHtml()}</div>
             <div class="spacer"></div>
-            <div style="text-align:right"><div style="font-weight:600">${esc(S.me.full_name || S.me.email)}</div><div class="small muted">${esc(titleOf(S.me))}</div></div>
+            <div class="hide-sm" style="text-align:right"><div style="font-weight:600">${esc(S.me.full_name || S.me.email)}</div><div class="small muted">${esc(titleOf(S.me))}</div></div>
             ${avatar(S.me.full_name, photoOf(S.me))}
             ${S.me.role === "oqituvchi" ? "" : `<button class="btn sm" id="logout" title="Chiqish">${ic("out", 16)}<span class="hide-sm">Chiqish</span></button>`}
           </header>
@@ -2247,7 +2281,7 @@ window.METODISTLAR = [
           const rep = repToday.find(x => x.author_id === p.id);
           const act = S.tasks.filter(x => x.assigned_to === p.id && ACTIVE_T.includes(x.status)).length;
           const od = S.tasks.filter(x => x.assigned_to === p.id && isOverdue(x)).length;
-          return `<tr class="click" data-info="${p.id}"><td><b>${esc(p.full_name)}</b></td><td>${rep ? gradePill(rep.grade) : !isWorkday(p) ? `<span class="small muted">Dam olish kuni</span>` : dueLabel(p)}</td>
+          return `<tr class="click" data-info="${p.id}"><td><b>${esc(p.full_name)}</b></td><td>${rep ? gradePill(rep.grade) : !isWorkday(p) ? `<span class="small muted">${onLeave(p) ? "Ta'tilda" : "Dam olish kuni"}</span>` : dueLabel(p)}</td>
             <td class="hide-sm small">${seenPill(p)}</td><td class="hide-sm">${act}</td><td>${od ? pill("overdue", od) : "0"}</td></tr>`;
         }).join("") || `<tr><td colspan="5" class="empty">Jamoangizda hali xodim yo'q</td></tr>`}</tbody></table>`;
     }
@@ -2302,7 +2336,7 @@ window.METODISTLAR = [
       ${note ? `<div class="ceo-note"><div class="small"><b>📌 Rahbaringizdan eslatma</b> · ${fmtDate(note.report_date)}</div><div style="white-space:pre-wrap;margin-top:4px">${esc(note.staff_note)}</div></div>` : ""}
       <div class="cols">
         <div class="card"><div class="card-head"><h2>Bugungi rejangiz</h2><span class="spacer"></span><span class="small muted">${esc(KUN[dowOf(t)])}</span></div>
-          ${!isWorkday(S.me) ? `<p class="muted">Bugun dam olish kuningiz.</p>` : plan ? `<div class="today-plan">${esc(plan)}</div>` : `<p class="muted">Bugun uchun reja hali kiritilmagan.</p>`}
+          ${!isWorkday(S.me) ? `<p class="muted">${onLeave(S.me) ? `Bugun ta'tildasiz${onLeave(S.me).reason ? " (" + esc(onLeave(S.me).reason) + ")" : ""}.` : "Bugun dam olish kuningiz."}</p>` : plan ? `<div class="today-plan">${esc(plan)}</div>` : `<p class="muted">Bugun uchun reja hali kiritilmagan.</p>`}
           <h3 style="margin:16px 0 8px">Shu haftalik reja</h3>
           <div class="week-mini">${sched(S.me).days.map(dw => { const d = addD(ws, dw - 1);
             return `<div class="wm ${d === t ? "today" : ""} ${d < t ? "past" : ""}"><b>${KUN_S[dw]}</b><span>${esc(days[dw] || "—")}</span></div>`; }).join("")}</div>
@@ -2910,8 +2944,27 @@ window.METODISTLAR = [
   const metName = b => b.metodist_key === "boshqa" ? b.metodist_name : (metOf(b.metodist_key)?.name || b.metodist_name);
   const metTitle = b => b.metodist_key === "boshqa" ? "Boshqa (rahbar yoki metodist)" : (metOf(b.metodist_key)?.title || "");
   const metPhoto = (b, cls = "") => { const m = b.metodist_key !== "boshqa" && metOf(b.metodist_key); return avatar(metName(b), m ? m.photo : "", cls); };
-  const metPcs = day => [{ id: "asosiy", main: true, day }, ...(S.mpcs || []).filter(p => p.day === day).sort((a, b) => nameOf(a.owner_id).localeCompare(nameOf(b.owner_id)))];
-  const metPc = id => id === "asosiy" ? { id: "asosiy", main: true } : (S.mpcs || []).find(p => p.id === id);
+  // Avtomatik bo'sh joy: ta'til kuni, 5 kunlik jadvalda shanba, yoki doimiy qoida (masalan, har kuni 13:00 dan)
+  function metAutoFrom(pid, day) {
+    const p = person(pid); if (!p || !p.active || p.archived || !["ceo", "xodim"].includes(p.role)) return null;
+    const dw = dowOf(day); if (dw === 7) return null;
+    if (onLeave(p, day)) return { from: "07:00", why: "Ta'tilda — butun kun bo'sh (avtomatik)" };
+    if (dw === 6 && /5\s*\/\s*2/.test(p.work_hours || "")) return { from: "07:00", why: "Shanba — 5 kunlik ish jadvali, butun kun bo'sh (avtomatik)" };
+    const r = (S.mrules || []).find(x => x.owner_id === pid);
+    if (r && (r.dows || []).includes(dw)) return { from: r.from_time, why: `Har kuni soat ${r.from_time} dan bo'sh (avtomatik)` };
+    return null;
+  }
+  const metPcs = day => {
+    const manual = (S.mpcs || []).filter(p => p.day === day).map(p => ({ ...p, manual: true }));
+    const autos = S.profiles.filter(p => !manual.some(m => m.owner_id === p.id)).map(p => { const a = metAutoFrom(p.id, day);
+      return a && { id: "auto:" + p.id, auto: true, owner_id: p.id, day, from_time: a.from, why: a.why }; }).filter(Boolean);
+    return [{ id: "asosiy", main: true, day }, ...[...manual, ...autos].sort((a, b) => nameOf(a.owner_id).localeCompare(nameOf(b.owner_id)))];
+  };
+  const metPc = (id, day) => {
+    if (id === "asosiy") return { id: "asosiy", main: true, day };
+    if (String(id).startsWith("auto:")) { const o = id.slice(5); const a = metAutoFrom(o, day || today()); return { id, auto: true, owner_id: o, day, from_time: a ? a.from : "07:00", why: a ? a.why : "" }; }
+    const m = (S.mpcs || []).find(p => p.id === id); return m && { ...m, manual: true };
+  };
   const pcName = pc => !pc ? "Yopilgan kompyuter" : pc.main ? "Metodist kompyuteri" : `${nameOf(pc.owner_id)} kompyuteri`;
   const metBk = (day, pcId) => (S.mbook || []).filter(b => b.day === day && b.pc_id === pcId && b.status === "faol").sort((a, b) => a.start_t < b.start_t ? -1 : 1);
   const metPending = () => !S.me ? [] : (S.mbook || []).filter(b => b.booked_by === S.me.id && b.status === "faol" && !b.fb_done && metEnded(b));
@@ -2961,7 +3014,7 @@ window.METODISTLAR = [
       const closedNow = !pc.main && day === t && false;
       const status = day !== t ? (bk.length ? pill("jarayonda", `${bk.length} ta bron`) : pill("tasdiqlandi", "Bo'sh"))
         : cur ? pill("qaytarildi", `Hozir band · ${cur.end_t} gacha`) : pill("tasdiqlandi", "Hozir bo'sh");
-      const sub = pc.main ? "Doimiy · har kuni ochiq" : `${day === t ? "Bugun" : fmtDate(pc.day)} soat ${pc.from_time} dan kun oxirigacha · ochdi: ${esc(nameOf(pc.opened_by))}`;
+      const sub = pc.main ? "Doimiy · har kuni ochiq (yakshanbadan tashqari)" : pc.auto ? esc(pc.why) : `${day === t ? "Bugun" : fmtDate(pc.day)} soat ${pc.from_time} dan kun oxirigacha · ochdi: ${esc(nameOf(pc.opened_by))}`;
       const own = b => b.booked_by === S.me.id || admin;
       return `<div class="card met-pc ${pc.main ? "main" : "extra"}">
         <div class="met-pc-h">${pc.main ? `<div class="met-ico">🖥</div>` : avatar(nameOf(pc.owner_id), photoOf(person(pc.owner_id)))}
@@ -2980,7 +3033,7 @@ window.METODISTLAR = [
             ${metNow(b) ? pill("qaytarildi", "Hozir") : metEnded(b) ? (b.fb_done ? pill("tasdiqlandi", "Yakunlandi") : pill("jarayonda", "So'rovnoma kutilmoqda")) : ""}
             ${own(b) && !metEnded(b) ? `<button class="btn sm ghost" data-mcancel="${b.id}" title="Bronni bekor qilish">Bekor</button>` : ""}
           </div>`).join("") : `<div class="small muted met-free">${esc(dayLabel(day))} hali hech kim band qilmagan</div>`}</div>
-        <div class="row met-pc-f">${!pc.main && admin ? `<button class="btn sm ghost" data-mclose="${pc.id}">Joyni yopish</button>` : ""}<span class="spacer"></span>
+        <div class="row met-pc-f">${pc.manual && admin ? `<button class="btn sm ghost" data-mclose="${pc.id}">Joyni yopish</button>` : ""}<span class="spacer"></span>
           <button class="btn primary" data-mbook="${pc.id}">Band qilish</button></div>
       </div>`;
     };
@@ -2989,7 +3042,7 @@ window.METODISTLAR = [
         <span class="small muted">${esc(dayLabel(day))} · hozir ${now}</span><span class="spacer"></span>
         ${admin && day === t ? `<button class="btn" id="met-open">+ Yana bir xodimning joyi bo'sh</button>` : ""}</div>
       ${admin && day !== t ? `<div class="small muted" style="margin:-4px 0 12px">Xodimning bo'sh joyi faqat bugun uchun ochiladi va kun tugashi bilan yopiladi.</div>` : ""}
-      <div class="met-grid">${pcs.map(card).join("")}</div>`;
+      ${dowOf(day) === 7 ? `<div class="card empty">🌿 <b>Yakshanba — hamma uchun dam olish kuni.</b><div class="small muted" style="margin-top:6px">Boshqa kunni tanlang.</div></div>` : `<div class="met-grid">${pcs.map(card).join("")}</div>`}`;
     $$("[data-md]", root).forEach(b => b.onclick = () => { S.ui.mday = b.dataset.md; metPcTab(root, top); });
     $("#met-d", root).onchange = e => { S.ui.mday = e.target.value; metPcTab(root, top); };
     $$("[data-mbook]", root).forEach(b => b.onclick = () => metBookForm(b.dataset.mbook, day, top));
@@ -3011,7 +3064,7 @@ window.METODISTLAR = [
     const t = today();
     let F = { pc: pcId, day, start: "", end: "", key: "", other: "", purpose: "" };
     const firstFree = () => {
-      const pc = metPc(F.pc); let a = F.day === t ? Math.ceil((tashNow().mins + 1) / 15) * 15 : 9 * 60;
+      const pc = metPc(F.pc, F.day); let a = F.day === t ? Math.ceil((tashNow().mins + 1) / 15) * 15 : 9 * 60;
       if (pc && !pc.main) a = Math.max(a, toMins(pc.from_time));
       const bk = metBk(F.day, F.pc);
       for (let m = Math.max(a, MET_FROM); m + 30 <= MET_TO; m += 15) { const s = minsToHM(m), e = minsToHM(m + 60 > MET_TO ? MET_TO : m + 60);
@@ -3025,7 +3078,7 @@ window.METODISTLAR = [
     const box = $("#mbf", m);
     const draw = () => {
       const pcs = metPcs(F.day); if (!pcs.some(p => p.id === F.pc)) F.pc = "asosiy";
-      const pc = metPc(F.pc);
+      const pc = metPc(F.pc, F.day);
       const bk = metBk(F.day, F.pc);
       const minS = F.day === t ? tashNow().mins : MET_FROM;
       const starts = metTimes(MET_FROM, MET_TO - 15).filter(x => toMins(x) >= (pc.main ? 0 : toMins(pc.from_time)) && toMins(x) + 15 > minS);
@@ -3046,7 +3099,7 @@ window.METODISTLAR = [
           ${F.key === "boshqa" ? `<input id="mbf-o" value="${esc(F.other)}" placeholder="Ism-familiyasi va lavozimi, masalan: Karimova Dilnoza, Chilonzor filiali direktori" style="margin-top:10px">` : ""}</div>
         <div class="field"><label>Maqsad <span class="muted">(ixtiyoriy)</span></label><input id="mbf-p" value="${esc(F.purpose)}" placeholder="Masalan: 5-sinflar ingliz tili darslarini ko'rish"></div>`;
       const d = $("#mbf-dur", box); if (d) d.textContent = F.end > F.start ? `· ${durH({ start_t: F.start, end_t: F.end })} soat` : "";
-      $("#mbf-pc", box).onchange = e => { F.pc = e.target.value; const p = metPc(F.pc); if (p && !p.main) F.day = p.day; [F.start, F.end] = firstFree(); draw(); };
+      $("#mbf-pc", box).onchange = e => { F.pc = e.target.value; const p = metPc(F.pc, F.day); if (p && !p.main) F.day = p.day; [F.start, F.end] = firstFree(); draw(); };
       $("#mbf-d", box).onchange = e => { F.day = e.target.value < t ? t : e.target.value; [F.start, F.end] = firstFree(); draw(); };
       $("#mbf-d", box).disabled = !pc.main;
       $("#mbf-s", box).onchange = e => { const len = toMins(F.end) - toMins(F.start); F.start = e.target.value; F.end = minsToHM(Math.min(MET_TO, toMins(F.start) + Math.max(15, len))); draw(); };
@@ -3060,7 +3113,8 @@ window.METODISTLAR = [
     const err = msg => { $("#mbf-err", m).textContent = msg; return null; };
     $("#mbf-ok", m).onclick = async e => {
       err("");
-      const pc = metPc(F.pc);
+      const pc = metPc(F.pc, F.day);
+      if (dowOf(F.day) === 7) return err("Yakshanba — dam olish kuni. Boshqa kunni tanlang");
       if (!F.start || !F.end || F.end <= F.start) return err("Vaqtni to'g'ri tanlang");
       if (F.day === t && F.end <= nowHM()) return err("Bu vaqt o'tib ketgan");
       if (pc && !pc.main && F.start < pc.from_time) return err(`Bu kompyuter soat ${pc.from_time} dan ochiq`);
@@ -3073,7 +3127,7 @@ window.METODISTLAR = [
       e.target.disabled = true;
       try {
         await db.bookMet(row);
-        toast(`${pcName(pc)} band qilindi: ${dayLabel(F.day)} ${F.start}–${F.end}`);
+        toast(`${pcName(metPc(F.pc, F.day))} band qilindi: ${dayLabel(F.day)} ${F.start}–${F.end}`);
         closeModal(); S.ui.mday = F.day; await metReload(); metView(top);
       } catch (x) { e.target.disabled = false; err(x.message || "Xatolik"); }
     };
@@ -3121,7 +3175,7 @@ window.METODISTLAR = [
     const st = b => b.status === "bekor" ? pill("missing", "Bekor qilingan") : metNow(b) ? pill("qaytarildi", "Hozir") : !metEnded(b) ? pill("jarayonda", "Kutilmoqda")
       : b.fb_done ? pill("tasdiqlandi", "So'rovnoma yuborildi") : `<button class="btn sm primary" data-mfb="${b.id}">So'rovnomani to'ldirish</button>`;
     root.innerHTML = `<div class="card">${mine.length ? mine.map(b => `<div class="list-item met-my">${metPhoto(b)}
-        <div style="flex:1;min-width:0"><div class="t">${esc(metName(b))}</div><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}${b.purpose ? " · " + esc(b.purpose) : ""}</div></div>
+        <div style="flex:1;min-width:0"><div class="t">${esc(metName(b))}</div><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id, b.day)))}${b.purpose ? " · " + esc(b.purpose) : ""}</div></div>
         ${st(b)}${b.status === "faol" && !metEnded(b) ? `<button class="btn sm ghost" data-mcancel="${b.id}">Bekor</button>` : ""}</div>`).join("")
       : `<div class="empty">Siz hali metodist vaqtini band qilmagansiz.<div style="margin-top:10px"><button class="btn primary sm" id="mm-go">Band qilish</button></div></div>`}</div>
       <p class="small muted" style="margin-top:10px">Metodist vaqti tugagach, so'rovnoma shu yerda va bosh sahifada chiqadi. Javoblaringizni faqat Monitoring bo'limi rahbari va Akademik bo'lim rahbari ko'radi.</p>`;
@@ -3141,7 +3195,7 @@ window.METODISTLAR = [
     const box = $("#mff", m);
     const draw = () => {
       box.innerHTML = `<div class="met-fbh">${metPhoto(b, "lg")}<div><b>${esc(metName(b))}</b><div class="small muted">${esc(metTitle(b))}</div>
-          <div class="small">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}</div></div></div>
+          <div class="small">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id, b.day)))}</div></div></div>
         <div class="field"><label>Metodist keldimi? *</label><div class="seg"><button type="button" data-came="1" class="${F.came ? "active" : ""}">Ha, keldi</button><button type="button" data-came="0" class="${!F.came ? "active" : ""}">Yo'q, kelmadi</button></div></div>
         ${F.came ? `
           <div class="field"><label>Metodist nimalarni ko'rdi? *</label><textarea id="mff-s" rows="3" placeholder="Masalan: 2 ta dars kuzatdi, dars ishlanmalari va sinf jurnalini tekshirdi…">${esc(F.seen)}</textarea></div>
@@ -3199,7 +3253,7 @@ window.METODISTLAR = [
         ${waiting.map(b => `<div class="list-item">${metPhoto(b)}<div style="flex:1;min-width:0"><div class="t">${esc(metName(b))}</div><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · bron qildi: <b>${esc(nameOf(b.booked_by))}</b></div></div></div>`).join("")}</div>` : ""}
       <div class="card"><div class="card-head"><h2>Javoblar</h2><span class="spacer"></span><span class="small muted">${done.length} ta</span></div>
         ${done.length ? done.map(({ f, b }) => `<div class="met-ans">
-          <div class="met-ans-h">${metPhoto(b)}<div style="flex:1;min-width:0"><b>${esc(metName(b))}</b><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}</div></div>
+          <div class="met-ans-h">${metPhoto(b)}<div style="flex:1;min-width:0"><b>${esc(metName(b))}</b><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id, b.day)))}</div></div>
             ${f.came ? pill("tasdiqlandi", "Keldi") : pill("missing", "Kelmadi")}</div>
           <div class="small muted" style="margin:6px 0 8px">Bron qildi va javob berdi: <b>${esc(nameOf(f.author_id || b.booked_by))}</b> · ${fmtDate(f.created_at)} ${tmOf(f.created_at)}${b.purpose ? ` · Maqsad: ${esc(b.purpose)}` : ""}</div>
           ${f.came ? `<div class="met-qa"><span>Nimalarni ko'rdi</span><p>${esc(f.seen)}</p></div><div class="met-qa"><span>Kimlarni ko'rdi</span><p>${esc(f.whom)}</p></div>` : ""}
@@ -4351,11 +4405,18 @@ window.METODISTLAR = [
   PAGES.xodimlar = page => (S.me.role === "asoschi" ? usersAdmin : myTeam)(page);
 
   function usersAdmin(page) {
+    const tab = S.ui.utab || "faol";
+    const archN = S.profiles.filter(p => p.archived).length;
+    const tabsHtml = `<div class="tabs" style="margin-top:0">${[["faol", "Faol xodimlar"], ["arxiv", `Arxiv${archN ? ` <span class="small muted">${archN}</span>` : ""}`], ["tatil", "Ta'til kunlari"]]
+      .map(([k, l]) => `<button data-ut="${k}" class="${k === tab ? "active" : ""}">${l}</button>`).join("")}</div>`;
+    const bindTabsU = () => $$("[data-ut]", page).forEach(b => b.onclick = () => { S.ui.utab = b.dataset.ut; usersAdmin(page); });
+    if (tab === "arxiv") { page.innerHTML = head("Foydalanuvchilar", "Ishdan bo'shatilgan xodimlar avtomatik shu yerga o'tadi. Ular portalga kira olmaydi, ma'lumotlari saqlanib qoladi.") + tabsHtml + `<div id="u-body"></div>`; bindTabsU(); return archiveView($("#u-body", page)); }
+    if (tab === "tatil") { page.innerHTML = head("Foydalanuvchilar", "Navbatdan tashqari ta'til kunlarini belgilang. Yakshanba — hamma uchun dam olish kuni, 5 kunlik ish jadvalidagilar uchun shanba ham.") + tabsHtml + `<div id="u-body"></div>`; bindTabsU(); return leavesView($("#u-body", page)); }
     const rf = S.ui.urole || "";
-    const list = S.profiles.filter(p => !rf || p.role === rf).sort((a, b) =>
+    const list = S.profiles.filter(p => !p.archived && (!rf || p.role === rf)).sort((a, b) =>
       ["kutilmoqda", "asoschi", "ceo", "xodim", "rahbar", "oqituvchi"].indexOf(a.role) - ["kutilmoqda", "asoschi", "ceo", "xodim", "rahbar", "oqituvchi"].indexOf(b.role) || (a.full_name || "").localeCompare(b.full_name || ""));
     const pendingN = S.profiles.filter(p => p.role === "kutilmoqda").length;
-    page.innerHTML = head("Foydalanuvchilar", "Kim qaysi rolda va kimning jamoasida ekanini shu yerda belgilaysiz.", `<button class="btn primary" id="new-user">+ Yangi foydalanuvchi</button>`) + `
+    page.innerHTML = head("Foydalanuvchilar", "Kim qaysi rolda va kimning jamoasida ekanini shu yerda belgilaysiz.", `<button class="btn primary" id="new-user">+ Yangi xodimni ishga olish</button>`) + tabsHtml + `
       ${pendingN ? `<div class="note bad" style="margin:0 0 14px">${pendingN} ta foydalanuvchi rol berilishini kutmoqda.</div>` : ""}
       <div id="import-box"></div>
       <div class="filters"><select id="ur"><option value="">Barcha rollar</option>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${rf === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
@@ -4363,9 +4424,10 @@ window.METODISTLAR = [
         ${list.map(p => `<tr><td><div class="row" style="gap:10px;flex-wrap:nowrap">${avatar(p.full_name, photoOf(p))}<div><b>${esc(p.full_name || "—")}</b><div class="small muted">${p.role === "oqituvchi" ? "Filial: " + esc(p.filial || "—") : esc(loginOf(p))}${["ceo", "xodim"].includes(p.role) ? " · " + esc(titleOf(p)) : ""}</div></div></div></td>
           <td>${p.role === "kutilmoqda" ? pill("missing", ROLES[p.role]) : esc(ROLES[p.role])}</td>
           <td class="hide-sm">${p.ceo_id ? esc(nameOf(p.ceo_id)) : p.role === "xodim" ? "Shaxsiy bo'limim" : "—"}</td>
-          <td class="hide-sm small">${!p.active ? pill("", "O'chirilgan") : ["ceo", "xodim", "asoschi"].includes(p.role) ? seenPill(p) : "—"}</td>
+          <td class="hide-sm small">${!p.active ? pill("", "O'chirilgan") : onLeave(p) ? pill("jarayonda", "Ta'tilda") : ["ceo", "xodim", "asoschi"].includes(p.role) ? seenPill(p) : "—"}</td>
           <td style="text-align:right;white-space:nowrap">${S.info[p.phone] || ["ceo", "xodim"].includes(p.role) ? `<button class="btn sm" data-info="${p.id}">Profil va reja</button> ` : ""}${p.id !== S.me.id ? `<button class="btn sm" data-u="${p.id}">Tahrirlash</button>` : `<span class="small muted">siz</span>`}</td></tr>`).join("")}
       </tbody></table></div></div>`;
+    bindTabsU();
     $("#ur").onchange = e => { S.ui.urole = e.target.value; usersAdmin(page); };
     $("#new-user").onclick = () => userForm();
     $$("[data-u]", page).forEach(b => b.onclick = () => userForm(person(b.dataset.u)));
@@ -4411,7 +4473,7 @@ window.METODISTLAR = [
   function userForm(u) {
     const ceos = S.profiles.filter(p => p.role === "ceo" && p.active && p.id !== u?.id);
     const roleOpts = Object.entries(ROLES).filter(([k]) => k !== "asoschi" && (k !== "kutilmoqda" || u)).map(([k, v]) => `<option value="${k}" ${(u?.role || "xodim") === k ? "selected" : ""}>${v}</option>`).join("");
-    const m = openModal(u ? "Foydalanuvchini tahrirlash" : "Yangi foydalanuvchi", `
+    const m = openModal(u ? "Foydalanuvchini tahrirlash" : "Yangi xodimni ishga olish", `
       <form id="uform">
         <div class="field"><label>To'liq ism *</label><input name="full_name" required value="${esc(u?.full_name)}"></div>
         ${u ? `<p class="small muted" style="margin-top:-6px">Login: <b>${esc(loginOf(u))}</b></p>` : `
@@ -4422,7 +4484,7 @@ window.METODISTLAR = [
           ${u && ["ceo", "xodim"].includes(u.role) ? `<div class="field"><label>Lavozim <span class="muted">(bo'limdan avtomatik)</span></label><input value="${esc(titleOf(u))}" disabled></div>` : ""}
           <div class="field"><label>Ish vaqti</label><input name="work_hours" placeholder="6/1 8:00 dan 18:00 gacha" value="${esc(u?.work_hours)}"></div>
           ${u ? `<div class="field"><label>Tug'ilgan sana</label><input type="date" name="birth_date" value="${esc(u.birth_date || "")}"></div>` : ""}
-          <div class="field"><label>Ish boshlagan sana</label><input type="date" name="start_date" value="${esc(u?.start_date || "")}"></div>
+          <div class="field"><label>${u ? "Ish boshlagan sana" : "Ishga olingan sana"}</label><input type="date" name="start_date" value="${esc(u?.start_date || (u ? "" : today()))}"></div>
         </div>
         <div class="grid2">
           <div class="field"><label>Rol</label><select name="role" id="u-role">${roleOpts}</select></div>
@@ -4430,13 +4492,14 @@ window.METODISTLAR = [
           <div class="field" id="ceo-field"><label>Qaysi CEO jamoasida</label><select name="ceo_id"><option value="">Asoschiga (shaxsiy bo'lim)</option>${ceos.map(c => `<option value="${c.id}" ${u?.ceo_id === c.id ? "selected" : ""}>${esc(c.full_name)}</option>`).join("")}</select></div>
         </div>
         ${u ? `<label style="display:flex;gap:8px;align-items:center;color:var(--text);font-weight:500"><input type="checkbox" name="active" style="width:auto" ${u.active ? "checked" : ""}> Faol (o'chirilsa, portalga kira olmaydi)</label>` : ""}
-      </form>`, `${u ? `<button class="btn sm" id="u-reset">Parolni tug'ilgan sanaga qaytarish</button><span class="spacer"></span>` : ""}<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="usave">Saqlash</button>`);
+      </form>`, `${u ? `<button class="btn sm" id="u-reset">Parolni tug'ilgan sanaga qaytarish</button>${!u.archived && u.role !== "asoschi" ? `<button class="btn sm bad" id="u-fire">Ishdan bo'shatish</button>` : ""}<span class="spacer"></span>` : ""}<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="usave">Saqlash</button>`);
     const rs = $("#u-reset", m);
     if (rs) rs.onclick = async () => {
       const bd = $("[name=birth_date]", m).value || u.birth_date;
       if (!bd) return toast("Avval tug'ilgan sanani kiriting", true);
       await act(() => db.adminSetPassword(u.id, pwFromBirth(bd)), `Parol tiklandi: ${pwFromBirth(bd)}`);
     };
+    const fb = $("#u-fire", m); if (fb) fb.onclick = () => dismissForm(u);
     const sync = () => { $("#ceo-field", m).style.display = $("#u-role", m).value === "xodim" ? "" : "none"; $("#bolim-field", m).style.display = $("#u-role", m).value === "ceo" ? "" : "none"; };
     $("#u-role", m).onchange = sync; sync();
     $("#usave", m).onclick = async () => {
@@ -4454,6 +4517,87 @@ window.METODISTLAR = [
       }
       await refresh(); render();
     };
+  }
+
+  // ---- Ishdan bo'shatish (faqat Monitoring bo'limi rahbari) — avtomatik arxivga o'tadi
+  const LEFT_REASONS = ["O'z xohishiga ko'ra", "Shartnoma muddati tugadi", "Boshqa ishga o'tdi", "Intizomiy sabab", "Lavozimga mos kelmadi", "Boshqa sabab"];
+  function dismissForm(u) {
+    const team = S.profiles.filter(p => p.ceo_id === u.id && p.active);
+    const m = openModal("Ishdan bo'shatish", `
+      <div class="met-fbh">${avatar(u.full_name, photoOf(u), "lg")}<div><b>${esc(u.full_name)}</b><div class="small muted">${esc(titleOf(u))}</div>${u.start_date ? `<div class="small">Ishga olingan: ${fmtBirth(u.start_date)}</div>` : ""}</div></div>
+      ${team.length ? `<div class="note bad" style="margin:0 0 12px">Bu rahbarning jamoasida ${team.length} ta xodim bor (${team.map(p => esc(p.full_name)).join(", ")}). Bo'shatgandan keyin ularni boshqa rahbarga biriktiring.</div>` : ""}
+      <div class="grid2"><div class="field"><label>Bo'shatilgan sana *</label><input type="date" id="df-d" value="${today()}"></div>
+        <div class="field"><label>Ketish sababi *</label><select id="df-r"><option value="">— tanlang —</option>${LEFT_REASONS.map(r => `<option>${esc(r)}</option>`).join("")}</select></div></div>
+      <div class="field"><label>Izoh <span class="muted" id="df-req">(ixtiyoriy)</span></label><textarea id="df-n" rows="3" placeholder="Batafsil: nima sababdan ketdi, kimga ishlarini topshirdi…"></textarea></div>
+      <p class="small muted" style="margin:0">Xodim avtomatik <b>arxivga</b> o'tadi va portalga kira olmaydi. Hisobotlari, baholari va boshqa ma'lumotlari o'chmaydi. Arxivdan istalgan vaqt qayta tiklash mumkin.</p>`,
+      `<span class="err-text" id="df-err" style="margin-right:auto"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary bad" id="df-ok">Bo'shatish va arxivlash</button>`);
+    $("#df-r", m).onchange = e => $("#df-req", m).textContent = e.target.value === "Boshqa sabab" ? "*" : "(ixtiyoriy)";
+    $("#df-ok", m).onclick = async e => {
+      const d = $("#df-d", m).value, r = $("#df-r", m).value, n = $("#df-n", m).value.trim();
+      const er = x => { $("#df-err", m).textContent = x; };
+      if (!d) return er("Sanani kiriting"); if (!r) return er("Ketish sababini tanlang"); if (r === "Boshqa sabab" && n.length < 3) return er("Sababni izohda yozing");
+      e.target.disabled = true;
+      try {
+        await db.updateProfile(u.id, { active: false, archived: true, left_at: d, left_reason: n ? `${r} — ${n}` : r });
+        toast(`${u.full_name} ishdan bo'shatildi va arxivga o'tkazildi`); closeModal(); await refresh(); render();
+      } catch (x) { e.target.disabled = false; er(x.message || "Xatolik"); }
+    };
+  }
+  function archiveView(root) {
+    const list = S.profiles.filter(p => p.archived).sort((a, b) => String(b.left_at || "").localeCompare(String(a.left_at || "")));
+    root.innerHTML = `<div class="card"><div class="table-wrap">${list.length ? `<table><thead><tr><th>Xodim</th><th class="hide-sm">Ishga olingan</th><th>Bo'shatilgan</th><th>Ketish sababi</th><th></th></tr></thead><tbody>
+      ${list.map(p => `<tr><td><div class="row" style="gap:10px;flex-wrap:nowrap">${avatar(p.full_name, photoOf(p))}<div><b>${esc(p.full_name)}</b><div class="small muted">${esc(titleOf(p))}${p.ceo_id ? " · " + esc(nameOf(p.ceo_id)) : ""}</div></div></div></td>
+        <td class="hide-sm small">${p.start_date ? fmtBirth(p.start_date) : "—"}</td><td class="small"><b>${p.left_at ? fmtBirth(p.left_at) : "—"}</b></td>
+        <td class="small" style="max-width:340px;white-space:pre-wrap">${esc(p.left_reason || "—")}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-info="${p.id}">Profil</button> <button class="btn sm" data-rest="${p.id}">Qayta ishga olish</button></td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty">Arxiv bo'sh — hali hech kim ishdan bo'shatilmagan</div>`}</div></div>`;
+    $$("[data-info]", root).forEach(b => b.onclick = () => infoModal(person(b.dataset.info)));
+    $$("[data-rest]", root).forEach(b => b.onclick = async () => { const p = person(b.dataset.rest); b.disabled = true;
+      try { await act(() => db.updateProfile(p.id, { archived: false, active: true, left_at: null, left_reason: "" }), `${p.full_name} qayta ishga olindi`); await refresh(); render(); } catch (e) { b.disabled = false; } });
+  }
+  // ---- Navbatdan tashqari ta'til kunlari (faqat Monitoring bo'limi rahbari)
+  function leavesView(root) {
+    const t = today();
+    const staff = S.profiles.filter(p => p.active && !p.archived && ["ceo", "xodim"].includes(p.role)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    const sel = new Set();
+    const list = (S.leaves || []).filter(l => l.to_day >= addD(t, -30)).sort((a, b) => a.from_day < b.from_day ? -1 : 1);
+    const daysN = l => dayDiff(l.from_day, l.to_day) + 1;
+    root.innerHTML = `<div class="cols">
+      <div class="card"><div class="card-head"><h2>Ta'til belgilash</h2></div>
+        <div class="grid2"><div class="field"><label>Qaysi kundan *</label><input type="date" id="lv-f" value="${t}"></div><div class="field"><label>Qaysi kungacha *</label><input type="date" id="lv-t" value="${t}"></div></div>
+        <div class="field"><label>Sababi</label><input id="lv-r" placeholder="Masalan: bayram, mehnat ta'tili, kasallik, o'qish…"></div>
+        <div class="field"><label class="row" style="gap:8px;margin:0"><span>Xodimlar *</span><span class="spacer"></span><label class="small" style="margin:0;display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" id="lv-all" style="width:auto;margin:0"> Hammasi</label></label>
+          <input id="lv-q" placeholder="Qidirish…" style="margin-bottom:8px"><div class="met-staff" id="lv-l" style="max-height:300px"></div></div>
+        <div class="err-text" id="lv-err"></div>
+        <div class="row" style="margin-top:10px"><span class="small muted" id="lv-n">Hech kim tanlanmagan</span><span class="spacer"></span><button class="btn primary" id="lv-ok" disabled>Ta'tilni belgilash</button></div></div>
+      <div class="card"><div class="card-head"><h2>Belgilangan ta'tillar</h2><span class="spacer"></span><span class="small muted">${list.length} ta</span></div>
+        ${list.length ? list.map(l => { const p = person(l.user_id) || { full_name: nameOf(l.user_id) }; const now = l.from_day <= t && t <= l.to_day; const past = l.to_day < t;
+          return `<div class="list-item" style="${past ? "opacity:.6" : ""}">${avatar(p.full_name, photoOf(p))}<div style="flex:1;min-width:0"><div class="t">${esc(p.full_name)}</div>
+            <div class="small muted">${fmtBirth(l.from_day)}${l.to_day !== l.from_day ? " – " + fmtBirth(l.to_day) : ""} · ${daysN(l)} kun${l.reason ? " · " + esc(l.reason) : ""}</div></div>
+            ${now ? pill("jarayonda", "Hozir ta'tilda") : past ? pill("", "O'tgan") : pill("tasdiqlandi", "Rejada")}<button class="x" data-lvdel="${l.id}" title="O'chirish">×</button></div>`; }).join("")
+          : `<div class="empty">Hali ta'til belgilanmagan</div>`}
+        <p class="small muted" style="margin:12px 0 0">Ta'til kunlari xodim uchun dam olish kuni hisoblanadi: hisobot eslatmalari chiqmaydi, kompyuteri esa metodistlar uchun avtomatik bo'sh joy bo'lib chiqadi.</p></div></div>`;
+    const draw = () => {
+      const q = $("#lv-q", root).value.trim().toLowerCase();
+      $("#lv-l", root).innerHTML = staff.filter(p => !q || p.full_name.toLowerCase().includes(q)).map(p => `<label class="met-st ${sel.has(p.id) ? "on" : ""}"><input type="checkbox" data-lid="${p.id}" ${sel.has(p.id) ? "checked" : ""}>
+        ${avatar(p.full_name, photoOf(p))}<div style="flex:1;min-width:0"><b>${esc(p.full_name)}</b><div class="small muted">${esc(titleOf(p))} · ${esc(sched(p).label)}</div></div>${onLeave(p) ? pill("jarayonda", "Ta'tilda") : ""}</label>`).join("") || `<div class="empty">Topilmadi</div>`;
+      $$("[data-lid]", root).forEach(c => c.onchange = () => { c.checked ? sel.add(c.dataset.lid) : sel.delete(c.dataset.lid); draw(); });
+      $("#lv-n", root).textContent = sel.size ? `${sel.size} ta xodim tanlandi` : "Hech kim tanlanmagan";
+      $("#lv-ok", root).disabled = !sel.size; $("#lv-all", root).checked = sel.size === staff.length;
+    };
+    $("#lv-q", root).oninput = draw;
+    $("#lv-all", root).onchange = e => { sel.clear(); if (e.target.checked) staff.forEach(p => sel.add(p.id)); draw(); };
+    draw();
+    $("#lv-ok", root).onclick = async e => {
+      const f = $("#lv-f", root).value, to = $("#lv-t", root).value, r = $("#lv-r", root).value.trim();
+      const er = x => { $("#lv-err", root).textContent = x; };
+      if (!f || !to) return er("Sanalarni kiriting"); if (to < f) return er("Tugash sanasi boshlanishidan oldin bo'lmasin");
+      e.target.disabled = true;
+      try { await db.addLeaves([...sel].map(user_id => ({ user_id, from_day: f, to_day: to, reason: r })));
+        toast(`${sel.size} ta xodimga ta'til belgilandi`); await refresh(); render(); } catch (x) { e.target.disabled = false; er(x.message || "Xatolik"); }
+    };
+    $$("[data-lvdel]", root).forEach(b => b.onclick = async () => { b.disabled = true;
+      try { await act(() => db.delLeave(b.dataset.lvdel), "Ta'til o'chirildi"); await refresh(); render(); } catch (e) { b.disabled = false; } });
   }
 
   function myTeam(page) {
