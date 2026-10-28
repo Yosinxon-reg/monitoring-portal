@@ -2921,7 +2921,7 @@ window.LESSONS = [
     return c ? deptOf(c) : (DEPTS[p.bolim] ? p.bolim : "administratsiya");
   }
   const itemsFor = p => isPersonal(p) ? [] : byFounder(p) ? [SIMPLE] : KPI_TPL[DEPTS[deptOf(p)].tpl].items;
-  const KPI_ANCHOR = "2026-10-19";
+  const KPI_ANCHOR = "2026-10-26"; // 1-bosqich: 26-oktyabr – 8-noyabr, keyin har 14 kun
   const addD = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return window.dateUtil.localDate(d); };
   const dayDiff = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
   const periodOf = iso => addD(KPI_ANCHOR, Math.floor(dayDiff(KPI_ANCHOR, iso) / 14) * 14);
