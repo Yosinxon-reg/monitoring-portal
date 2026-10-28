@@ -615,6 +615,11 @@ th:first-child { border-top-left-radius: 8px; } th:last-child { border-top-right
 .rh-full { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; }
 .rh-full label { margin: 0; }
 .btn.bad.on { background: var(--bad); color: #fff; border-color: var(--bad); }
+.rh-help { border-style: dashed; }
+.rh-help.open { border-style: solid; }
+.rh-helper { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 14px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.rh-hsel { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.rh-hsel select { flex: 1; min-width: 0; }
 .rh-branches { display: grid; gap: 8px; }
 .rh-branch { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .rh-branch.filled { border-color: var(--brand); }
@@ -661,6 +666,8 @@ th:first-child { border-top-left-radius: 8px; } th:last-child { border-top-right
 @media (max-width: 760px) {
   .rh-staff { grid-template-columns: 1fr auto; }
   .rh-staff .rh-who { grid-column: 1 / -1; }
+  .rh-helper { grid-template-columns: 1fr auto; }
+  .rh-helper .rh-hsel { grid-column: 1 / -1; }
   .rh-obs { grid-template-columns: 1fr auto; }
   .rh-obs select, .rh-obs input { grid-column: 1 / -1; }
   .rh-obs .rh-lv { grid-column: 1; overflow-x: auto; }
@@ -3186,6 +3193,10 @@ window.LESSONS = [
   const rhCeos = () => S.profiles.filter(p => p.active && rhKindOf(p)).sort((a, b) => a.full_name.localeCompare(b.full_name));
   const rhTeam = c => [c, ...S.profiles.filter(p => p.ceo_id === c.id && p.active && p.role === "xodim").sort((a, b) => a.full_name.localeCompare(b.full_name))];
   const rhNum = v => v === "" || v === null || v === undefined || isNaN(+v) ? null : +v;
+  // Intizomiy bo'lim xodimlari (akademik hisobotida "yordam berganlar" uchun)
+  const rhIntzStaff = () => S.profiles.filter(p => p.active && (p.role === "ceo" || p.role === "xodim") && deptOf(p) === "intizomiy")
+    .sort((a, b) => (a.role === "ceo" ? 0 : 1) - (b.role === "ceo" ? 0 : 1) || a.full_name.localeCompare(b.full_name));
+  const rhHelpers = r => ((r && r.data && r.data.helpers) || []).filter(h => h && h.id);
   const fmtH = v => { v = Math.round((+v || 0) * 10) / 10; return `${v} soat`; };
   const tmOf = ts => ts ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tashkent", hour: "2-digit", minute: "2-digit" }).format(new Date(ts)) : "";
   const OYLAR_B = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
@@ -3197,7 +3208,9 @@ window.LESSONS = [
     const absent = staff.filter(s => s.absent);
     if (r.kind === "akademik") {
       const hours = staff.filter(s => !s.absent).reduce((a, s) => a + (+s.hours || 0), 0);
-      return { hours: Math.round(hours * 10) / 10, absent, staff };
+      const helpers = rhHelpers(r);
+      const helpH = helpers.reduce((a, h) => a + (+h.hours || 0), 0);
+      return { hours: Math.round(hours * 10) / 10, absent, staff, helpers, helpH: Math.round(helpH * 10) / 10 };
     }
     const br = (d.branches || []);
     const posts = br.reduce((a, b) => a + (+b.posts || 0), 0);
@@ -3234,11 +3247,36 @@ window.LESSONS = [
     // Forma holati
     const F = {
       summary: ex ? ex.summary || "" : "",
+      helpers: (old.helpers || []).map(h => ({ id: h.id || "", hours: h.hours ?? "", note: h.note || "" })),
+      helpOpen: (old.helpers || []).length > 0,
       staff: team.map(p => ({ id: p.id, hours: oldStaff(p.id).hours ?? "", note: oldStaff(p.id).note || "", absent: !!oldStaff(p.id).absent, reason: oldStaff(p.id).reason || "" })),
       branches: FILIALLAR.map(n => { const b = (old.branches || []).find(x => x.name === n) || {};
         return { name: n, posts: b.posts ?? "", issues: [...(b.issues || [])], observers: (b.observers || []).map(o => ({ ...o })), open: !!b.posts || (b.observers || []).length > 0 }; })
     };
+    const intz = rhIntzStaff();
+    const helpCard = () => {
+      const helpH = F.helpers.reduce((a, h) => a + (h.id ? +h.hours || 0 : 0), 0);
+      const used = F.helpers.map(h => h.id);
+      const hopts = sel => `<option value="">— intizomiy bo'lim xodimini tanlang —</option>${intz.map(p => `<option value="${p.id}" ${sel === p.id ? "selected" : ""} ${sel !== p.id && used.includes(p.id) ? "disabled" : ""}>${esc(p.full_name)}${p.role === "ceo" ? " (bo'lim rahbari)" : ""}</option>`).join("")}`;
+      return `<div class="card rh-help ${F.helpOpen ? "open" : ""}" style="margin-top:16px">
+        <div class="card-head"><h2>Sizga intizomiy bo'limdan kimdir yordam berdimi?</h2><span class="spacer"></span><span class="small muted">ixtiyoriy</span></div>
+        ${!F.helpOpen ? `<p class="small muted" style="margin:0 0 10px">Agar bugun Intizomiy monitoring bo'limi xodimlaridan kimdir sizlar uchun dars ko'rib bergan bo'lsa, shu yerga kiriting. Bo'lmasa — o'tkazib yuboring.</p>
+          <button type="button" class="btn sm" id="rh-hopen">+ Ha, yordam berishdi</button>`
+        : !intz.length ? `<div class="empty">Intizomiy bo'lim xodimlari topilmadi</div>`
+        : `<div class="rh-list">${F.helpers.map((h, k) => { const p = h.id && person(h.id);
+            return `<div class="rh-helper">
+              <div class="rh-hsel">${p ? avatar(p.full_name, photoOf(p)) : ""}<select data-hi="${k}">${hopts(h.id)}</select></div>
+              <div class="rh-hours"><label class="small muted">Necha soat dars ko'rib berdi *</label><input type="number" min="0" max="16" step="0.5" inputmode="decimal" data-hh="${k}" value="${esc(h.hours)}" placeholder="0"></div>
+              <button type="button" class="x rh-del" data-hd="${k}" title="Olib tashlash">×</button>
+              <div class="rh-full"><input data-hn="${k}" value="${esc(h.note)}" placeholder="Qisqacha (ixtiyoriy): qaysi filialda, nechta dars…"></div>
+            </div>`; }).join("")}</div>
+          <div class="row" style="margin-top:10px;gap:10px">${F.helpers.length < intz.length ? `<button type="button" class="btn sm" id="rh-hadd">+ Yana xodim qo'shish</button>` : ""}
+            <span class="spacer"></span><span class="small muted">Jami yordam: <b id="rh-htot">${fmtH(helpH)}</b></span></div>`}
+      </div>`;
+    };
     const draw = () => {
+      const saveRow = `<div class="err-text" id="rh-err"></div>
+          <div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn primary" id="rh-save">${ex ? "Hisobotni yangilash" : "Hisobotni yuborish"}</button></div>`;
       const totalH = F.staff.filter(s => !s.absent).reduce((a, s) => a + (+s.hours || 0), 0);
       const absN = F.staff.filter(s => s.absent).length;
       const staffRows = F.staff.map((s, i) => { const p = person(s.id) || { full_name: nameOf(s.id) };
@@ -3286,8 +3324,8 @@ window.LESSONS = [
             <div class="rh-list">${staffRows}</div></div>`}
         <div class="card" style="margin-top:16px"><div class="card-head"><h2>Siz bugun nimalar qildingiz? *</h2></div>
           <textarea id="rh-sum" rows="4" placeholder="Bugun bajargan ishlaringizni yozing: qaysi filialga bordingiz, kimlar bilan ishladingiz, qanday qarorlar qabul qilindi…">${esc(F.summary)}</textarea>
-          <div class="err-text" id="rh-err"></div>
-          <div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn primary" id="rh-save">${ex ? "Hisobotni yangilash" : "Hisobotni yuborish"}</button></div></div>`;
+          ${kind === "akademik" ? "" : saveRow}</div>
+        ${kind === "akademik" ? helpCard() + `<div class="card" style="margin-top:16px">${saveRow}</div>` : ""}`;
       bind();
     };
     const recalc = () => {
@@ -3309,6 +3347,12 @@ window.LESSONS = [
       $$("[data-ol]", body).forEach(b => b.onclick = () => { F.branches[+b.dataset.ol].observers[+b.dataset.k].level = b.dataset.v; draw(); });
       $$("[data-od]", body).forEach(b => b.onclick = () => { F.branches[+b.dataset.od].observers.splice(+b.dataset.k, 1); draw(); });
       $$("[data-oa]", body).forEach(b => b.onclick = () => { F.branches[+b.dataset.oa].observers.push({ id: "", level: "", note: "" }); draw(); });
+      const ho = $("#rh-hopen", body); if (ho) ho.onclick = () => { F.helpOpen = true; if (!F.helpers.length) F.helpers.push({ id: "", hours: "", note: "" }); draw(); const sl = $(`[data-hi="0"]`, body); sl && sl.focus(); };
+      const ha = $("#rh-hadd", body); if (ha) ha.onclick = () => { F.helpers.push({ id: "", hours: "", note: "" }); draw(); const sl = $(`[data-hi="${F.helpers.length - 1}"]`, body); sl && sl.focus(); };
+      $$("[data-hi]", body).forEach(i => i.onchange = () => { F.helpers[+i.dataset.hi].id = i.value; draw(); const h = $(`[data-hh="${i.dataset.hi}"]`, body); h && !h.value && h.focus(); });
+      $$("[data-hh]", body).forEach(i => i.oninput = () => { F.helpers[+i.dataset.hh].hours = i.value; const tt = $("#rh-htot", body); if (tt) tt.textContent = fmtH(F.helpers.reduce((a, h) => a + (h.id ? +h.hours || 0 : 0), 0)); });
+      $$("[data-hn]", body).forEach(i => i.oninput = () => F.helpers[+i.dataset.hn].note = i.value);
+      $$("[data-hd]", body).forEach(b => b.onclick = () => { F.helpers.splice(+b.dataset.hd, 1); if (!F.helpers.length) F.helpOpen = false; draw(); });
       $("#rh-save", body).onclick = save;
     };
     const fail = (msg, sel) => { $("#rh-err", body).textContent = msg; const el = sel && $(sel, body); if (el) { el.focus(); el.scrollIntoView({ block: "center", behavior: "smooth" }); } return null; };
@@ -3325,6 +3369,19 @@ window.LESSONS = [
         } else staff.push({ id: s.id, absent: false });
       }
       const data = { staff };
+      if (kind === "akademik") {
+        const helpers = [];
+        for (let k = 0; k < F.helpers.length; k++) {
+          const hp = F.helpers[k];
+          if (!hp.id && (hp.hours === "" || hp.hours === null) && !hp.note.trim()) continue;
+          if (!hp.id) return fail("Yordam bergan intizomiy bo'lim xodimini tanlang", `[data-hi="${k}"]`);
+          const h = rhNum(hp.hours);
+          if (h === null || h <= 0 || h > 16) return fail(`${nameOf(hp.id)}: necha soat dars ko'rib berganini kiriting (0,5–16)`, `[data-hh="${k}"]`);
+          if (helpers.some(x => x.id === hp.id)) return fail(`${nameOf(hp.id)} ikki marta tanlangan`, `[data-hi="${k}"]`);
+          helpers.push({ id: hp.id, hours: h, note: hp.note.trim() });
+        }
+        if (helpers.length) data.helpers = helpers;
+      }
       if (kind === "intizomiy") {
         data.branches = [];
         for (let bi = 0; bi < F.branches.length; bi++) {
@@ -3423,11 +3480,12 @@ window.LESSONS = [
       const work = s.staff.filter(x => !x.absent).sort((a, b) => (+b.hours || 0) - (+a.hours || 0));
       const maxH = Math.max(1, ...work.map(x => +x.hours || 0));
       root.innerHTML = `<div class="rh-hero"><div><div class="small">Bugun jami necha soat dars ko'rildi</div><div class="rh-big">${fmtH(s.hours)}</div></div>
-          <div class="rh-hero-s"><div><b>${work.length}</b><span>ishda</span></div><div><b>${s.absent.length}</b><span>kelmagan</span></div><div><b>${work.length ? Math.round(s.hours / work.length * 10) / 10 : 0}</b><span>o'rtacha soat</span></div></div></div>
+          <div class="rh-hero-s"><div><b>${work.length}</b><span>ishda</span></div><div><b>${s.absent.length}</b><span>kelmagan</span></div><div><b>${work.length ? Math.round(s.hours / work.length * 10) / 10 : 0}</b><span>o'rtacha soat</span></div>${s.helpH ? `<div><b>+${s.helpH}</b><span>intizomiy yordam</span></div>` : ""}</div></div>
         <div class="cols"><div class="card"><div class="card-head"><h2>Kim necha soat dars ko'rdi</h2></div>
           <div class="table-wrap"><table><thead><tr><th>Xodim</th><th style="min-width:160px">Soat</th><th class="hide-sm">Qisqacha ma'lumot</th></tr></thead><tbody>
           ${work.map(x => `<tr class="click" data-rs="${x.id}"><td><b>${esc(nameOf(x.id))}</b></td><td><div class="row" style="gap:8px;flex-wrap:nowrap"><div class="progress" style="flex:1"><i style="width:${(+x.hours || 0) / maxH * 100}%;background:var(--brand)"></i></div><b>${+x.hours || 0}</b></div></td><td class="hide-sm small">${esc(x.note) || `<span class="muted">—</span>`}</td></tr>`).join("") || `<tr><td colspan="3" class="empty">—</td></tr>`}
-          </tbody></table></div></div><div class="stack">${absCard}</div></div><div style="margin-top:16px">${sumCard}</div>`;
+          </tbody></table></div></div><div class="stack">${absCard}${s.helpers.length ? `<div class="card"><div class="card-head"><h2>Intizomiy bo'limdan yordam</h2><span class="spacer"></span>${pill("tasdiqlandi", fmtH(s.helpH))}</div>
+            ${s.helpers.map(h => `<div class="list-item click" data-rs="${h.id}"><div style="flex:1"><div class="t">${esc(nameOf(h.id))}</div>${h.note ? `<div class="small muted">${esc(h.note)}</div>` : ""}</div><b>${+h.hours || 0} soat</b></div>`).join("")}</div>` : ""}</div></div><div style="margin-top:16px">${sumCard}</div>`;
     } else {
       root.innerHTML = `<div class="rh-hero"><div><div class="small">Bugun filiallar bo'yicha yuborilgan postlar</div><div class="rh-big">${s.posts} ta</div></div>
           <div class="rh-hero-s"><div><b>${s.visited}</b><span>filial</span></div><div><b>${s.obs}</b><span>kuzatuv</span></div><div><b>${s.absent.length}</b><span>kelmagan</span></div></div></div>
@@ -3450,12 +3508,12 @@ window.LESSONS = [
     const workDays = days.filter(d => dowOf(d) <= 6 && d >= RH_START);
     const missed = workDays.filter(d => !reps.some(r => r.report_date === d));
     const P = Object.fromEntries(ids.map(id => [id, { id, hours: 0, present: 0, absent: [], obs: [], branches: {} }]));
-    let totPosts = 0, totObs = 0, totH = 0; const BR = Object.fromEntries(FILIALLAR.map(n => [n, { posts: 0, issues: [], obs: 0, days: 0 }]));
+    let totPosts = 0, totObs = 0, totH = 0, totHelp = 0; const HELP = {}; const BR = Object.fromEntries(FILIALLAR.map(n => [n, { posts: 0, issues: [], obs: 0, days: 0 }]));
     reps.forEach(r => {
       const st = rhStats(r);
       (st.staff || []).forEach(s => { const x = P[s.id]; if (!x) return;
         if (s.absent) x.absent.push({ d: r.report_date, reason: s.reason }); else { x.present++; x.hours += +s.hours || 0; } });
-      if (kind === "akademik") totH += st.hours;
+      if (kind === "akademik") { totH += st.hours; (st.helpers || []).forEach(h => { const x = HELP[h.id] || (HELP[h.id] = { id: h.id, hours: 0, days: 0 }); x.hours += +h.hours || 0; x.days++; totHelp += +h.hours || 0; }); }
       else (st.branches || []).forEach(b => { const B = BR[b.name] || (BR[b.name] = { posts: 0, issues: [], obs: 0, days: 0 });
         B.posts += +b.posts || 0; B.days++; totPosts += +b.posts || 0; (b.issues || []).forEach(i => B.issues.push({ d: r.report_date, t: i }));
         (b.observers || []).forEach(o => { B.obs++; totObs++; const x = P[o.id]; if (x) { x.obs.push({ d: r.report_date, b: b.name, level: o.level, note: o.note }); x.branches[b.name] = (x.branches[b.name] || 0) + 1; } }); });
@@ -3482,6 +3540,11 @@ window.LESSONS = [
         <thead><tr><th>Filial</th><th>Postlar</th><th>Kuzatuvlar</th><th>Kiritilgan kunlar</th></tr></thead><tbody>
         ${Object.entries(BR).map(([n, B]) => `<tr class="click" data-rb="${esc(n)}"><td><b>${esc(n)}</b></td><td><b>${B.posts}</b></td><td>${B.obs}</td><td>${B.days}</td></tr>`).join("")}
         </tbody></table></div></div>` : "";
+    const helpRows = Object.values(HELP).sort((a, b) => b.hours - a.hours);
+    const helpTable = kind === "akademik" && helpRows.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Intizomiy bo'limdan yordam berganlar</h2><span class="spacer"></span>${pill("tasdiqlandi", "jami " + fmtH(totHelp))}</div><div class="table-wrap"><table>
+        <thead><tr><th>Xodim</th><th>Ko'rib bergan soat</th><th>Necha kun</th></tr></thead><tbody>
+        ${helpRows.map(x => `<tr class="click" data-rs="${x.id}"><td><b>${esc(nameOf(x.id))}</b></td><td><b>${Math.round(x.hours * 10) / 10}</b></td><td>${x.days}</td></tr>`).join("")}
+        </tbody></table></div></div>` : "";
     const absList = rows.flatMap(x => x.absent.map(a => ({ ...a, id: x.id }))).sort((a, b) => a.d < b.d ? 1 : -1);
     root.innerHTML = `<div class="stats">
         ${kind === "akademik" ? stat("Jami ko'rilgan dars", fmtH(totH)) + stat("Kunlik o'rtacha", reps.length ? fmtH(totH / reps.length) : "—")
@@ -3490,7 +3553,7 @@ window.LESSONS = [
         ${stat("Kelmaganlar (kun)", absTot, absTot ? "warn" : "ok")}</div>
       ${missCard}${chart}
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Xodimlar bo'yicha jamlanma</h2><span class="spacer"></span><span class="small muted">Xodimni bosing — kunma-kun ma'lumot</span></div><div class="table-wrap">${staffTable}</div></div>
-      ${branchTable}
+      ${branchTable}${helpTable}
       <div class="cols" style="margin-top:16px">
         <div class="card"><div class="card-head"><h2>Kelmaganlar va sabablari</h2></div>${absList.length ? absList.slice(0, 40).map(a => `<div class="list-item"><div style="flex:1"><div class="t">${esc(nameOf(a.id))}</div><div class="small muted">${fmtDate(a.d)} · ${esc(a.reason)}</div></div></div>`).join("") : `<div class="empty">Kelmagan xodim yo'q</div>`}</div>
         <div class="card"><div class="card-head"><h2>Rahbar nimalar qildi</h2></div>${reps.length ? reps.slice().reverse().slice(0, 31).map(r => `<div class="list-item click" data-rd="${r.report_date}"><div style="flex:1"><div class="small muted">${fmtDate(r.report_date)}, ${KUN[dowOf(r.report_date)].toLowerCase()}</div><div class="rh-clip">${esc(r.summary)}</div></div></div>`).join("") : `<div class="empty">Bu davrda hisobot yo'q</div>`}</div>
@@ -3507,7 +3570,7 @@ window.LESSONS = [
   function rhStaffModal(id, kind, reps, label) {
     const lines = [];
     reps.forEach(r => {
-      const s = ((r.data || {}).staff || []).find(x => x.id === id);
+      const s = ((r.data || {}).staff || []).find(x => x.id === id) || (kind === "akademik" ? (h => h ? { ...h, helper: true } : undefined)(rhHelpers(r).find(x => x.id === id)) : undefined);
       const obs = kind === "intizomiy" ? ((r.data || {}).branches || []).flatMap(b => (b.observers || []).filter(o => o.id === id).map(o => ({ ...o, b: b.name }))) : [];
       if (s || obs.length) lines.push({ d: r.report_date, s, obs });
     });
@@ -3518,7 +3581,7 @@ window.LESSONS = [
       <div class="stats" style="grid-template-columns:repeat(3,1fr)">${kind === "akademik" ? stat("Jami soat", Math.round(hours * 10) / 10) : stat("Kuzatuvlar", lines.reduce((a, l) => a + l.obs.length, 0))}${stat("Hisobotdagi kunlar", lines.length)}${stat("Kelmagan", absN, absN ? "warn" : "ok")}</div>
       ${lines.length ? `<div class="table-wrap"><table><thead><tr><th>Sana</th><th>Holat</th><th>Ma'lumot</th></tr></thead><tbody>
         ${lines.slice().reverse().map(l => `<tr><td class="small" style="white-space:nowrap">${fmtDate(l.d)}</td>
-          <td>${l.s && l.s.absent ? pill("missing", "Kelmadi") : kind === "akademik" ? `<b>${+(l.s && l.s.hours) || 0}</b> soat` : pill("tasdiqlandi", "Ishda")}</td>
+          <td>${l.s && l.s.absent ? pill("missing", "Kelmadi") : kind === "akademik" ? `<b>${+(l.s && l.s.hours) || 0}</b> soat${l.s && l.s.helper ? ` ${pill("bajarildi", "yordam")}` : ""}` : pill("tasdiqlandi", "Ishda")}</td>
           <td class="small">${l.s && l.s.absent ? "Sabab: " + esc(l.s.reason) : esc((l.s && l.s.note) || "")}${l.obs.map(o => { const L = klev(o.level); return `<div>${esc(o.b)}: ${L ? pill(L[3], L[1]) : ""} ${esc(o.note || "")}</div>`; }).join("")}${!(l.s && (l.s.absent || l.s.note)) && !l.obs.length ? `<span class="muted">—</span>` : ""}</td></tr>`).join("")}
         </tbody></table></div>` : `<div class="empty">Bu davrda ma'lumot yo'q</div>`}`);
     $(".modal", $("#modal-root")).style.maxWidth = "760px";
@@ -3533,7 +3596,7 @@ window.LESSONS = [
       if (!r) return `<a class="rh-today pending" href="#/rahbar-hisobot"><div><div class="small muted">${esc(RH_KINDS[k])}</div><b>${esc(c.full_name)}</b></div><span class="spacer"></span>${pill("missing", isA ? "Hali yubormagan" : "Bugungi hisobot yozilmagan")}</a>`;
       const s = rhStats(r);
       return `<a class="rh-today" href="#/rahbar-hisobot" data-rhc="${c.id}"><div><div class="small muted">${esc(RH_KINDS[k])} · ${tmOf(r.updated_at || r.created_at)}</div><b>${esc(c.full_name)}</b></div><span class="spacer"></span>
-        <div class="rh-today-n">${k === "akademik" ? `<b>${fmtH(s.hours)}</b><span>dars ko'rildi</span>` : `<b>${s.posts} post</b><span>${s.obs} kuzatuv</span>`}</div>
+        <div class="rh-today-n">${k === "akademik" ? `<b>${fmtH(s.hours)}</b><span>dars ko'rildi${s.helpH ? ` · +${s.helpH} yordam` : ""}</span>` : `<b>${s.posts} post</b><span>${s.obs} kuzatuv</span>`}</div>
         ${s.absent.length ? pill("missing", s.absent.length + " kelmagan") : pill("tasdiqlandi", "Hamma ishda")}</a>`; }).join("");
     return `<div class="card rh-card" style="margin-bottom:16px"><div class="card-head"><h2>${isA ? "Bugungi rahbar hisobotlari" : "Rahbarga bugungi hisobotim"}</h2><span class="spacer"></span><a class="btn sm" href="#/rahbar-hisobot">${isA ? "Barchasi va jamlanma" : "Ochish"} ›</a></div>${items}</div>`;
   }
