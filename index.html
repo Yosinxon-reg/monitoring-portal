@@ -731,7 +731,7 @@ tr.unseen td { background: var(--brand-soft); }
 .rv-kpi summary { cursor: pointer; font-weight: 600; font-size: 14px; margin: 6px 0; }
 /* ---- Metodistlar vaqti */
 .met-top { gap: 10px; margin-bottom: 14px; }
-.met-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.met-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 16px; }
 .met-pc { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .met-pc.main { border: 2px solid var(--brand); }
 .met-pc.extra { border: 1px dashed var(--brand); }
@@ -755,6 +755,7 @@ tr.unseen td { background: var(--brand-soft); }
 .met-b.now { border-color: var(--bad); background: var(--bad-soft); }
 .met-b.past { opacity: .7; }
 .met-bt { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 92px; }
+.met-b > div[style] { flex: 1 1 200px; }
 .met-free { padding: 6px 2px; }
 .met-pc-f { margin-top: auto; gap: 8px; }
 .met-busy { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -787,7 +788,7 @@ tr.unseen td { background: var(--brand-soft); }
   .met-grid { grid-template-columns: 1fr; }
   .met-pick { grid-template-columns: repeat(2, 1fr); }
   .met-bt { min-width: 0; flex-basis: 100%; }
-  .met-b > div[style] { flex-basis: calc(100% - 60px); }
+  .met-b > div[style] { flex: 1 1 calc(100% - 60px); }
   .met-top .spacer { display: none; }
 }
 
