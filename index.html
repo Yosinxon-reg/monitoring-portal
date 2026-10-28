@@ -729,6 +729,67 @@ tr.unseen td { background: var(--brand-soft); }
 .chip-btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
 .rep-box { background: var(--surface-2); box-shadow: none; }
 .rv-kpi summary { cursor: pointer; font-weight: 600; font-size: 14px; margin: 6px 0; }
+/* ---- Metodistlar vaqti */
+.met-top { gap: 10px; margin-bottom: 14px; }
+.met-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.met-pc { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.met-pc.main { border: 2px solid var(--brand); }
+.met-pc.extra { border: 1px dashed var(--brand); }
+.met-pc-h { display: flex; gap: 12px; align-items: center; }
+.met-ico { width: 40px; height: 40px; border-radius: 12px; background: var(--brand-soft); display: grid; place-items: center; font-size: 22px; flex: 0 0 40px; }
+.met-pc-n { font-weight: 800; font-size: 17px; overflow-wrap: anywhere; }
+.met-tl { position: relative; height: 26px; background: var(--surface-2); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.met-tl i { position: absolute; top: 0; bottom: 0; display: block; }
+.met-off { background: repeating-linear-gradient(45deg, var(--border) 0 6px, transparent 6px 12px); }
+.met-past { background: rgba(120, 130, 150, .12); }
+.met-blk { background: var(--warn); border-radius: 4px; top: 3px !important; bottom: 3px !important; opacity: .9; }
+.met-blk.mine { background: var(--brand); }
+.met-blk.now { background: var(--bad); }
+.met-nowl { width: 2px; background: var(--bad); }
+.met-ticks { position: relative; height: 14px; margin-top: -6px; }
+.met-ticks span { position: absolute; transform: translateX(-50%); font-size: 10.5px; color: var(--muted); }
+.met-ticks span:first-child { transform: none; }
+.met-ticks span:last-child { transform: translateX(-100%); }
+.met-bl { display: grid; gap: 8px; }
+.met-b { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); flex-wrap: wrap; }
+.met-b.now { border-color: var(--bad); background: var(--bad-soft); }
+.met-b.past { opacity: .7; }
+.met-bt { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 92px; }
+.met-free { padding: 6px 2px; }
+.met-pc-f { margin-top: auto; gap: 8px; }
+.met-busy { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.met-chip { font-size: 12.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); }
+.met-chip.clash { background: var(--bad); color: #fff; }
+.met-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.met-opt { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 12px 8px; border: 2px solid var(--border); border-radius: 14px; background: var(--surface); cursor: pointer; font: inherit; color: var(--text); }
+.met-opt img, .met-oth { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+.met-oth { display: grid; place-items: center; font-size: 34px; font-weight: 300; background: var(--surface-2); color: var(--muted); }
+.met-opt b { font-size: 13px; line-height: 1.25; }
+.met-opt span { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
+.met-opt:hover { border-color: var(--brand); }
+.met-opt.on { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 3px rgba(6,110,207,.15); }
+.met-staff { display: grid; gap: 6px; max-height: 52vh; overflow: auto; }
+.met-st { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; margin: 0; }
+.met-st.on { border-color: var(--brand); background: var(--brand-soft); }
+.met-st.dis { opacity: .6; cursor: default; }
+.met-st input { width: auto; margin: 0; }
+.met-alert { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--warn-soft); border: 1px solid var(--warn); margin-bottom: 14px; flex-wrap: wrap; }
+.met-alert-i { font-size: 22px; }
+.met-fbh { display: flex; gap: 12px; align-items: center; padding: 10px; background: var(--surface-2); border-radius: 12px; margin-bottom: 14px; }
+.met-ans { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.met-ans:last-child { border-bottom: 0; }
+.met-ans-h { display: flex; gap: 10px; align-items: center; }
+.met-qa { margin-top: 6px; }
+.met-qa span { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.met-qa p { margin: 2px 0 0; white-space: pre-wrap; }
+.met-my { gap: 10px; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .met-grid { grid-template-columns: 1fr; }
+  .met-pick { grid-template-columns: repeat(2, 1fr); }
+  .met-bt { min-width: 0; flex-basis: 100%; }
+  .met-b > div[style] { flex-basis: calc(100% - 60px); }
+  .met-top .spacer { display: none; }
+}
 
 </style>
 </head>
@@ -1224,6 +1285,25 @@ window.LESSONS = [
         d.ceoReps = d.ceoReps || []; const ex = d.ceoReps.find(r => r.report_date === date && r.ceo_id === m.id); const now = new Date().toISOString();
         if (ex) Object.assign(ex, { kind, data, summary, updated_at: now }); else d.ceoReps.push({ report_date: date, ceo_id: m.id, kind, data, summary, created_at: now, updated_at: now });
         save(); return ok(true); },
+      // ---- Metodistlar vaqti (demo)
+      async listMetPcs(from, to) { const d = load(); return ok((d.mpcs || []).filter(r => r.day >= from && r.day <= to)); },
+      async openMetPc(day, owner_id, from_time) { const d = load(); const m = me(); const adm = m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik");
+        if (!adm) return fail("Faqat Monitoring bo'limi va Akademik bo'lim rahbari ochadi"); d.mpcs = d.mpcs || [];
+        if (d.mpcs.some(r => r.day === day && r.owner_id === owner_id)) return fail("Bu xodimning joyi allaqachon ochilgan");
+        const r = { id: "pc" + Date.now() + Math.random().toString(36).slice(2, 6), day, owner_id, from_time, opened_by: m.id, created_at: new Date().toISOString() }; d.mpcs.push(r); save(); return ok(r); },
+      async closeMetPc(id) { const d = load(); d.mpcs = (d.mpcs || []).filter(r => r.id !== id); save(); return ok(true); },
+      async listMetBookings(from, to) { const d = load(); return ok((d.mbook || []).filter(r => r.day >= from && r.day <= to)); },
+      async bookMet(row) { const d = load(); const m = me(); d.mbook = d.mbook || [];
+        if (row.end_t <= row.start_t) return fail("Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak");
+        if (row.pc_id !== "asosiy") { const pc = (d.mpcs || []).find(x => x.id === row.pc_id); if (!pc) return fail("Bu kompyuter topilmadi yoki yopilgan"); if (row.start_t < pc.from_time) return fail("Bu kompyuter soat " + pc.from_time + " dan ochiq"); }
+        if (d.mbook.some(b => b.day === row.day && b.pc_id === row.pc_id && b.status === "faol" && b.start_t < row.end_t && row.start_t < b.end_t)) return fail("Bu vaqtda kompyuter band. Boshqa vaqt yoki kompyuterni tanlang");
+        const r = { ...row, id: "mb" + Date.now(), booked_by: m.id, status: "faol", fb_done: false, created_at: new Date().toISOString() }; d.mbook.push(r); save(); return ok(r); },
+      async cancelMet(id) { const d = load(); const b = (d.mbook || []).find(x => x.id === id); if (b) b.status = "bekor"; save(); return ok(true); },
+      async listMetFeedback() { const d = load(); const m = me(); const adm = m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"); return ok(adm ? (d.mfb || []) : []); },
+      async sendMetFeedback(booking_id, f) { const d = load(); const m = me(); const b = (d.mbook || []).find(x => x.id === booking_id);
+        if (!b || b.booked_by !== m.id) return fail("So'rovnomani faqat bron qilgan xodim to'ldiradi"); d.mfb = d.mfb || [];
+        if (d.mfb.some(x => x.booking_id === booking_id)) return fail("So'rovnoma allaqachon yuborilgan");
+        d.mfb.push({ booking_id, ...f, author_id: m.id, created_at: new Date().toISOString() }); b.fb_done = true; save(); return ok(true); },
       async listKpiRange(from, to) { const d = load(); const m = me(); const vis = r => m.role === "asoschi" || r.user_id === m.id || isMember(r.user_id);
         return ok({ scores: (d.kpi || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)), finals: (d.kpiF || []).filter(r => r.period_start >= from && r.period_start <= to && vis(r)),
           daily: (d.kpiD || []).filter(r => r.day >= from && r.day <= to && vis(r)), week: (d.kpiW || []).filter(r => r.week_start >= from && r.week_start <= to && vis(r)) }); },
@@ -1385,6 +1465,15 @@ window.LESSONS = [
       async saveCeoReport(date, kind, data, summary) {
         chk(await sb.from("ceo_reports").upsert({ report_date: date, ceo_id: meCache.id, kind, data, summary }, { onConflict: "report_date,ceo_id" })); return true;
       },
+      // ---- Metodistlar vaqti
+      async listMetPcs(from, to) { return chk(await sb.from("metod_pcs").select("*").gte("day", from).lte("day", to)); },
+      async openMetPc(day, owner_id, from_time) { const r = chk(await sb.from("metod_pcs").insert({ day, owner_id, from_time }).select().single()); return r; },
+      async closeMetPc(id) { chk(await sb.from("metod_pcs").delete().eq("id", id)); return true; },
+      async listMetBookings(from, to) { return chk(await sb.from("metod_bookings").select("*").gte("day", from).lte("day", to).order("start_t")); },
+      async bookMet(row) { return chk(await sb.from("metod_bookings").insert(row).select().single()); },
+      async cancelMet(id) { chk(await sb.from("metod_bookings").update({ status: "bekor" }).eq("id", id)); return true; },
+      async listMetFeedback() { const r = await sb.from("metod_feedback").select("*").order("created_at", { ascending: false }).limit(1000); return r.error ? [] : r.data; },
+      async sendMetFeedback(booking_id, f) { chk(await sb.from("metod_feedback").insert({ booking_id, ...f })); return true; },
       async listKpiRange(from, to) {
         const [a, b, c, w] = await Promise.all([sb.from("kpi_scores").select("*").gte("period_start", from).lte("period_start", to), sb.from("kpi_final").select("*").gte("period_start", from).lte("period_start", to),
           sb.from("kpi_daily").select("*").gte("day", from).lte("day", to), sb.from("kpi_week").select("*").gte("week_start", from).lte("week_start", to)]);
@@ -1472,6 +1561,54 @@ window.LESSONS = [
 
 </script>
   <script>
+// Bosh metodistlar (Bosh_metodistlar.docx asosida, 2026-10-28)
+window.METODISTLAR = [
+ {
+  "key": "arab",
+  "name": "Raxmatullayeva Ra'no Maxmudjon qizi",
+  "title": "Arab tili bosh metodisti",
+  "phone": "+998 95 414 12 53",
+  "photo": "data:image/jpeg;base64,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"
+ },
+ {
+  "key": "rus",
+  "name": "Xabibulloyeva Munisa Mardonbek qizi",
+  "title": "Rus tili bosh metodisti",
+  "phone": "+998 90 035 19 99",
+  "photo": "data:image/jpeg;base64,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"
+ },
+ {
+  "key": "ingliz",
+  "name": "Hayitov Begzod Mardonovich",
+  "title": "Ingliz tili bosh metodisti",
+  "phone": "+998 99 885 78 32",
+  "photo": "data:image/jpeg;base64,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"
+ },
+ {
+  "key": "matem",
+  "name": "Kurbanov Akmal Abdumutolib o'g'li",
+  "title": "Matematika bosh metodisti",
+  "phone": "+998 94 633 51 22",
+  "photo": "data:image/jpeg;base64,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"
+ },
+ {
+  "key": "boshl",
+  "name": "Haqberdiyeva Shahlo Muhammadovna",
+  "title": "Boshlang'ich ta'lim bosh metodisti",
+  "phone": "+998 90 317 95 45",
+  "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCACAAIADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD1OlFNFOrvPnwpw6U0U8dKACiij8sDqaBXsGaCwqC6u7exga4up4oIV6ySttUfjXBap8ePBGmXRt/t0tyVOGeFcqP8aWhahOWx6Hmlrn/DPjnw74vTOjanFcP/AM8vusPwNbx3AHPykdc9v8apWYOMluOopoPrTqCQooooAZRS4pDQAgFLQKDSAUU7tTVp1ABVe+voNPtp7u7kSK1hXfI7HhQKsY5A7mvnz43eO5vEOsJ4O0eRhCJQtwUP+scfw/QVMpqKuzWjSdSaRx/j7x3rnxN164gsBN/ZkbFIokOFYDue2aoWXw21QxiWa3jA67WBNeyeAPCGkeHbKNZrMTz4zycA+9d0ZLWSJQtvEq9MbelebOrJvQ9+nQjFWPlXU9O1Pwtex39pC9qF4LQMVB/rXqHgf426hZQwLqjG/svu+Z/y0i/xr0DXfDemazaSQtCvnYOBjg189avo8nhLxBJZkFbW5PAI4U+lbUa95KLMMTh01dH1lo2s2GvWCX+mzrNAx5I6qfQ1oYwSPSvnX4V+LpvDXiKG1lcmyu28ooTwH7GvovjHByM8H1rve54tSPKFFGDRiggTFIR3p1IelADRQaSlpAKtOpq06gXUp6pcta6Zdzg8pC7g+mFOK+U/h8raz4tnv7xgzKGmLN6k19U6wiy6Pfq3A+zSj/x018pfDy8g0saheTQvPtOxUAzn6+1c+I2PSwS9657dYahYJIFe7gLAYwJBW39sgjj37/k/vZ4rwG7me81ASLpMsbjnK55r1rwz4dn1Xwo1y7vGQpPlk8mvP2PZTuX73xp4btpPLm1CMzA/dUZOa83+L9vDdafBqtq5IWTccjmsy8iurG7luBYgsj7QpXlual8R6td6j4Uu7W+0+SHaMo/pirVk00RLVWOaWYokcsbFXJUq39019U+DtaTxB4bsb9fvPEFkHow4r5MEjNaWSd2IJ/AV9JfBk7vBETZzumavUTujxcQjvRSNQtK1M4htFFFFwI6UU3NKKQDgcUo5puKcOlMClrTJHot+z8D7NJz/AMBNeHfBnRLRvDoupVUm5lfJYZzg4Ar2fxgTF4U1RlBYrbOOPpXhfwu1kQ+FEtwctBO4YehJyK5cS7JHp4CzbR6hqVlo2k26StBGZnO1AmOvvVjSdb0yDTXRrqJGBxjPyqa4t3j11pBdXDQgKdhB71h2/hqxETafJqKvayMWkHmck/WuFybPZVK+qPUrWHRdbeVJYEiuoxlVbB8wev0qr4h8P6fPod7bNEMmFyuPXFc9FpVvoVpBdafevPNGNrbmydvpVm419n028Z2+5A7A++OlCn7yRLiuVs8KkjFtJCD/AMsFYkfpX0f8FoXT4f2MjZAlLOv0zXzNqVw0hcrk+aMD3719a+AbI6d4L0a0KbDHbLke55r1ovQ8LEux0A4pGNLjFDCqOIbRRRQBCKcKZTl6VIDzSgZGKYDilzTQDLu2jvrWa2kOI7hGjb8RivmrwXYJpWteI9CJy1tdFh/urxX0ypywA65r5c8ceKItI+K+palZW/lxK3lTxkf63HDH8+ayrw5oHbgpWmddc+HzqkhImnhjUYURnAb60lt4dUSLD/Y8zdvM8w5PvVrRPEMV/AlzYSieM8hv6Gugj8R3LR/6gcfxA/0ry9Yo+hpzMuPwo9hIlzbzTEjrE75FV/G1xDYeFrx/lieYBUA7tnkVq3mtSMpkZlQAcsThQK8a+IHjZfEF0ljYM7WlufmcfxN6inTpuU0zKrNKLM/RLdNT8S6bbMuYpLhIwB3yea+yIUWKNEVdqooUD6DFfO/wT+G19q97D4lu08rTrSXdHvGDK46Fa+iy24lsde/rXr8tj5/EVFLQdQ3SgUN0pnOxlFFITimCIaUGm5pQalOw7DxRTQS3RTUy20rc44q1FtkSkokfP0r59+Pvgm4t9W/4SCzszNZ3S/vmQf6px6/WvosWQ43HOar6lo8d9YzQTJuhk4k/2h6EVssPzLUiGKUJI+GrHV9Q0SUT2F49seoAOQfw6V00HxN8SiMFmtWYj7xGD9a9M8efs428kUmp+G7+K2kJz9iuDhST/dPYVzHhf9nPxFqWqmLV57e0tVwWaF97N7CuGWH961j3IYqLje5xc+s+I/F90ti91cXskh+WC2Tn8MV7Z8NP2cWbyb/xUywqQCtjHyx/3z/Qc16z4G+HPh7wPaLHpdhHFLgeZcMMysfc/wCFdjDs+6oI3c49fc11QoKCOCvjHN8qKI0uC3sY7Gzt0ghhXCIgwFArI5BOecHFdO0ysxSMgkcEjoarT2MLEoE6859DVuJxJ6mHuz0HFGauTaRcR5MSmRfaqTqyNsYFW9G4rG1jXcaabSscfT1pOtAFcH9Kt2lo03zn7tVI13yLGeh71sxAx7YhwR1rWjSUndmNWbWwRwLGAFUVNspSvzgU88Gu2yWxyttkBB5OahvtXt9Ogw+JJWGREOpq0EySe1ZWqWIkuIpFXcx4xRK72HBR5tTJtpLrVbtZ3h3Rq2BFjgCtHVLe502Nbm2jIbep5GCR6AVpaBaGJ3G0KepBrYms47kq0h6cYrnk7aHU5dERadf2uoWP2zKxMoxIrdjVc3E2pSbIFMFp/E/8T1Ouixb94X5R/Bn71W47fIAC7QO1Z6dxrUbBCsahIwFUDjNTxW+Tk9T1qRIelTY2DNZykaRgNXbH8oyDUN1Y294NssIJ9e9SjoWNQrOTO3oKhJ7luydjC1DQZbYloMyIOdo7Csk5zgjB6Yrtw+8Fi2QeMVkatp6XCF41xKvaqSbJbSOWRcgkHlRmtWGcu8En94YNZMDhjP7YFWbSXy3i5+XdgV20FaJzVdTbIHnjFSPHh6CB5qFematOgJBFDlYxSuVApJqWO23urEDip1i+YVYRB+IqJVOxcaeuplwBrfUJMjqKsb2JUe9S3EGZVlXGehp2AJAMVMpJouCsyyg3EVKetNXjBpw561zs6YpIevJNMc5bHYUrHA4pgOTUruW2loJIwA56VSily7DHWpL6cRqR7VXtGyC7V0Rj7tzCUtSxPdC3gLdzwBVbJZQ245PJ5qrczGe4CjopqwRhCR0FaKHKZylc/9k="
+ },
+ {
+  "key": "it",
+  "name": "Yuldashev Hayotbek To'lqin o'g'li",
+  "title": "Axborot texnologiyalari (IT) fani bosh metodisti",
+  "phone": "+998 90 937 98 84",
+  "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCACAAIADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6G8Pf8i1pP/XpF/6DWgetZ/h4f8U3pQ/6dIv/AEGtA9a1IEooo6HB69h60gDJHsPWobm8gtULzyeUoGdx71T1/X9O8Oae95qlwsESjIBPJNfPHxB+Nlxr7Nbaapit1OFJPLCpc7aFxhfU99sfF2mahN5dvMpPuasXOvwRSFEG5h19q+O08a6hauLhbko4/unitI/GbVmgMRk+YjAYdaXtAcNT6cvviFpemZEzqX9M0unfE3w3qMix/bUgmb5cE18f3XirUL6YyzvI7HvnioX1SXejgSLg5JB5o9oDhc+7IZoplDxSJIv95TkVJ05r5d+EPxXu9A1X7LrFxJLpk3A3HLIe1fTdhfW+o2cd3aSrPBIuVkU8H2q4zuZyhYnznmkNJkHpS5qidhK5P4sf8k28Qf8AXsa6wmuT+K5/4tt4g/69jSkJbm/4e/5FzSv+vSL/ANBq9VHw9/yLmlf9ekX/AKDV6kaC5A69KraheLptjc3shAFuhfmrAOOcZry79ojxO/h/wR9mhlKS37+WzA/Mq+tD0GtT5/8AiR8SdR8aavcfaZiLeNykcYPyketceX2lSWy3bHQVTNzFLOUI+QcA+vvUsi+VDsTkHnNYtrc2imivqt3hPlJqjY3ZBJIz9aW6DTcDmoYbRy2BnPoKWgNSb2NgXpkwCCPpVm1vd7bHHA4FUY4LwIMW7kDvionMqP8AOrIc96V0UoSW50SzMrYTbjrzXtv7P/xAe1vm8NapcHyJ/nt2Y8IfSvAIbgvDtfBHY981Np2p3Om6lBMszI8TBlYHvVoiWrPv8sWOSAD7Uh6Vwnwh8dDxv4dDXBP2y3IR8Hr6Gu7J5yOmMVtFnPPQYTXKfFY/8W18Qf8AXsa6smuT+K3/ACTbxB/17GiRK3Oi8OjPhzSfe0i/9Bq/iqPhz/kW9H/69Iv/AEGtDGSak0G7SelfHv7R/ii81nxjLYs5WC3HlpH2I9a+xMAda+RP2hdMt7Hx5LKUPzDdmpm9Bw3POPCfhuXX9TFsFIQDLe1epW/wihaMb5GzjI4qv8FtNM9zdXpQbBwOK9hRTtxx04rz6tW2h7WGpJxTZ5BL8KoYnwsIIq7ZfDSxtmEjQgnvntXpjwl2ztqNoGJxtrD2kjuVKC1OGfwjEVZEiVB24rj/ABN4Cm8lpFizjuBXtS2p/u06ewDxbZFUqeKI1WnqTUpQa0Pkq5WSwkaFkZQOMmkgukYCKUbm7NXrXxK+HheOW7tF5HOAK8ZgeSCRoZIizq2K7qdS55Fenys+hP2Yr6VfEd5aJKfJeEuR6EV9LDgEdcd6+ZP2Z9PvZfEE+oQQ4tY4jHKfc19NMMAE8Jjge9dkNUebPVjSa5T4qsP+Fb+IP+vY11Rrkvit/wAk38Qf9exokT1Oo8OL/wAU5pPtaRf+g1o49Ko+HB/xTmk/9ekX/oNaIAqWaMYFzweleAftMaAoNtqpt1IlXy3cH+LtX0HtGeelcZ8WdBs9e8LypfzLFbwN5pcjAGB60SWhVNXZ5H8MNJi8PeEo5p2OZxvYkYxU+ofEvRtMlKPKkjLwMGp/DunWOpabFDDDP9nSIqdznk+orjNTtdC0mK8K6Y955bHe4XcE+tcUqSbud1HF6+zXQ7Wx+JGh3yqY5iHbnaOa1bbXbS4XcrFtx4wOgrxGzt9J13Yy2E1qJnKRujFfxqZH8Uadp+o2eiztJDacl2XJI9jU+zSO5VnHc9U1Lx3pumuwmmWIKSDurPt/i74fuT5Rl+XP3iMCvPNN8GSPpUeu6l5l20uCwZsrk9sU2HU9Aj1FtPn0STcvXavAHrTVOPYzliJPY9Un8V+HNWh8hNRtSZPl2F+a8C8caCdE8RzqrK0Up3wlDkOPTNdvPoej6vp1yum2wU7SyPGMMG7CodT03TNJ8P2tpraXEiSrtFxjLROff0pwSTMKs3JWserfstaS9t4Tv71nbbdSAgH27V7QxJVgOuRXFfBfSLbQ/ANhYpcJPJhpMg8lSeDXcbd2WHGRnFd0dVoeZNOL1RCelcj8VSf+Fb+IP+vY115HFcj8Vhj4ceIP+vY02Zrc67w2M+HdI/69Iv8A0EVobf51S8Mr/wAU7pPtZwn/AMcFaQTvUpmthoTPFeZ/E64ub66OjjP2WWL5h2PNeoba4L4h2xtruC/K/ulj2sfesK8pJaHXg1FzSZi+H9JhtdOa2gA3ovH0xXKX+iqUurYQBBOxL+9dDBfOm2SJtpI7elJcP5xLseTXMqjseisFFVXJHB2vhKC1l82RcKmdir0U10PhTRI7fTbiNkVjcyMRnqR6UTyia6NusgjU8uT2q/b6lp9oN6XSFYxgc9Khyk3Y6vZR3OXm0t7QS6SxIhLlsDsO1VbTwcouGleRD5g2l8c4rS8U67Y3FqNQ064WSSNwJFHcZrVsZYrqFJEACuoJFPmaM3CNyHStAs7XEUMaqq8HAxu96peMtDs7/SkimjyizDNbEl4sfyKeB3rH8TGe80WfypWVs7l2jPSs3N9C6cIynqS+ANVvLTx1p9pC7CylgZRH2AFe8uCTkcAcV4v8EtLfWLuHV7uMrJao0fTrXtbglQfzHpXoYWTtqeVmbjzWiV2WuP8Aiwv/ABbjxB/17Gu0Za4/4sjHw38Qf9exroZ5aWp13hgZ8OaV/wBecP8A6AK08Vm+GP8AkXNK/wCvOH/0AVpfxVmasMVz/jPTBqvh64gPXG4GugqOaFbiJo3GQRg1MlzKxpCXLJM8ahgCwKAfujFRXEhRcA11Hi/RItIZZogRDIfm+tcLfzsnmbeSv3a8+acWfQYespq5Xu7JZWIEn7xh8xBrEbRbSKLyzK2GY7jmoo7XX3lmnZsQN2rOubObLeZeGPPQZq42audEI3NWw8NabZAiFjJG7ZcE1tBhbgeRgR9h6CuN/sbUZ8/ZL5w+OK0tIW7s4TFfyb3HGfWokRJJM6VHWXoMluKeywwssTyAY4INUrS5HBxkDoK9R8H+DdN1HSIbzU7RbiYsWUt2ohTcmclauqXvE3wz0b+zdLllAG25bcvFde2O3epYII7eJY4kVEUYCjoKcVr0aa5UeHiJuo+YqMtcf8Wl/wCLbeIP+vY12zrXGfFxf+La+IP+vY1stjJHUeGP+Rc0r/rzh/8AQBWljnNZvhj/AJFzSv8Arzh/9AFadZGgYpMUtFAPUyvEmlrqulywnG4AsufWvDLslZHhY/vAa+gb2RYreV5GCIEOWP0rwDxDDKlxIY8blJO71Ga5MSkehgm9hLfeqlA5OfXpWLrOiG8uBL5qpjoKi/t8W+QwIrFv/FIaQ4cisoq2x61Oq0jpLS1e1TdvyQMcVnXk5EhcvnBrm5fFzKNoc1FHrEl+4A5yaGjGdRt6HX6ZK9zOq5PJ4xX0tpAWPSbREG1REpPtxXzb4agfzY2K4969s8B/Ejw94zkn0vTrg/bNOASWJxgnHUit8PpoedjU2lc7ROUFOpsZyvJzT8V0vc89bEbDNcZ8XVx8NfEH/Xqa7UiuO+L6/wDFtPEH/Xq1O4rHQeGP+Rc0r/rzh/8AQBWnWZ4Y48OaV/15w/8AoArTzmkUBpucY54okkSNWZ3VVUZJJ4FcP4u+L3hjwrFNG16lxdxIWWKP5gT9RTSb2Fc5b4+fEE6FDY6BZzFbm9kUyFDyqZ6Gs6/txcRI46FBv9uK+e/G3jC78UeI5tbuGwzzBwuc+WoPQV7noOvRa5p1tfROCsigOv0Fc2LpvlTPQwE05WMLUdIjuCf4a5e/8NxqxO816jcWsMpzgDPpWHqujbgQF+lcinoem462PMJtCXzBhia3NF0iOBgdhJ+lbkehYb5lH51o29ultyWXA7UnJkcmpc0qDylVz/DzivNNU1+6+HXxh/tqx3LbyBXkVeAw75r00XSouVwuBnPavDPiFrX9peJppAQwhG0Dsa3wjbmc2OsoWPuzw/rtp4j0e21SymV4LiMNlT0OORWkM7s8+n1r46+Cfxkn8ByHSb9JLzTbk5RM/wCqPtX0x4Q+KHhfxnGG03UYxMDtaGVtrA+gB616EoNHjQeh19cf8Xx/xbTxB/16N/SuvLAVx/xfI/4Vp4g7ZtW/pUFH/9k="
+ }
+];
+
+</script>
+  <script>
 // =============================================================
 // Monitoring bo'limi portali — interfeys
 // =============================================================
@@ -1484,7 +1621,7 @@ window.LESSONS = [
     return;
   }
   const { today } = window.dateUtil;
-  const S = { me: null, about: {}, creps: [], views: [], profiles: [], tasks: [], reports: [], posts: [], videos: [], info: {}, dtasks: [], dstatus: [], lviews: [], plans: [], navOpen: false, ui: {} };
+  const S = { me: null, about: {}, creps: [], mpcs: [], mbook: [], views: [], profiles: [], tasks: [], reports: [], posts: [], videos: [], info: {}, dtasks: [], dstatus: [], lviews: [], plans: [], navOpen: false, ui: {} };
   const app = document.getElementById("app");
 
   // ---------------------------------------------------------- constants
@@ -1657,6 +1794,12 @@ window.LESSONS = [
       out.push(`<div class="due-banner newitems">📬 <span><b>Sizga yangi ${[nt && nt + " ta topshiriq", ne && ne + " ta eslatma"].filter(Boolean).join(" va ")} keldi.</b> Ochib ko'ring — yuborgan rahbar ko'rganingizni biladi.</span><a class="btn sm primary" href="#/masalalar" data-gote="${nt ? "t" : "e"}">Ko'rish</a></div>`);
     }
     nw.forEach(({ kind, x }) => notifyOnce("item_" + kind + "_" + x.id, kind === "task" ? "Yangi topshiriq" : "Yangi eslatma", `${x.title} — ${nameOf(x.created_by)}`));
+    // 0a) Metodist vaqti tugadi — so'rovnoma
+    const mp = metPending();
+    if (mp.length && !(route() === "masalalar" && S.ui.pcat === "metodistlar")) {
+      out.push(`<div class="due-banner due">🧑‍🏫 <span><b>Metodist vaqti tugadi.</b> ${esc(metName(mp[0]))} (${hmRange(mp[0])}) — nimalarni, kimlarni ko'rgani va qanday xulosa bergani haqida so'rovnomani to'ldiring.</span><a class="btn sm primary" href="#/masalalar" data-gomet="1">To'ldirish</a></div>`);
+      mp.forEach(b => notifyOnce("metfb_" + b.id, "Metodist vaqti tugadi", `${metName(b)} (${hmRange(b)}) — so'rovnomani to'ldiring`));
+    }
     // 0b) Shaxsiy bo'lim: "Bugun nima qildim" eslatmasi (ish tugashidan 1 soat oldin)
     if (isPersonal(S.me) && ["due", "late"].includes(dueState(S.me)) && !(S.slogs || []).some(x => x.user_id === S.me.id && x.log_date === today())) {
       out.push(`<div class="due-banner due">📝 <span><b>Bugun nima qildingiz?</b> Ish kuni oxirida bajargan ishlaringizni yozing.</span><a class="btn sm" href="#/profil">Yozish</a></div>`);
@@ -1846,6 +1989,7 @@ window.LESSONS = [
       const w0 = weekOf(today());
       try { S.plans = await db.listPlans(addD(w0, -7), addD(w0, 7)); } catch (e) { S.plans = []; }
       if (isManager()) { try { S.creps = await db.listCeoReports(today(), today()); } catch (e) { S.creps = []; } }
+      if (db.listMetBookings) { try { await metReload(); } catch (e) { S.mpcs = S.mpcs || []; S.mbook = S.mbook || []; } }
       if ((S.me.role === "asoschi" || isPersonal(S.me)) && db.listSelfLogs) { try { S.slogs = await db.listSelfLogs(addD(today(), -7), today()); } catch (e) { S.slogs = []; } }
       touchSeen();
     }
@@ -2132,7 +2276,8 @@ window.LESSONS = [
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
 
-  document.addEventListener("click", e => { const a = e.target.closest && e.target.closest("[data-gote]"); if (a) { S.ui.pcat = "te"; S.ui.teTab = a.dataset.gote; } }, true);
+  document.addEventListener("click", e => { const a = e.target.closest && e.target.closest("[data-gote]"); if (a) { S.ui.pcat = "te"; S.ui.teTab = a.dataset.gote; }
+    const g = e.target.closest && e.target.closest("[data-gomet]"); if (g) { S.ui.pcat = "metodistlar"; S.ui.mtab = "my"; } }, true);
   function dashStaff(page) {
     const t = today();
     const mine = S.tasks.filter(x => x.assigned_to === S.me.id);
@@ -2700,6 +2845,7 @@ window.LESSONS = [
     const teActive = S.tasks.filter(t => (S.me.role !== "xodim" || t.assigned_to === S.me.id) && (ACTIVE_T.includes(t.status) || t.status === "bajarildi")).length;
     const right = cat === "te"
       ? (mgr ? `<button class="btn" id="new-dt">+ Eslatma</button><button class="btn primary" id="new-task">+ Topshiriq</button>` : "")
+      : cat === "metodistlar" ? `<button class="btn primary" id="met-new">+ Band qilish</button>`
       : `<button class="btn primary" id="new-post">+ Yangi masala</button>`;
     page.innerHTML = head("Masalalar", mgr ? "Topshiriqlar, eslatmalar va masalalar — bitta joyda. Har bir xodim ko'rgani va bajargani ko'rinib turadi." : "Sizga kelgan topshiriq va eslatmalar hamda bo'lim masalalari — bitta joyda.", `<div class="row" style="gap:8px">${right}</div>`) + `
       <div class="posts-layout">
@@ -2707,7 +2853,8 @@ window.LESSONS = [
           <button class="cat-row te-row ${cat === "te" ? "active" : ""}" data-cat="te"><div class="cat-dot" style="background:#8e4ec6">✓</div><span>${S.me.role === "xodim" ? "Topshiriq va eslatmalarim" : "Topshiriqlar va eslatmalar"}</span><span class="spacer"></span>${teBadge ? `<span class="badge">${teBadge}</span>` : teActive ? `<span class="small muted">${teActive}</span>` : ""}</button>
           <div class="cat-sep"></div>
           <button class="cat-row ${cat === "" ? "active" : ""}" data-cat=""><div class="cat-dot" style="background:var(--brand)">≡</div><span>Barcha masalalar</span><span class="spacer"></span>${newIn("") ? `<span class="new-dot">${newIn("")}</span>` : `<span class="small muted">${S.posts.filter(p => p.status !== "hal_qilindi").length}</span>`}</button>
-          ${POST_CATS.map(([k, [label]]) => `<button class="cat-row ${cat === k ? "active" : ""}" data-cat="${k}">${catBadge(k, 30)}<span>${esc(label)}</span><span class="spacer"></span>${newIn(k) ? `<span class="new-dot">${newIn(k)}</span>` : counts(k) ? `<span class="small muted">${counts(k)}</span>` : ""}</button>`).join("")}
+          ${POST_CATS.map(([k, [label]]) => `<button class="cat-row ${cat === k ? "active" : ""}" data-cat="${k}">${catBadge(k, 30)}<span>${esc(label)}</span><span class="spacer"></span>${k === "metodistlar" ? (metPending().length ? `<span class="badge">${metPending().length}</span>` : (S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length ? `<span class="small muted">${(S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length} bron</span>` : "")
+            : newIn(k) ? `<span class="new-dot">${newIn(k)}</span>` : counts(k) ? `<span class="small muted">${counts(k)}</span>` : ""}</button>`).join("")}
         </div>
         <div id="mz-body"></div>
       </div>`;
@@ -2717,6 +2864,7 @@ window.LESSONS = [
     if ($("#new-dt", page)) $("#new-dt", page).onclick = () => dtForm();
     const body = $("#mz-body", page);
     if (cat === "te") return teView(body);
+    if (cat === "metodistlar") { const nb = $("#met-new", page); if (nb) nb.onclick = () => metBookForm("asosiy", S.ui.mday && S.ui.mday >= today() ? S.ui.mday : today(), body); return metView(body); }
     const st = S.ui.pst ?? "";
     const list = S.posts.filter(p => (!cat || p.category === cat) && (!st || p.status === st));
     body.innerHTML = `<div class="filters">
@@ -2738,6 +2886,326 @@ window.LESSONS = [
     if (tab === "t") return tasksView(tb);
     if (tab === "e") return dtView(tb);
     tb.innerHTML = `<div class="card">${legacy.map(postLine).join("")}</div>`; bindPostLines(tb);
+  }
+
+
+  // =============================================================
+  // ---- Metodistlar vaqti: metodist kompyuterini bron qilish
+  //  * "Metodist kompyuteri" — doimiy, har kuni ochiq
+  //  * Monitoring bo'limi rahbari va Akademik bo'lim rahbari xodimning bo'sh
+  //    joyini qo'shimcha kompyuter sifatida ochadi (o'sha kun tugaguncha)
+  //  * Bron vaqti tugagach, bron qilgan xodimga so'rovnoma chiqadi;
+  //    javoblarni faqat ular ikkisi ko'radi
+  // =============================================================
+  const METS = window.METODISTLAR || [];
+  const metOf = k => METS.find(m => m.key === k);
+  const isAkCeo = () => S.me?.role === "ceo" && deptOf(S.me) === "akademik";
+  const canMetAdmin = () => S.me?.role === "asoschi" || isAkCeo();
+  const MET_FROM = 7 * 60, MET_TO = 21 * 60;
+  const metTimes = (a = MET_FROM, b = MET_TO) => { const r = []; for (let m = a; m <= b; m += 15) r.push(minsToHM(m)); return r; };
+  const nowHM = () => minsToHM(tashNow().mins);
+  const metEnded = b => b.day < today() || (b.day === today() && b.end_t <= nowHM());
+  const metNow = b => b.day === today() && b.start_t <= nowHM() && nowHM() < b.end_t;
+  const metName = b => b.metodist_key === "boshqa" ? b.metodist_name : (metOf(b.metodist_key)?.name || b.metodist_name);
+  const metTitle = b => b.metodist_key === "boshqa" ? "Boshqa (rahbar yoki metodist)" : (metOf(b.metodist_key)?.title || "");
+  const metPhoto = (b, cls = "") => { const m = b.metodist_key !== "boshqa" && metOf(b.metodist_key); return avatar(metName(b), m ? m.photo : "", cls); };
+  const metPcs = day => [{ id: "asosiy", main: true, day }, ...(S.mpcs || []).filter(p => p.day === day).sort((a, b) => nameOf(a.owner_id).localeCompare(nameOf(b.owner_id)))];
+  const metPc = id => id === "asosiy" ? { id: "asosiy", main: true } : (S.mpcs || []).find(p => p.id === id);
+  const pcName = pc => !pc ? "Yopilgan kompyuter" : pc.main ? "Metodist kompyuteri" : `${nameOf(pc.owner_id)} kompyuteri`;
+  const metBk = (day, pcId) => (S.mbook || []).filter(b => b.day === day && b.pc_id === pcId && b.status === "faol").sort((a, b) => a.start_t < b.start_t ? -1 : 1);
+  const metPending = () => !S.me ? [] : (S.mbook || []).filter(b => b.booked_by === S.me.id && b.status === "faol" && !b.fb_done && metEnded(b));
+  const hmRange = b => `${b.start_t}–${b.end_t}`;
+  const durH = b => Math.round((toMins(b.end_t) - toMins(b.start_t)) / 6) / 10;
+  const dayLabel = d => d === today() ? "Bugun" : d === addD(today(), 1) ? "Ertaga" : `${fmtDate(d)}, ${KUN[dowOf(d)].toLowerCase()}`;
+  async function metReload() {
+    const [pcs, bk] = await Promise.all([db.listMetPcs(addD(today(), -1), addD(today(), 31)), db.listMetBookings(addD(today(), -45), addD(today(), 62))]);
+    S.mpcs = pcs; S.mbook = bk;
+  }
+
+  async function metView(root) {
+    const admin = canMetAdmin(); setTimeout(dueBanner, 0);
+    const pend = metPending();
+    const legacy = S.posts.filter(p => p.category === "metodistlar");
+    const tabs = [["pc", "Kompyuterlar va bron", 0], ["my", "Mening bronlarim", pend.length]];
+    if (admin) tabs.push(["ans", "So'rovnoma javoblari", 0]);
+    if (legacy.length) tabs.push(["old", "Guruhdagi xabarlar", 0]);
+    const tab = tabs.some(t => t[0] === S.ui.mtab) ? S.ui.mtab : "pc";
+    root.innerHTML = `${pend.length ? `<div class="met-alert"><div class="met-alert-i">📝</div><div style="flex:1;min-width:0"><b>Metodist vaqti tugadi — so'rovnomani to'ldiring</b>
+        <div class="small">${pend.map(b => `${esc(dayLabel(b.day))} ${hmRange(b)} · ${esc(metName(b))}`).join("; ")}</div></div>
+        <button class="btn sm primary" data-mfb="${pend[0].id}">To'ldirish</button></div>` : ""}
+      <div class="tabs" style="margin-top:0">${tabs.map(([k, l, n]) => `<button data-mt="${k}" class="${k === tab ? "active" : ""}">${l}${n ? ` <span class="badge">${n}</span>` : ""}</button>`).join("")}</div>
+      <div id="met-body"></div>`;
+    $$("[data-mt]", root).forEach(b => b.onclick = () => { S.ui.mtab = b.dataset.mt; metView(root); });
+    $$("[data-mfb]", root).forEach(b => b.onclick = () => metFbForm(b.dataset.mfb, root));
+    const mb = $("#met-body", root);
+    if (tab === "pc") return metPcTab(mb, root);
+    if (tab === "my") return metMyTab(mb, root);
+    if (tab === "ans") return metAnsTab(mb);
+    mb.innerHTML = `<div class="card">${legacy.map(postLine).join("")}</div>`; bindPostLines(mb);
+  }
+
+  // ---- Kompyuterlar va kunlik jadval
+  function metPcTab(root, top) {
+    const t = today();
+    const day = S.ui.mday && S.ui.mday >= t && S.ui.mday <= addD(t, 30) ? S.ui.mday : t;
+    const admin = canMetAdmin();
+    const pcs = metPcs(day);
+    const now = nowHM();
+    const ticks = []; for (let m = MET_FROM; m <= MET_TO; m += 120) ticks.push(m);
+    const pos = hm => Math.max(0, Math.min(100, (toMins(hm) - MET_FROM) / (MET_TO - MET_FROM) * 100));
+    const card = pc => {
+      const bk = metBk(day, pc.id);
+      const cur = day === t ? bk.find(metNow) : null;
+      const nxt = day === t ? bk.find(b => b.start_t > now) : bk[0];
+      const closedNow = !pc.main && day === t && false;
+      const status = day !== t ? (bk.length ? pill("jarayonda", `${bk.length} ta bron`) : pill("tasdiqlandi", "Bo'sh"))
+        : cur ? pill("qaytarildi", `Hozir band · ${cur.end_t} gacha`) : pill("tasdiqlandi", "Hozir bo'sh");
+      const sub = pc.main ? "Doimiy · har kuni ochiq" : `${day === t ? "Bugun" : fmtDate(pc.day)} soat ${pc.from_time} dan kun oxirigacha · ochdi: ${esc(nameOf(pc.opened_by))}`;
+      const own = b => b.booked_by === S.me.id || admin;
+      return `<div class="card met-pc ${pc.main ? "main" : "extra"}">
+        <div class="met-pc-h">${pc.main ? `<div class="met-ico">🖥</div>` : avatar(nameOf(pc.owner_id), photoOf(person(pc.owner_id)))}
+          <div style="flex:1;min-width:0"><div class="met-pc-n">${esc(pcName(pc))}</div><div class="small muted">${sub}</div></div>${status}</div>
+        <div class="met-tl" title="${esc(dayLabel(day))}: 07:00–21:00">
+          ${!pc.main ? `<i class="met-off" style="left:0;width:${pos(pc.from_time)}%"></i>` : ""}
+          ${day === t && now > minsToHM(MET_FROM) ? `<i class="met-past" style="left:0;width:${pos(now)}%"></i>` : ""}
+          ${bk.map(b => `<i class="met-blk ${b.booked_by === S.me.id ? "mine" : ""} ${metNow(b) ? "now" : ""}" style="left:${pos(b.start_t)}%;width:${Math.max(1.2, pos(b.end_t) - pos(b.start_t))}%" title="${esc(hmRange(b) + " · " + metName(b) + " · " + nameOf(b.booked_by))}"></i>`).join("")}
+          ${day === t && toMins(now) >= MET_FROM && toMins(now) <= MET_TO ? `<i class="met-nowl" style="left:${pos(now)}%"></i>` : ""}
+        </div>
+        <div class="met-ticks">${ticks.map(m => `<span style="left:${(m - MET_FROM) / (MET_TO - MET_FROM) * 100}%">${minsToHM(m)}</span>`).join("")}</div>
+        <div class="met-bl">${bk.length ? bk.map(b => `<div class="met-b ${metNow(b) ? "now" : ""} ${metEnded(b) ? "past" : ""}">
+            <div class="met-bt">${hmRange(b)}</div>${metPhoto(b)}
+            <div style="flex:1;min-width:0"><b>${esc(metName(b))}</b><div class="small muted">${esc(metTitle(b))}</div>
+              <div class="small">Bron qildi: ${esc(nameOf(b.booked_by))}${b.purpose ? ` · ${esc(b.purpose)}` : ""}</div></div>
+            ${metNow(b) ? pill("qaytarildi", "Hozir") : metEnded(b) ? (b.fb_done ? pill("tasdiqlandi", "Yakunlandi") : pill("jarayonda", "So'rovnoma kutilmoqda")) : ""}
+            ${own(b) && !metEnded(b) ? `<button class="btn sm ghost" data-mcancel="${b.id}" title="Bronni bekor qilish">Bekor</button>` : ""}
+          </div>`).join("") : `<div class="small muted met-free">${esc(dayLabel(day))} hali hech kim band qilmagan</div>`}</div>
+        <div class="row met-pc-f">${!pc.main && admin ? `<button class="btn sm ghost" data-mclose="${pc.id}">Joyni yopish</button>` : ""}<span class="spacer"></span>
+          <button class="btn primary" data-mbook="${pc.id}">Band qilish</button></div>
+      </div>`;
+    };
+    root.innerHTML = `<div class="row met-top"><div class="seg">${[t, addD(t, 1)].map(d => `<button data-md="${d}" class="${d === day ? "active" : ""}">${d === t ? "Bugun" : "Ertaga"}</button>`).join("")}</div>
+        <input type="date" id="met-d" value="${day}" min="${t}" max="${addD(t, 30)}" style="width:auto">
+        <span class="small muted">${esc(dayLabel(day))} · hozir ${now}</span><span class="spacer"></span>
+        ${admin && day === t ? `<button class="btn" id="met-open">+ Yana bir xodimning joyi bo'sh</button>` : ""}</div>
+      ${admin && day !== t ? `<div class="small muted" style="margin:-4px 0 12px">Xodimning bo'sh joyi faqat bugun uchun ochiladi va kun tugashi bilan yopiladi.</div>` : ""}
+      <div class="met-grid">${pcs.map(card).join("")}</div>`;
+    $$("[data-md]", root).forEach(b => b.onclick = () => { S.ui.mday = b.dataset.md; metPcTab(root, top); });
+    $("#met-d", root).onchange = e => { S.ui.mday = e.target.value; metPcTab(root, top); };
+    $$("[data-mbook]", root).forEach(b => b.onclick = () => metBookForm(b.dataset.mbook, day, top));
+    $$("[data-mcancel]", root).forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { await act(() => db.cancelMet(b.dataset.mcancel), "Bron bekor qilindi"); await metReload(); metView(top); } catch (e) { b.disabled = false; } });
+    $$("[data-mclose]", root).forEach(b => b.onclick = async () => {
+      const id = b.dataset.mclose;
+      if ((S.mbook || []).some(x => x.pc_id === id && x.status === "faol" && !metEnded(x))) return toast("Bu kompyuterda hali tugamagan bron bor — avval uni bekor qiling", true);
+      b.disabled = true;
+      try { await act(() => db.closeMetPc(id), "Joy yopildi"); await metReload(); metView(top); } catch (e) { b.disabled = false; } });
+    const op = $("#met-open", root); if (op) op.onclick = () => metOpenPcForm(top);
+    clearTimeout(S._metT);
+    S._metT = setTimeout(() => { if (root.isConnected && !$("#modal-root").innerHTML && route() === "masalalar") metView(top); }, 60000);
+  }
+
+  // ---- Bron qilish oynasi
+  function metBookForm(pcId, day, top) {
+    const t = today();
+    let F = { pc: pcId, day, start: "", end: "", key: "", other: "", purpose: "" };
+    const firstFree = () => {
+      const pc = metPc(F.pc); let a = F.day === t ? Math.ceil((tashNow().mins + 1) / 15) * 15 : 9 * 60;
+      if (pc && !pc.main) a = Math.max(a, toMins(pc.from_time));
+      const bk = metBk(F.day, F.pc);
+      for (let m = Math.max(a, MET_FROM); m + 30 <= MET_TO; m += 15) { const s = minsToHM(m), e = minsToHM(m + 60 > MET_TO ? MET_TO : m + 60);
+        if (!bk.some(b => b.start_t < e && s < b.end_t)) return [s, e]; }
+      return [minsToHM(Math.max(a, MET_FROM)), minsToHM(Math.min(MET_TO, Math.max(a, MET_FROM) + 60))];
+    };
+    [F.start, F.end] = firstFree();
+    const m = openModal("Metodist vaqtini band qilish", `<div id="mbf"></div>`,
+      `<span class="err-text" id="mbf-err" style="margin-right:auto"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="mbf-ok">Band qilish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "820px";
+    const box = $("#mbf", m);
+    const draw = () => {
+      const pcs = metPcs(F.day); if (!pcs.some(p => p.id === F.pc)) F.pc = "asosiy";
+      const pc = metPc(F.pc);
+      const bk = metBk(F.day, F.pc);
+      const minS = F.day === t ? tashNow().mins : MET_FROM;
+      const starts = metTimes(MET_FROM, MET_TO - 15).filter(x => toMins(x) >= (pc.main ? 0 : toMins(pc.from_time)) && toMins(x) + 15 > minS);
+      const ends = metTimes(MET_FROM + 15, MET_TO).filter(x => x > F.start);
+      box.innerHTML = `
+        <div class="grid2">
+          <div class="field"><label>Kompyuter</label><select id="mbf-pc">${pcs.map(p => `<option value="${p.id}" ${p.id === F.pc ? "selected" : ""}>${esc(pcName(p))}${p.main ? "" : ` (${p.from_time} dan)`}</option>`).join("")}</select></div>
+          <div class="field"><label>Sana</label><input type="date" id="mbf-d" value="${F.day}" min="${t}" max="${addD(t, 30)}"></div>
+        </div>
+        <div class="field"><label>Vaqt *</label><div class="row" style="gap:8px;flex-wrap:nowrap">
+          <select id="mbf-s" style="max-width:130px">${starts.map(x => `<option ${x === F.start ? "selected" : ""}>${x}</option>`).join("")}</select><span class="muted">dan</span>
+          <select id="mbf-e" style="max-width:130px">${ends.map(x => `<option ${x === F.end ? "selected" : ""}>${x}</option>`).join("")}</select><span class="muted">gacha</span>
+          <span class="small muted" id="mbf-dur"></span></div>
+          <div class="met-busy">${bk.length ? `<span class="small muted">Band vaqtlar:</span> ${bk.map(b => `<span class="met-chip ${b.start_t < F.end && F.start < b.end_t ? "clash" : ""}">${hmRange(b)}</span>`).join("")}` : `<span class="small muted">${esc(dayLabel(F.day))} bu kompyuter butunlay bo'sh</span>`}</div></div>
+        <div class="field"><label>Metodistingiz *</label>
+          <div class="met-pick">${METS.map(x => `<button type="button" class="met-opt ${F.key === x.key ? "on" : ""}" data-mk="${x.key}"><img src="${x.photo}" alt=""><b>${esc(x.name)}</b><span>${esc(x.title)}</span></button>`).join("")}
+            <button type="button" class="met-opt other ${F.key === "boshqa" ? "on" : ""}" data-mk="boshqa"><div class="met-oth">+</div><b>Boshqa</b><span>Rahbar yoki boshqa metodist</span></button></div>
+          ${F.key === "boshqa" ? `<input id="mbf-o" value="${esc(F.other)}" placeholder="Ism-familiyasi va lavozimi, masalan: Karimova Dilnoza, Chilonzor filiali direktori" style="margin-top:10px">` : ""}</div>
+        <div class="field"><label>Maqsad <span class="muted">(ixtiyoriy)</span></label><input id="mbf-p" value="${esc(F.purpose)}" placeholder="Masalan: 5-sinflar ingliz tili darslarini ko'rish"></div>`;
+      const d = $("#mbf-dur", box); if (d) d.textContent = F.end > F.start ? `· ${durH({ start_t: F.start, end_t: F.end })} soat` : "";
+      $("#mbf-pc", box).onchange = e => { F.pc = e.target.value; const p = metPc(F.pc); if (p && !p.main) F.day = p.day; [F.start, F.end] = firstFree(); draw(); };
+      $("#mbf-d", box).onchange = e => { F.day = e.target.value < t ? t : e.target.value; [F.start, F.end] = firstFree(); draw(); };
+      $("#mbf-d", box).disabled = !pc.main;
+      $("#mbf-s", box).onchange = e => { const len = toMins(F.end) - toMins(F.start); F.start = e.target.value; F.end = minsToHM(Math.min(MET_TO, toMins(F.start) + Math.max(15, len))); draw(); };
+      $("#mbf-e", box).onchange = e => { F.end = e.target.value; draw(); };
+      $$("[data-mk]", box).forEach(b => b.onclick = () => { F.key = b.dataset.mk; draw(); if (F.key === "boshqa") $("#mbf-o", box).focus(); });
+      const o = $("#mbf-o", box); if (o) o.oninput = e => F.other = e.target.value;
+      $("#mbf-p", box).oninput = e => F.purpose = e.target.value;
+      if (!$("#mbf-s", box).value) { F.start = ""; }
+    };
+    draw();
+    const err = msg => { $("#mbf-err", m).textContent = msg; return null; };
+    $("#mbf-ok", m).onclick = async e => {
+      err("");
+      const pc = metPc(F.pc);
+      if (!F.start || !F.end || F.end <= F.start) return err("Vaqtni to'g'ri tanlang");
+      if (F.day === t && F.end <= nowHM()) return err("Bu vaqt o'tib ketgan");
+      if (pc && !pc.main && F.start < pc.from_time) return err(`Bu kompyuter soat ${pc.from_time} dan ochiq`);
+      const clash = metBk(F.day, F.pc).find(b => b.start_t < F.end && F.start < b.end_t);
+      if (clash) return err(`${hmRange(clash)} oralig'i band (${nameOf(clash.booked_by)})`);
+      if (!F.key) return err("Metodistni tanlang");
+      if (F.key === "boshqa" && F.other.trim().length < 3) { $("#mbf-o", m).focus(); return err("Boshqa metodist yoki rahbarning ismini yozing"); }
+      const row = { day: F.day, pc_id: F.pc, start_t: F.start, end_t: F.end, metodist_key: F.key,
+        metodist_name: F.key === "boshqa" ? F.other.trim() : metOf(F.key).name, purpose: F.purpose.trim() };
+      e.target.disabled = true;
+      try {
+        await db.bookMet(row);
+        toast(`${pcName(pc)} band qilindi: ${dayLabel(F.day)} ${F.start}–${F.end}`);
+        closeModal(); S.ui.mday = F.day; await metReload(); metView(top);
+      } catch (x) { e.target.disabled = false; err(x.message || "Xatolik"); }
+    };
+  }
+
+  // ---- Xodimning bo'sh joyini qo'shimcha kompyuter sifatida ochish
+  function metOpenPcForm(top) {
+    const t = today();
+    const opened = new Set((S.mpcs || []).filter(p => p.day === t).map(p => p.owner_id));
+    const staff = S.profiles.filter(p => p.active && ["asoschi", "ceo", "xodim"].includes(p.role)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    const nowR = minsToHM(Math.max(MET_FROM, Math.floor(tashNow().mins / 15) * 15));
+    const sel = new Set();
+    const m = openModal("Yana bir xodimning joyi bo'sh", `
+      <p class="small muted" style="margin-top:0">Bugun ishda bo'lmagan yoki joyi bo'sh xodimlarni belgilang. Ularning kompyuteri metodistlar uchun qo'shimcha joy bo'lib ochiladi va barcha xodimlarga ko'rinadi. Joy tanlangan vaqtdan <b>bugun kun oxirigacha</b> amal qiladi, ertaga avtomatik yopiladi.</p>
+      <div class="row" style="gap:10px;margin-bottom:10px"><label class="small" style="margin:0">Qaysi vaqtdan bo'sh:</label>
+        <select id="mop-t" style="width:auto">${metTimes(MET_FROM, MET_TO - 30).map(x => `<option ${x === nowR ? "selected" : ""}>${x}</option>`).join("")}</select>
+        <span class="spacer"></span><input id="mop-q" placeholder="Qidirish…" style="max-width:220px"></div>
+      <div class="met-staff" id="mop-l"></div>`,
+      `<span class="small muted" id="mop-n" style="margin-right:auto">Hech kim tanlanmagan</span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="mop-ok" disabled>Joyni ochish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "720px";
+    const list = $("#mop-l", m);
+    const draw = () => {
+      const q = $("#mop-q", m).value.trim().toLowerCase();
+      list.innerHTML = staff.filter(p => !q || p.full_name.toLowerCase().includes(q)).map(p => {
+        const op = opened.has(p.id), on = sel.has(p.id);
+        return `<label class="met-st ${op ? "dis" : ""} ${on ? "on" : ""}"><input type="checkbox" data-sid="${p.id}" ${op || on ? "checked" : ""} ${op ? "disabled" : ""}>
+          ${avatar(p.full_name, photoOf(p))}<div style="flex:1;min-width:0"><b>${esc(p.full_name)}</b><div class="small muted">${esc(titleOf(p))}</div></div>${op ? pill("tasdiqlandi", "Ochiq") : ""}</label>`; }).join("") || `<div class="empty">Topilmadi</div>`;
+      $$("[data-sid]", list).forEach(c => c.onchange = () => { c.checked ? sel.add(c.dataset.sid) : sel.delete(c.dataset.sid); draw(); });
+      $("#mop-n", m).textContent = sel.size ? `${sel.size} ta joy tanlandi` : "Hech kim tanlanmagan";
+      $("#mop-ok", m).disabled = !sel.size;
+    };
+    $("#mop-q", m).oninput = draw; draw();
+    $("#mop-ok", m).onclick = async e => {
+      e.target.disabled = true; const ft = $("#mop-t", m).value;
+      try {
+        for (const id of sel) await db.openMetPc(t, id, ft);
+        toast(`${sel.size} ta qo'shimcha kompyuter ochildi (bugun ${ft} dan)`); closeModal(); await metReload(); S.ui.mday = t; metView(top);
+      } catch (x) { e.target.disabled = false; toast(x.message || "Xatolik", true); }
+    };
+  }
+
+  // ---- Mening bronlarim
+  function metMyTab(root, top) {
+    const mine = (S.mbook || []).filter(b => b.booked_by === S.me.id).sort((a, b) => (a.day + a.start_t) < (b.day + b.start_t) ? 1 : -1);
+    const st = b => b.status === "bekor" ? pill("missing", "Bekor qilingan") : metNow(b) ? pill("qaytarildi", "Hozir") : !metEnded(b) ? pill("jarayonda", "Kutilmoqda")
+      : b.fb_done ? pill("tasdiqlandi", "So'rovnoma yuborildi") : `<button class="btn sm primary" data-mfb="${b.id}">So'rovnomani to'ldirish</button>`;
+    root.innerHTML = `<div class="card">${mine.length ? mine.map(b => `<div class="list-item met-my">${metPhoto(b)}
+        <div style="flex:1;min-width:0"><div class="t">${esc(metName(b))}</div><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}${b.purpose ? " · " + esc(b.purpose) : ""}</div></div>
+        ${st(b)}${b.status === "faol" && !metEnded(b) ? `<button class="btn sm ghost" data-mcancel="${b.id}">Bekor</button>` : ""}</div>`).join("")
+      : `<div class="empty">Siz hali metodist vaqtini band qilmagansiz.<div style="margin-top:10px"><button class="btn primary sm" id="mm-go">Band qilish</button></div></div>`}</div>
+      <p class="small muted" style="margin-top:10px">Metodist vaqti tugagach, so'rovnoma shu yerda va bosh sahifada chiqadi. Javoblaringizni faqat Monitoring bo'limi rahbari va Akademik bo'lim rahbari ko'radi.</p>`;
+    $$("[data-mfb]", root).forEach(b => b.onclick = () => metFbForm(b.dataset.mfb, top));
+    $$("[data-mcancel]", root).forEach(b => b.onclick = async () => { b.disabled = true;
+      try { await act(() => db.cancelMet(b.dataset.mcancel), "Bron bekor qilindi"); await metReload(); metView(top); } catch (e) { b.disabled = false; } });
+    const g = $("#mm-go", root); if (g) g.onclick = () => metBookForm("asosiy", today(), top);
+  }
+
+  // ---- So'rovnoma (bron qilgan xodim to'ldiradi)
+  function metFbForm(id, top) {
+    const b = (S.mbook || []).find(x => x.id === id); if (!b) return;
+    const F = { came: true, seen: "", whom: "", conclusion: "" };
+    const m = openModal("Metodist vaqti bo'yicha so'rovnoma", `<div id="mff"></div>`,
+      `<span class="err-text" id="mff-err" style="margin-right:auto"></span><button class="btn" data-close>Keyinroq</button><button class="btn primary" id="mff-ok">Yuborish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "680px";
+    const box = $("#mff", m);
+    const draw = () => {
+      box.innerHTML = `<div class="met-fbh">${metPhoto(b, "lg")}<div><b>${esc(metName(b))}</b><div class="small muted">${esc(metTitle(b))}</div>
+          <div class="small">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}</div></div></div>
+        <div class="field"><label>Metodist keldimi? *</label><div class="seg"><button type="button" data-came="1" class="${F.came ? "active" : ""}">Ha, keldi</button><button type="button" data-came="0" class="${!F.came ? "active" : ""}">Yo'q, kelmadi</button></div></div>
+        ${F.came ? `
+          <div class="field"><label>Metodist nimalarni ko'rdi? *</label><textarea id="mff-s" rows="3" placeholder="Masalan: 2 ta dars kuzatdi, dars ishlanmalari va sinf jurnalini tekshirdi…">${esc(F.seen)}</textarea></div>
+          <div class="field"><label>Kimlarni ko'rdi? *</label><textarea id="mff-w" rows="2" placeholder="O'qituvchilarning ismi, sinfi, filiali: masalan, Aliyeva M. — 5-B, ingliz tili">${esc(F.whom)}</textarea></div>
+          <div class="field"><label>Qanday xulosa va tavsiya berdi? *</label><textarea id="mff-c" rows="3" placeholder="Metodistning xulosasi, kamchiliklar va tavsiyalar…">${esc(F.conclusion)}</textarea></div>`
+        : `<div class="field"><label>Sababi yoki izoh *</label><textarea id="mff-c" rows="3" placeholder="Masalan: oldindan ogohlantirmasdan kelmadi / boshqa kunga ko'chirildi…">${esc(F.conclusion)}</textarea></div>`}
+        <p class="small muted" style="margin:0">🔒 Javoblaringizni faqat Monitoring bo'limi rahbari va Akademik bo'lim rahbari ko'radi.</p>`;
+      $$("[data-came]", box).forEach(x => x.onclick = () => { F.came = x.dataset.came === "1"; draw(); });
+      [["#mff-s", "seen"], ["#mff-w", "whom"], ["#mff-c", "conclusion"]].forEach(([s, k]) => { const el = $(s, box); if (el) el.oninput = () => F[k] = el.value; });
+    };
+    draw();
+    const err = (msg, sel) => { $("#mff-err", m).textContent = msg; const el = sel && $(sel, m); el && el.focus(); return null; };
+    $("#mff-ok", m).onclick = async e => {
+      err("");
+      if (F.came && F.seen.trim().length < 3) return err("Metodist nimalarni ko'rganini yozing", "#mff-s");
+      if (F.came && F.whom.trim().length < 3) return err("Kimlarni ko'rganini yozing", "#mff-w");
+      if (F.conclusion.trim().length < 3) return err(F.came ? "Metodist qanday xulosa berganini yozing" : "Sababini yozing", "#mff-c");
+      e.target.disabled = true;
+      try {
+        await db.sendMetFeedback(b.id, { came: F.came, seen: F.came ? F.seen.trim() : "", whom: F.came ? F.whom.trim() : "", conclusion: F.conclusion.trim() });
+        b.fb_done = true; toast("So'rovnoma yuborildi. Rahmat!"); closeModal(); await metReload().catch(() => {}); dueBanner();
+        if (top && top.isConnected) metView(top); else render();
+      } catch (x) { e.target.disabled = false; err(x.message || "Xatolik"); }
+    };
+  }
+
+  // ---- So'rovnoma javoblari (faqat Monitoring bo'limi rahbari va Akademik bo'lim rahbari)
+  async function metAnsTab(root) {
+    if (!canMetAdmin()) { root.innerHTML = `<div class="card empty">Bu bo'lim faqat rahbarlar uchun</div>`; return; }
+    root.innerHTML = `<div class="card empty">Yuklanmoqda…</div>`;
+    const t = today();
+    const per = S.ui.mper || "oy";
+    const from = per === "hafta" ? addD(t, -6) : per === "oy" ? addD(t, -30) : addD(t, -365);
+    let fb = [], bks = [];
+    try { [fb, bks] = await Promise.all([db.listMetFeedback(), db.listMetBookings(from, t)]); } catch (e) { root.innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
+    const fk = S.ui.mkey || "";
+    const byId = Object.fromEntries(bks.map(b => [b.id, b]));
+    const done = fb.map(f => ({ f, b: byId[f.booking_id] })).filter(x => x.b && x.b.status === "faol" && (!fk || x.b.metodist_key === fk))
+      .sort((a, b) => (a.b.day + a.b.start_t) < (b.b.day + b.b.start_t) ? 1 : -1);
+    const waiting = bks.filter(b => b.status === "faol" && !b.fb_done && metEnded(b) && (!fk || b.metodist_key === fk));
+    const all = bks.filter(b => b.status === "faol" && (!fk || b.metodist_key === fk));
+    const hours = all.filter(metEnded).reduce((a, b) => a + durH(b), 0);
+    const notCame = done.filter(x => !x.f.came).length;
+    const perMet = [...METS.map(x => x.key), "boshqa"].map(k => { const r = bks.filter(b => b.status === "faol" && b.metodist_key === k && metEnded(b));
+      return { k, n: r.length, h: Math.round(r.reduce((a, b) => a + durH(b), 0) * 10) / 10, miss: done.filter(x => x.b.metodist_key === k && !x.f.came).length }; });
+    root.innerHTML = `
+      <div class="row" style="gap:10px;margin-bottom:14px"><div class="seg">${[["hafta", "7 kun"], ["oy", "30 kun"], ["yil", "1 yil"]].map(([k, l]) => `<button data-mp="${k}" class="${k === per ? "active" : ""}">${l}</button>`).join("")}</div>
+        <select id="ma-k" style="width:auto"><option value="">Barcha metodistlar</option>${METS.map(x => `<option value="${x.key}" ${fk === x.key ? "selected" : ""}>${esc(x.name)}</option>`).join("")}<option value="boshqa" ${fk === "boshqa" ? "selected" : ""}>Boshqa</option></select>
+        <span class="spacer"></span><span class="small muted">🔒 Faqat siz va ${S.me.role === "asoschi" ? "Akademik bo'lim rahbari" : "Monitoring bo'limi rahbari"} ko'radi</span></div>
+      <div class="stats">${stat("O'tkazilgan vaqtlar", all.filter(metEnded).length)}${stat("Jami soat", Math.round(hours * 10) / 10)}${stat("So'rovnoma kutilmoqda", waiting.length, waiting.length ? "warn" : "ok")}${stat("Metodist kelmagan", notCame, notCame ? "warn" : "ok")}</div>
+      ${!fk ? `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Metodistlar bo'yicha</h2></div><div class="table-wrap"><table><thead><tr><th>Metodist</th><th>Vaqtlar</th><th>Soat</th><th>Kelmagan</th></tr></thead><tbody>
+        ${perMet.filter(x => x.n || METS.some(m => m.key === x.k)).map(x => { const M = metOf(x.k); return `<tr class="click" data-mk2="${x.k}"><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(M ? M.name : "Boshqa", M ? M.photo : "")}<div><b>${esc(M ? M.name : "Boshqa")}</b><div class="small muted">${esc(M ? M.title : "Rahbar yoki boshqa metodist")}</div></div></div></td><td><b>${x.n}</b></td><td>${x.h}</td><td>${x.miss ? pill("missing", x.miss) : "0"}</td></tr>`; }).join("")}
+        </tbody></table></div></div>` : ""}
+      ${waiting.length ? `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>So'rovnoma hali to'ldirilmagan</h2><span class="spacer"></span>${pill("jarayonda", waiting.length)}</div>
+        ${waiting.map(b => `<div class="list-item">${metPhoto(b)}<div style="flex:1;min-width:0"><div class="t">${esc(metName(b))}</div><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · bron qildi: <b>${esc(nameOf(b.booked_by))}</b></div></div></div>`).join("")}</div>` : ""}
+      <div class="card"><div class="card-head"><h2>Javoblar</h2><span class="spacer"></span><span class="small muted">${done.length} ta</span></div>
+        ${done.length ? done.map(({ f, b }) => `<div class="met-ans">
+          <div class="met-ans-h">${metPhoto(b)}<div style="flex:1;min-width:0"><b>${esc(metName(b))}</b><div class="small muted">${esc(dayLabel(b.day))} · ${hmRange(b)} · ${esc(pcName(metPc(b.pc_id)))}</div></div>
+            ${f.came ? pill("tasdiqlandi", "Keldi") : pill("missing", "Kelmadi")}</div>
+          <div class="small muted" style="margin:6px 0 8px">Bron qildi va javob berdi: <b>${esc(nameOf(f.author_id || b.booked_by))}</b> · ${fmtDate(f.created_at)} ${tmOf(f.created_at)}${b.purpose ? ` · Maqsad: ${esc(b.purpose)}` : ""}</div>
+          ${f.came ? `<div class="met-qa"><span>Nimalarni ko'rdi</span><p>${esc(f.seen)}</p></div><div class="met-qa"><span>Kimlarni ko'rdi</span><p>${esc(f.whom)}</p></div>` : ""}
+          <div class="met-qa"><span>${f.came ? "Xulosa va tavsiya" : "Sababi"}</span><p>${esc(f.conclusion)}</p></div></div>`).join("") : `<div class="empty">Bu davrda javob yo'q</div>`}</div>`;
+    $$("[data-mp]", root).forEach(b => b.onclick = () => { S.ui.mper = b.dataset.mp; metAnsTab(root); });
+    $("#ma-k", root).onchange = e => { S.ui.mkey = e.target.value; metAnsTab(root); };
+    $$("[data-mk2]", root).forEach(r => r.onclick = () => { S.ui.mkey = r.dataset.mk2; metAnsTab(root); });
   }
 
   // ---- Ko'rilganlar (kim qachon ko'rdi)
