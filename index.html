@@ -2785,6 +2785,8 @@ window.METODISTLAR = [
   }
   const isAkadSubj = s => AKAD_SUBJ.includes(canonSubj(s));
   const canEditLead = () => canMetAdmin() || (S.teditors || []).some(x => x.user_id === S.me?.id);
+  // Munisa va Dilshoda faqat boshlang'ich o'qituvchilarni kuzatadi — ular kiritgan hamma o'qituvchi boshlang'ich
+  const boshlOnly = () => !canMetAdmin() && (S.teditors || []).some(x => x.user_id === S.me?.id);
   const subjOptions = v => { const c = canonSubj(v);
     return `<option value="">— fan —</option><optgroup label="Akademik ball qo'yiladigan">${AKAD_SUBJ.map(x => `<option ${x === c ? "selected" : ""}>${esc(x)}</option>`).join("")}</optgroup>
       <optgroup label="Boshqa fanlar (faqat intizomiy ball)">${[...OTHER_SUBJ, ...(c && ![...AKAD_SUBJ, ...OTHER_SUBJ].includes(c) ? [c] : [])].map(x => `<option ${x === c ? "selected" : ""}>${esc(x)}</option>`).join("")}</optgroup>`; };
@@ -2793,7 +2795,8 @@ window.METODISTLAR = [
     const t = today(); const date = S.ui.myDate && S.ui.myDate <= t ? S.ui.myDate : t;
     const kind = deptOf(S.me); const r = repOf(S.me, date); const locked = isGraded(r);
     const d0 = (r && r.data && r.data.kind === kind) ? JSON.parse(JSON.stringify(r.data)) : {};
-    const blankRow = (o = {}) => ({ teacher: "", teacher_id: "", subject: "", filial: "", klass: "", soat: "", ib: "", ab: "", lead: "", date, ...o });
+    const bOnly = kind === "akademik" && boshlOnly();
+    const blankRow = (o = {}) => { const x = { teacher: "", teacher_id: "", subject: "", filial: "", klass: "", soat: "", ib: "", ab: "", lead: "", date, ...o }; if (bOnly) x.subject = BOSHL; return x; };
     const F = kind === "akademik"
       ? { rows: (d0.rows && d0.rows.length ? d0.rows : [blankRow()]).map(x => blankRow(x)), note: d0.note || "" }
       : { filials: d0.filials || [], topics: d0.topics && d0.topics.length ? d0.topics : [{ topic: "", posts: "" }], answered: d0.answered ?? "", mgmt: d0.mgmt || "", mgmt_note: d0.mgmt_note || "", note: d0.note || "",
@@ -2824,7 +2827,7 @@ window.METODISTLAR = [
         <div class="ar-grid">
           <div class="field ar-t"><label>O'qituvchining I/F *</label><input data-r="${i}" data-f="teacher" value="${esc(x.teacher)}" placeholder="Familiya Ism" autocomplete="off"><div class="ar-ac" data-ac="${i}"></div>
             <div class="ar-hint" data-hint="${i}">${tt ? teacherHint(tt) : x.teacher.trim() ? `<span class="th-new">Yangi o'qituvchi — hisobot yuborilganda bazaga avtomatik qo'shiladi</span>` : ""}</div></div>
-          <div class="field"><label>Fan *</label><select data-r="${i}" data-f="subject">${subjOptions(x.subject)}</select></div>
+          <div class="field"><label>Fan *</label>${bOnly ? `<input value="${esc(BOSHL)}" disabled title="Siz faqat boshlang'ich o'qituvchilarni kuzatasiz">` : `<select data-r="${i}" data-f="subject">${subjOptions(x.subject)}</select>`}</div>
           <div class="field"><label>Filial *</label><select data-r="${i}" data-f="filial">${filOpts(x.filial)}</select></div>
           <div class="field"><label>Sinf</label><input data-r="${i}" data-f="klass" value="${esc(x.klass || "")}" list="mr-kl-${i}" placeholder="5-A">
             <datalist id="mr-kl-${i}">${((tt && tt.classes) || []).map(c => `<option value="${esc(c)}">`).join("")}</datalist></div>
@@ -2841,7 +2844,7 @@ window.METODISTLAR = [
       </div>`; };
     const rowsBlock = () => `<div class="ar-list">${F.rows.map(rowHtml).join("")}</div>
       <button type="button" class="btn sm" id="mr-add" style="margin-top:10px">+ Yangi qator</button>`;
-    const longBlock = () => { const lu = longUnseen(S.ui.luFil || "");
+    const longBlock = () => { const lu = longUnseen(S.ui.luFil || "").filter(z => !bOnly || canonSubj(z.t.subject) === BOSHL);
       return `<details class="card ar-long" style="margin-top:16px" ${S.ui.luOpen ? "open" : ""}><summary><b>${LONG_DAYS} kundan ko'p kuzatilmagan o'qituvchilar</b> ${lu.length ? `<span class="badge">${lu.length}</span>` : `<span class="small muted">— yo'q</span>`}</summary>
         <div class="row" style="gap:8px;margin:10px 0"><select id="lu-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === (S.ui.luFil || "") ? "selected" : ""}>${esc(f)}</option>`).join("")}</select><span class="small muted">Ertangi rejangizni tuzishda foydali</span></div>
         ${lu.slice(0, 40).map(({ t: q, f }) => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(q.full_name)}</div><div class="small muted">${esc([canonSubj(q.subject), q.filial].filter(Boolean).join(" · "))}${f.last ? ` · oxirgi: ${fmtDate(f.last.day)}` : ""}</div></div>
@@ -2886,10 +2889,10 @@ window.METODISTLAR = [
     };
     const bind = () => {
       $("#mr-d", root).onchange = e => { S.ui.myDate = e.target.value; myReportForm(root); };
-      const pickTeacher = (i, tt) => { const x = F.rows[i]; x.teacher = tt.full_name; x.teacher_id = tt.id; if (tt.filial) x.filial = tt.filial; if (tt.subject) x.subject = canonSubj(tt.subject);
+      const pickTeacher = (i, tt) => { const x = F.rows[i]; x.teacher = tt.full_name; x.teacher_id = tt.id; if (tt.filial) x.filial = tt.filial; if (tt.subject && !bOnly) x.subject = canonSubj(tt.subject);
         if (!x.klass && (tt.classes || []).length === 1) x.klass = tt.classes[0];
         saveDraft(); draw(); const k = $(`[data-r="${i}"][data-f=klass]`, root); k && k.focus(); };
-      const showAc = i => { const box = $(`[data-ac="${i}"]`, root); if (!box) return; const x = F.rows[i]; const ms = teacherMatches(x.teacher);
+      const showAc = i => { const box = $(`[data-ac="${i}"]`, root); if (!box) return; const x = F.rows[i]; const ms = teacherMatches(x.teacher, 8, bOnly ? (q => !q.subject || canonSubj(q.subject) === BOSHL) : null);
         const exact = ms.length === 1 && ms[0].name_key === tkey(x.teacher);
         box.innerHTML = ms.length && !exact ? `<div class="ar-ac-h">Taxminiy:</div>${ms.map(tt => `<div class="ar-ac-i" data-pick="${tt.id}"><b>${esc(tt.full_name)}</b><span>${esc([canonSubj(tt.subject), tt.filial, tt.lead_class ? "sinf rahbari " + tt.lead_class : (tt.classes || []).slice(-3).join(", ")].filter(Boolean).join(" · "))}</span></div>`).join("")}` : "";
         box.classList.toggle("on", !!box.innerHTML);
@@ -2905,7 +2908,7 @@ window.METODISTLAR = [
           i.onkeydown = ev => { if (ev.key === "Enter") { const first = $(`[data-ac="${ri}"] [data-pick]`, root); if (first) { ev.preventDefault(); pickTeacher(ri, teacherById(first.dataset.pick)); } } };
           i.onblur = () => setTimeout(() => { const box = $(`[data-ac="${ri}"]`, root); if (box) { box.innerHTML = ""; box.classList.remove("on"); }
             const x = F.rows[ri]; const tt = !x.teacher_id && teacherByName(x.teacher);
-            if (tt) { x.teacher_id = tt.id; x.teacher = tt.full_name; if (tt.filial) x.filial = tt.filial; if (tt.subject) x.subject = canonSubj(tt.subject); if (!x.klass && (tt.classes || []).length === 1) x.klass = tt.classes[0]; saveDraft(); draw(); } }, 160);
+            if (tt) { x.teacher_id = tt.id; x.teacher = tt.full_name; if (tt.filial) x.filial = tt.filial; if (tt.subject && !bOnly) x.subject = canonSubj(tt.subject); if (!x.klass && (tt.classes || []).length === 1) x.klass = tt.classes[0]; saveDraft(); draw(); } }, 160);
         }
       });
       $$("[data-kl]", root).forEach(b => b.onclick = () => { F.rows[+b.dataset.kl].klass = b.dataset.v; saveDraft(); draw(); });
@@ -2938,7 +2941,7 @@ window.METODISTLAR = [
     // Kuzatilgan darslar qatorlarini tekshirish
     const collectRows = () => {
       const rows = F.rows.map(x => { const tt = x.teacher_id ? teacherById(x.teacher_id) : teacherByName(x.teacher);
-          const same = tt && tkey(tt.full_name) === tkey(x.teacher); const subj = canonSubj(x.subject);
+          const same = tt && tkey(tt.full_name) === tkey(x.teacher); const subj = bOnly ? BOSHL : canonSubj(x.subject);
           return { teacher: (same ? tt.full_name : x.teacher).trim(), teacher_id: same ? tt.id : (x.teacher_id || ""), subject: subj, filial: (x.filial || "").trim(),
             klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib: fnum(x.ib), ab: isAkadSubj(subj) ? fnum(x.ab) : null,
             lead: (x.lead || "").trim().toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
@@ -3518,10 +3521,10 @@ window.METODISTLAR = [
       .sort((a, b) => (b.f.days ?? 9999) - (a.f.days ?? 9999) || a.t.full_name.localeCompare(b.t.full_name));
   }
   // Taxminiy variantlar (yozilayotgan ism bo'yicha)
-  function teacherMatches(q, limit = 8) {
+  function teacherMatches(q, limit = 8, only = null) {
     const k = tkey(q); if (!k) return [];
     const words = k.split(" ");
-    return (S.teachers || []).map(t => { const tk = t.name_key || tkey(t.full_name);
+    return (S.teachers || []).filter(t => !only || only(t)).map(t => { const tk = t.name_key || tkey(t.full_name);
       const sc = tk.startsWith(k) ? 3 : tk.split(" ").some(w => w.startsWith(words[0])) && words.every(w => tk.includes(w)) ? 2 : tk.includes(k) ? 1 : 0;
       return { t, sc }; }).filter(x => x.sc).sort((a, b) => b.sc - a.sc || a.t.full_name.localeCompare(b.t.full_name)).slice(0, limit).map(x => x.t);
   }
