@@ -2220,9 +2220,8 @@ window.METODISTLAR = [
     if (r === "asoschi") items.push({ id: "xodimlar", label: "Foydalanuvchilar", icon: "users", sec: "Jamoa" });
     if (r === "ceo") items.push({ id: "xodimlar", label: "Jamoam", icon: "users", sec: "Jamoa" });
     // "Videolar va maqolalar" bo'limi yopilgan (2026-10-29)
-    items.push({ id: "savollar", label: "Savol-javob", icon: "chat" });
-    if (r !== "oqituvchi") items.push({ id: "uchrashuvlar", label: "Zoom uchrashuvlar", icon: "cam" });
-    items.push({ id: "portal-haqida", label: "Portal haqida", icon: "info" });
+    // "Savol-javob" va "Zoom uchrashuvlar" bo'limlari yopilgan (2026-10-29)
+    items.push({ id: "portal-haqida", label: "Portal haqida", icon: "info", sec: "Ma'lumot" });
     items.push({ id: "profil", label: "Profilim", icon: "about" });
     return items;
   }
@@ -6188,12 +6187,14 @@ window.METODISTLAR = [
     };
   }
 
-  PAGES.savollar = soon("Savol-javob", {
+  PAGES.savollar_old = soon("Savol-javob", {
     rahbar: "Monitoring bo'limiga savol yuborasiz va javobni shu yerda olasiz.",
     oqituvchi: "Monitoringga savol yuborasiz (xohlasangiz, ismsiz) va javobni shu yerda ko'rasiz.",
     default: "Rahbarlar va o'qituvchilardan kelgan savollar shu yerda yig'iladi va javob beriladi."
   });
-  PAGES.uchrashuvlar = soon("Zoom uchrashuvlar", {
+  const _closedPage = page => PAGES.bosh(page);
+  PAGES.uchrashuvlar = _closedPage; PAGES.savollar = _closedPage;
+  PAGES.uchrashuvlar_old = soon("Zoom uchrashuvlar", {
     rahbar: "Monitoring bo'limi bilan Zoom uchrashuvini shu yerdan belgilaysiz.",
     default: "Rahbarlar bilan Zoom uchrashuvlarini rejalashtirish va havolalarni yuborish shu yerda bo'ladi."
   });
