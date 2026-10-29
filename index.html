@@ -912,6 +912,13 @@ tr.unseen td { background: var(--brand-soft); }
 .tb-tile:hover { box-shadow: var(--shadow); } .tb-tile.all { border-left-color: var(--muted); }
 .tb-tile.bog, .rk-cnt.bog { border-left: 5px solid #e08a1e; background: color-mix(in srgb, #e08a1e 7%, var(--surface)); }
 .tb-tile.ak { border-left-color: #1f9d55; } .tb-tile.empty { opacity: .5; cursor: default; }
+/* ---- Oy ustozi */
+.oy-card { margin-bottom: 16px; border: 2px solid #f0d27a; background: linear-gradient(180deg, #fffaf0, var(--surface)); }
+.oy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.oy-w { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.oy-w.bog { border-left: 5px solid #e08a1e; }
+.oy-m { font-size: 30px; }
+.oy-w b.click { font-size: 16px; }
 
 </style>
 </head>
@@ -4049,6 +4056,30 @@ window.METODISTLAR = [
     const arrow = x => { if (x.rank === null) return ""; const p = prank(x.t.id); if (p === null) return `<span class="rk-new" title="${esc(P.pLabel)}da reytingda yo'q edi">yangi</span>`;
       const d = p - x.rank; return d > 0 ? `<span class="rk-up" title="${esc(P.pLabel)}: ${p}-o'rin">↑${d}</span>` : d < 0 ? `<span class="rk-down" title="${esc(P.pLabel)}: ${p}-o'rin">↓${-d}</span>` : `<span class="rk-eq" title="${esc(P.pLabel)}: ${p}-o'rin">=</span>`; };
     const over = obs.filter(o => (o.ib !== null && +o.ib > IB_MAX) || (o.ab !== null && +o.ab > abMax(o.subject)));
+    // Oy ustozi: har bir fan (Bog'cha alohida) bo'yicha oyning 1-o'rni
+    const winners = P.mode === "oy" ? RK_GROUPS.map(g => ({ g, x: (out[g] || []).find(z => z.rank === 1) })).filter(w => w.x) : [];
+    const isCur = P.mode === "oy" && P.m === monthOf(t);
+    const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy ustozi — hozircha yetakchilar" : "Oy ustozi"} · ${esc(monthLabel(P.m))}</h2><span class="spacer"></span><span class="small muted">${isCur ? "oy oxirida aniq bo'ladi" : "har bir fan bo'yicha 1-o'rin"}${fil ? " · " + esc(fil) : ""}</span></div>
+      ${winners.length ? `<div class="oy-grid">${winners.map(w => `<div class="oy-w ${w.g === BOG ? "bog" : ""}"><div class="oy-m">🥇</div><div style="min-width:0;flex:1"><div class="small muted">${esc(w.g)}</div><b class="click" data-tid="${w.x.t.id}">${esc(w.x.t.full_name)}</b>
+          <div class="small muted">${esc(w.x.t.filial || "—")} · ${w.x.n} ta kuzatuv · <b style="color:#1f9d55">${w.x.total}%</b></div></div>
+          ${isCur ? "" : `<button class="btn sm" data-oyp="${esc(w.g)}" title="Tabriknoma">🎉 Tabriknoma</button>`}</div>`).join("")}</div>`
+        : `<div class="empty">Bu oyda reytingga kirgan (kamida ${MIN_OBS} marta kuzatilgan) ustoz hali yo'q</div>`}</div>`;
+    const oyPdf = g => { const w = winners.find(z => z.g === g); if (!w) return; const x = w.x; const win = window.open("", "_blank"); if (!win) return toast("Brauzer yangi oynani to'sib qo'ydi — ruxsat bering", true);
+      win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Tabriknoma — ${esc(x.t.full_name)}</title><style>
+        @page{size:A4 landscape;margin:0}body{margin:0;font-family:Georgia,'Times New Roman',serif;color:#13233d}
+        .pg{width:297mm;height:210mm;box-sizing:border-box;padding:18mm;background:#fffdf7;position:relative}
+        .bd{position:absolute;inset:10mm;border:3px solid #c9a227;border-radius:6mm}.bd2{position:absolute;inset:13mm;border:1px solid #c9a227;border-radius:4mm}
+        .in{position:relative;text-align:center;padding-top:14mm}.br{font:700 14pt Arial,sans-serif;letter-spacing:.2em;color:#066ecf}
+        h1{font-size:46pt;margin:8mm 0 2mm;color:#8a6a00;letter-spacing:.04em}.sub{font:600 16pt Arial,sans-serif;color:#40526b}
+        .nm{font-size:38pt;font-weight:700;margin:12mm 0 4mm;border-bottom:2px solid #c9a227;display:inline-block;padding:0 12mm 2mm}
+        .tx{font-size:17pt;line-height:1.6;max-width:210mm;margin:6mm auto 0}.md{font-size:54pt}
+        .ft{position:absolute;left:30mm;right:30mm;bottom:22mm;display:flex;justify-content:space-between;font:14pt Arial,sans-serif;color:#40526b}
+        .ft div{border-top:1px solid #8895a8;padding-top:2mm;min-width:70mm;text-align:center}</style></head><body><div class="pg"><div class="bd"></div><div class="bd2"></div><div class="in">
+        <div class="br">REGISTON MAKTABI · MONITORING BO'LIMI</div><div class="md">🏅</div><h1>TABRIKNOMA</h1><div class="sub">${esc(monthLabel(P.m))} — «${esc(g)}» yo'nalishi bo'yicha oy ustozi</div>
+        <div class="nm">${esc(x.t.full_name)}</div>
+        <div class="tx">${esc(x.t.filial || "")} filiali ustozi sifatida ${esc(monthLabel(P.m).toLowerCase())} davomida o'tkazgan darslari monitoring kuzatuvlarida eng yuqori natijani ko'rsatgani — <b>${x.total}%</b> (${x.n} ta kuzatuv) — uchun samimiy tabriklaymiz va yangi yutuqlar tilaymiz!</div></div>
+        <div class="ft"><div>Monitoring bo'limi rahbari</div><div>${esc(fmtDate(today()))}</div></div></div>
+        <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`); win.document.close(); };
     // kuzatuvchilar o'rtasidagi farq (aynan intizomiy yoki aynan akademik ballda 10 va undan ko'p)
     const diffs = [];
     const byT = {}; obs.forEach(o => (byT[o.teacher_id] = byT[o.teacher_id] || []).push(o));
@@ -4070,6 +4101,7 @@ window.METODISTLAR = [
           : `<input type="date" id="rk-f" value="${P.from}" max="${t}" style="width:auto"><span class="muted">–</span><input type="date" id="rk-t" value="${P.to}" max="${t}" style="width:auto">`}
         <select id="tx-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
         <span class="small muted">${esc(P.label)} · ${obs.length} ta kuzatuv · taqqoslash: ${esc(P.pLabel)}</span></div>
+      ${oyCard()}
       <div class="rk-counts">${RK_GROUPS.map(g => `<button class="rk-cnt ${g === grp ? "on" : ""} ${g === BOG ? "bog" : ""}" data-rg="${esc(g)}"><b>${cnt[g] || 0}</b><span>${esc(g)}</span><i>${out[g].filter(x => x.rank).length} reytingda</i></button>`).join("")}
         <div class="rk-cnt total"><b>${(S.teachers || []).length}</b><span>Jami o'qituvchi</span><i>${cnt["Fani kiritilmagan"] ? cnt["Fani kiritilmagan"] + " tasi fani kiritilmagan" : "bazada"}</i></div></div>
       ${grp === OTHER_GRP && Object.keys(otherSplit).length ? `<div class="small muted" style="margin:-4px 0 12px">Boshqa fanlar: ${Object.entries(otherSplit).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${esc(k)} — ${v}`).join(" · ")}</div>` : ""}
@@ -4097,6 +4129,7 @@ window.METODISTLAR = [
     const rt = $("#rk-t", root); if (rt) rt.onchange = e => { S.ui.rto = e.target.value; teachRating(root); };
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachRating(root); };
     $$("[data-rg]", root).forEach(b => b.onclick = () => { S.ui.rgrp = b.dataset.rg; teachRating(root); });
+    $$("[data-oyp]", root).forEach(b => b.onclick = () => oyPdf(b.dataset.oyp));
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
   }
   // O'qituvchining oyma-oy dinamikasi (oxirgi 6 oy)
