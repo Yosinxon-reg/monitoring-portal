@@ -4918,7 +4918,7 @@ window.METODISTLAR = [
       <p style="margin-bottom:0">${txt}</p></div>`;
   };
   // ---- Videolar
-  const AUD = { rahbar: "Rahbarlar", oqituvchi: "O'qituvchilar", xodim: "Barcha xodimlar", ceo: "CEO'lar", "dept:akademik": "Akademik bo'lim (rahbari va xodimlari)", "dept:intizomiy": "Intizomiy bo'lim (rahbari va xodimlari)" };
+  const AUD = { rahbar: "Rahbarlar", oqituvchi: "O'qituvchilar", xodim: "Barcha xodimlar", ceo: "CEO'lar", "dept:akademik": "Akademik bo'lim (rahbari va xodimlari)", "dept:intizomiy": "Intizomiy bo'lim (rahbari va xodimlari)", "ceo:akademik": "Faqat Akademik bo'lim rahbari", "ceo:intizomiy": "Faqat Intizomiy bo'lim rahbari" };
   const ytId = u => { const m = String(u || "").match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/); return m ? m[1] : null; };
   function videoCard(v) {
     const yt = v.kind === "youtube" && ytId(v.url);
