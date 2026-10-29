@@ -2219,7 +2219,7 @@ window.METODISTLAR = [
     }
     if (r === "asoschi") items.push({ id: "xodimlar", label: "Foydalanuvchilar", icon: "users", sec: "Jamoa" });
     if (r === "ceo") items.push({ id: "xodimlar", label: "Jamoam", icon: "users", sec: "Jamoa" });
-    items.push({ id: "videolar", label: "Videolar va maqolalar", icon: "video", sec: "Ma'lumot" });
+    // "Videolar va maqolalar" bo'limi yopilgan (2026-10-29)
     items.push({ id: "savollar", label: "Savol-javob", icon: "chat" });
     if (r !== "oqituvchi") items.push({ id: "uchrashuvlar", label: "Zoom uchrashuvlar", icon: "cam" });
     items.push({ id: "portal-haqida", label: "Portal haqida", icon: "info" });
@@ -2330,8 +2330,8 @@ window.METODISTLAR = [
         </section>
         <section class="login-main">
           <div class="login-card">
-          <div class="tabs" style="margin-bottom:20px"><button type="button" data-lt="teacher" class="active">O'qituvchi</button><button type="button" data-lt="staff">Rahbar yoki xodim</button></div>
-          <form id="teacher-form">
+          <!-- O'qituvchi va rahbar rollari yopilgan: faqat xodimlar login bilan kiradi -->
+          <form id="teacher-form" style="display:none">
             <h2>O'qituvchilar uchun</h2>
             <p class="muted" style="margin:0 0 20px">Login va parol kerak emas. Ismingiz va filialingizni yozing — portal sizni shu qurilmada eslab qoladi.</p>
             <div class="field"><label for="t-name">Ism-familiya</label><input id="t-name" required autocomplete="name" placeholder="Masalan: Feruza Abdullayeva"></div>
@@ -2339,7 +2339,7 @@ window.METODISTLAR = [
             <div class="err-text" id="t-err"></div>
             <button class="btn primary" style="width:100%;justify-content:center" type="submit">Kirish</button>
           </form>
-          <form id="login-form" autocomplete="on" style="display:none">
+          <form id="login-form" autocomplete="on">
             <h2>Tizimga kirish</h2>
             <p class="muted" style="margin:0 0 20px">Login va parolingizni kiriting.</p>
             <div class="field"><label for="email">Telefon raqam (yoki email)</label><input id="email" type="text" inputmode="tel" required autocomplete="username" placeholder="90 123 45 67"></div>
@@ -4911,6 +4911,9 @@ window.METODISTLAR = [
       summary: ex ? ex.summary || "" : "",
       helpers: ex ? (old.helpers || []).map(h => ({ id: h.id || "", hours: h.hours ?? "", note: h.note || "" })) : autoHelp(),
       helpOpen: ex ? (old.helpers || []).length > 0 : autoHelp().length > 0,
+      // Bo'lim rahbarining o'zi ko'rgan darslari (o'qituvchilar bazasi va reytingga tushadi, kunlik soatga qo'shiladi)
+      mine: (S.tobs || []).filter(o => o.author_id === S.me.id && o.report_date === date).map(o => { const tt = teacherById(o.teacher_id) || {};
+        return { teacher: tt.full_name || "", teacher_id: o.teacher_id, subject: canonSubj(o.subject), filial: o.filial || "", klass: o.klass || "", soat: o.soat ?? "", ib: o.ib ?? "", ab: o.ab ?? "", lesson: o.lesson || "" }; }),
       staff: team.map(p => ({ id: p.id, hours: oldStaff(p.id).hours ?? (ex ? "" : (autoN(p.id) ?? "")), note: oldStaff(p.id).note || "", absent: !!oldStaff(p.id).absent, reason: oldStaff(p.id).reason || "" })),
       branches: FILIALLAR.map(n => { const b = (old.branches || []).find(x => x.name === n) || {};
         return { name: n, posts: b.posts ?? "", issues: [...(b.issues || [])], observers: (b.observers || []).map(o => ({ ...o })), open: !!b.posts || (b.observers || []).length > 0 }; }),
@@ -4922,6 +4925,25 @@ window.METODISTLAR = [
         const have = new Set(b.observers.map(o => o.id)); [...a.obs].forEach(id => { if (!have.has(id)) b.observers.push({ id, level: "", note: "" }); }); b.open = true; }); };
     if (kind === "intizomiy" && !ex) applyAgg();
     const intz = rhIntzStaff();
+    const blankMine = (o = {}) => ({ teacher: "", teacher_id: "", subject: "", filial: "", klass: "", soat: "", ib: "", ab: "", lesson: "", ...o });
+    const mineFix = () => { const me = F.staff.find(s => s.id === S.me.id); const n = F.mine.filter(x => (x.teacher || "").trim()).length; if (me && !me.absent && n) me.hours = Math.max(n, +me.hours || 0); };
+    const mineCard = () => { const dl = `<datalist id="rhm-t">${(S.teachers || []).map(t => `<option value="${esc(t.full_name)}">`).join("")}</datalist>`;
+      const fo = v => `<option value="">— filial —</option>${FILIALLAR.map(f => `<option ${f === v ? "selected" : ""}>${esc(f)}</option>`).join("")}`;
+      return `<div class="card" style="margin-top:16px"><div class="card-head"><h2>O'zim ko'rgan darslar</h2><span class="spacer"></span><span class="small muted">ixtiyoriy · har bir dars kunlik umumiy soatga qo'shiladi</span></div>
+        ${F.mine.length ? "" : `<p class="small muted" style="margin:0 0 10px">Bugun o'zingiz dars kuzatgan bo'lsangiz, qo'shing — o'qituvchilar bazasi va reytingga ham tushadi.</p>`}
+        <div class="ar-list">${F.mine.map((x, i) => { const subj = canonSubj(x.subject); const akad = isAkadSubj(subj);
+          return `<div class="ar-row"><div class="ar-n">${i + 1}</div><div class="ar-grid">
+            <div class="field ar-t"><label>O'qituvchining I/F *</label><input data-rm="${i}" data-f="teacher" value="${esc(x.teacher)}" list="rhm-t" placeholder="Familiya Ism" autocomplete="off"></div>
+            <div class="field"><label>Fan *</label><select data-rm="${i}" data-f="subject">${subjOptions(x.subject)}</select></div>
+            <div class="field"><label>Filial *</label><select data-rm="${i}" data-f="filial">${fo(x.filial)}</select></div>
+            <div class="field"><label>Sinf</label><input data-rm="${i}" data-f="klass" value="${esc(x.klass)}" placeholder="5-A"></div>
+            <div class="field"><label>Nechanchi soat</label><select data-rm="${i}" data-f="soat"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${String(x.soat) === String(n) ? "selected" : ""}>${n}-soat</option>`).join("")}</select></div>
+            <div class="field"><label>Intizomiy <span class="muted">/${IB_MAX}</span></label>${subj === BOG ? `<input class="num" disabled placeholder="—">` : `<input data-rm="${i}" data-f="ib" type="number" step="0.5" min="0" max="${IB_MAX}" value="${esc(x.ib)}" class="num">`}</div>
+            <div class="field"><label>Akademik <span class="muted">/${abMax(subj)}</span></label>${akad || !subj ? `<input data-rm="${i}" data-f="ab" type="number" step="0.5" min="0" max="${abMax(subj)}" value="${esc(x.ab)}" class="num">` : `<input class="num" disabled placeholder="—"><span class="ar-na">bu fanda qo'yilmaydi</span>`}</div>
+          </div>
+          ${subj === BOSHL ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-rml="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
+          <div class="ar-act"><button type="button" class="btn sm ghost" data-rmd="${i}">O'chirish</button></div></div>`; }).join("")}</div>${dl}
+        <button type="button" class="btn sm" id="rhm-add" style="margin-top:10px">+ Ko'rgan darsimni qo'shish</button></div>`; };
     const helpCard = () => {
       const helpH = F.helpers.reduce((a, h) => a + (h.id ? +h.hours || 0 : 0), 0);
       const used = F.helpers.map(h => h.id);
@@ -4997,7 +5019,7 @@ window.METODISTLAR = [
         <div class="card" style="margin-top:16px"><div class="card-head"><h2>Siz bugun nimalar qildingiz? *</h2></div>
           <textarea id="rh-sum" rows="4" placeholder="Bugun bajargan ishlaringizni yozing: qaysi filialga bordingiz, kimlar bilan ishladingiz, qanday qarorlar qabul qilindi…">${esc(F.summary)}</textarea>
           ${kind === "akademik" ? "" : saveRow}</div>
-        ${kind === "akademik" ? helpCard() + `<div class="card" style="margin-top:16px">${saveRow}</div>` : ""}`;
+        ${kind === "akademik" ? mineCard() + helpCard() + `<div class="card" style="margin-top:16px">${saveRow}</div>` : ""}`;
       bind();
     };
     const recalc = () => {
@@ -5029,6 +5051,13 @@ window.METODISTLAR = [
       $$("[data-hh]", body).forEach(i => i.oninput = () => { F.helpers[+i.dataset.hh].hours = i.value; recalc(); const tt = $("#rh-htot", body); if (tt) tt.textContent = fmtH(F.helpers.reduce((a, h) => a + (h.id ? +h.hours || 0 : 0), 0)); });
       $$("[data-hn]", body).forEach(i => i.oninput = () => F.helpers[+i.dataset.hn].note = i.value);
       $$("[data-hd]", body).forEach(b => b.onclick = () => { F.helpers.splice(+b.dataset.hd, 1); if (!F.helpers.length) F.helpOpen = false; draw(); });
+      $$("[data-rm]", body).forEach(i => { const x = F.mine[+i.dataset.rm], f = i.dataset.f;
+        if (i.tagName === "SELECT") i.onchange = () => { x[f] = i.value; if (f === "subject") { if (!isAkadSubj(i.value)) x.ab = ""; if (canonSubj(i.value) === BOG) x.ib = ""; } draw(); };
+        else i.oninput = () => { x[f] = i.value; if (f === "teacher") { x.teacher_id = ""; } };
+        if (f === "teacher") i.onchange = () => { const tt = teacherByName(i.value); if (tt) { x.teacher_id = tt.id; x.teacher = tt.full_name; if (tt.filial) x.filial = tt.filial; if (tt.subject) x.subject = canonSubj(tt.subject); if (!x.klass && (tt.classes || []).length === 1) x.klass = tt.classes[0]; } mineFix(); draw(); }; });
+      $$("[data-rml]", body).forEach(b => b.onclick = () => { const x = F.mine[+b.dataset.rml]; x.lesson = x.lesson === b.dataset.v ? "" : b.dataset.v; draw(); });
+      $$("[data-rmd]", body).forEach(b => b.onclick = () => { F.mine.splice(+b.dataset.rmd, 1); draw(); });
+      const rma = $("#rhm-add", body); if (rma) rma.onclick = () => { F.mine.push(blankMine({ filial: F.mine[F.mine.length - 1]?.filial || "" })); draw(); const n = $(`[data-rm="${F.mine.length - 1}"][data-f=teacher]`, body); n && n.focus(); };
       $("#rh-save", body).onclick = save;
     };
     const fail = (msg, sel) => { $("#rh-err", body).textContent = msg; const el = sel && $(sel, body); if (el) { el.focus(); el.scrollIntoView({ block: "center", behavior: "smooth" }); } return null; };
@@ -5078,11 +5107,25 @@ window.METODISTLAR = [
         const own = holCollect(F.own, fail, "c"); if (!own) return;
         if (own.length) data.own_issues = own;
       }
+      const mineRows = [];
+      if (kind === "akademik") for (let i = 0; i < F.mine.length; i++) { const x = F.mine[i], n = i + 1, q = f => `[data-rm="${i}"][data-f=${f}]`;
+        if (!(x.teacher || "").trim() && x.ib === "" && x.ab === "") continue;
+        const subj = canonSubj(x.subject), tt = x.teacher_id ? teacherById(x.teacher_id) : teacherByName(x.teacher);
+        if (!(x.teacher || "").trim()) return fail(`O'zim ko'rgan darslar, ${n}-qator: o'qituvchini yozing`, q("teacher"));
+        if (!subj) return fail(`O'zim ko'rgan darslar, ${n}-qator: fanni tanlang`, q("subject"));
+        if (!x.filial) return fail(`O'zim ko'rgan darslar, ${n}-qator: filialni tanlang`, q("filial"));
+        const ib = subj === BOG ? null : fnum(x.ib), ab = isAkadSubj(subj) ? fnum(x.ab) : null;
+        if (ib !== null && (ib < 0 || ib > IB_MAX)) return fail(`${n}-qator: intizomiy ball 0 dan ${IB_MAX} gacha bo'ladi`, q("ib"));
+        if (ab !== null && (ab < 0 || ab > abMax(subj))) return fail(`${n}-qator: akademik ball 0 dan ${abMax(subj)} gacha bo'ladi`, q("ab"));
+        mineRows.push({ teacher: tt ? tt.full_name : x.teacher.trim(), teacher_id: tt ? tt.id : "", subject: subj, filial: x.filial, klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib, ab, lesson: subj === BOSHL ? x.lesson || "" : "", lead: "", date }); }
+      if (mineRows.length) { data.mine = mineRows.length; const me = staff.find(s => s.id === S.me.id); if (me && !me.absent && (+me.hours || 0) < mineRows.length) me.hours = mineRows.length; }
       const summary = F.summary.trim();
       if (!summary) return fail("«Siz bugun nimalar qildingiz?» qismini to'ldiring", "#rh-sum");
       const btn = e.target; btn.disabled = true;
       try {
         await db.saveCeoReport(date, kind, data, summary);
+        if (kind === "akademik" && db.saveAkademikObs && (mineRows.length || (S.tobs || []).some(o => o.author_id === S.me.id && o.report_date === date))) {
+          try { await db.saveAkademikObs(date, mineRows); await teachReload(); } catch (x) { toast("Hisobot yuborildi, lekin ko'rgan darslaringiz bazaga yozilmadi: " + x.message, true); } }
         toast("Hisobot yuborildi — Monitoring bo'limi rahbariga yetib bordi");
         S.creps = await db.listCeoReports(t, t).catch(() => S.creps || []);
         render();
@@ -5627,7 +5670,7 @@ window.METODISTLAR = [
 
   function userForm(u) {
     const ceos = S.profiles.filter(p => p.role === "ceo" && p.active && p.id !== u?.id);
-    const roleOpts = Object.entries(ROLES).filter(([k]) => k !== "asoschi" && (k !== "kutilmoqda" || u)).map(([k, v]) => `<option value="${k}" ${(u?.role || "xodim") === k ? "selected" : ""}>${v}</option>`).join("");
+    const roleOpts = Object.entries(ROLES).filter(([k]) => k !== "asoschi" && !["rahbar", "oqituvchi"].includes(k) && (k !== "kutilmoqda" || u)).map(([k, v]) => `<option value="${k}" ${(u?.role || "xodim") === k ? "selected" : ""}>${v}</option>`).join("");
     const m = openModal(u ? "Foydalanuvchini tahrirlash" : "Yangi xodimni ishga olish", `
       <form id="uform">
         <div class="field"><label>To'liq ism *</label><input name="full_name" required value="${esc(u?.full_name)}"></div>
@@ -6085,7 +6128,7 @@ window.METODISTLAR = [
   }
   const bindVideoCards = root => $$("[data-video]", root).forEach(el => el.onclick = () => openVideo(+el.dataset.video || el.dataset.video));
 
-  PAGES.videolar = page => {
+  PAGES.videolar = page => { if (S.me && S.me.role !== "__") return PAGES.bosh(page);
     const isA = S.me.role === "asoschi";
     page.innerHTML = head("Videolar va maqolalar", isA ? "Har bir video kimga ko'rinishini o'zingiz belgilaysiz." : "Siz uchun tayyorlangan uslubiy materiallar.",
       isA ? `<button class="btn primary" id="new-video">+ Video qo'shish</button>` : "") +
