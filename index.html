@@ -2837,7 +2837,8 @@ window.METODISTLAR = [
           <div class="field"><label>Sana</label><input data-r="${i}" data-f="date" type="date" value="${esc(x.date || date)}" max="${t}"></div>
         </div>
         ${boshl ? `<div class="ar-lead">${tt && tt.lead_class ? `🏫 Sinf rahbari: <b>${esc(tt.lead_class)}</b>` : needLead
-          ? `<label class="small" style="margin:0">🏫 Qaysi sinf rahbari? *</label><input data-r="${i}" data-f="lead" value="${esc(x.lead || "")}" placeholder="Masalan: 3-B" style="max-width:140px"><span class="small muted">bir marta kiritiladi, keyin eslab qolinadi</span>`
+          ? bOnly ? `🏫 <span class="small">Sinf rahbarligi <b>«Sinf»</b> maydonidagi sinfdan avtomatik belgilanadi</span>`
+          : `<label class="small" style="margin:0">🏫 Qaysi sinf rahbari? *</label><input data-r="${i}" data-f="lead" value="${esc(x.lead || "")}" placeholder="Masalan: 3-B" style="max-width:140px"><span class="small muted">bir marta kiritiladi, keyin eslab qolinadi</span>`
           : `<span class="small muted">🏫 Sinf rahbarligi hali kiritilmagan (Munisa yoki Dilshoda kiritadi)</span>`}</div>` : ""}
         ${tt && (tt.classes || []).length ? `<div class="ar-kl"><span class="small muted">Sinflari (taxminiy):</span>${tt.classes.map(c => `<button type="button" class="chip-btn sm ${x.klass === c ? "on" : ""}" data-kl="${i}" data-v="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
         <div class="ar-act"><button type="button" class="btn sm" data-rdup="${i}" title="Shu o'qituvchining keyingi darsi">⧉ Shu o'qituvchi, keyingi sinf</button>${F.rows.length > 1 || kind !== "akademik" ? `<button type="button" class="btn sm ghost" data-rdel="${i}">O'chirish</button>` : ""}</div>
@@ -2944,7 +2945,7 @@ window.METODISTLAR = [
           const same = tt && tkey(tt.full_name) === tkey(x.teacher); const subj = bOnly ? BOSHL : canonSubj(x.subject);
           return { teacher: (same ? tt.full_name : x.teacher).trim(), teacher_id: same ? tt.id : (x.teacher_id || ""), subject: subj, filial: (x.filial || "").trim(),
             klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib: fnum(x.ib), ab: isAkadSubj(subj) ? fnum(x.ab) : null,
-            lead: (x.lead || "").trim().toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
+            lead: ((x.lead || "").trim() || (bOnly ? x.klass || "" : "")).toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
         .filter(x => x.teacher || x.ib !== null || x.ab !== null);
       for (let i = 0; i < rows.length; i++) { const x = rows[i], n = i + 1;
         if (!x.teacher) return fail(`${n}-qatorda o'qituvchining ism-familiyasini yozing`, `[data-r="${i}"][data-f=teacher]`);
@@ -2953,6 +2954,7 @@ window.METODISTLAR = [
         if (x.ib !== null && (x.ib < 0 || x.ib > IB_MAX)) return fail(`${n}-qator: intizomiy ball 0 dan ${IB_MAX} gacha bo'ladi`, `[data-r="${i}"][data-f=ib]`);
         if (x.ab !== null && (x.ab < 0 || x.ab > AB_MAX)) return fail(`${n}-qator: akademik ball 0 dan ${AB_MAX} gacha bo'ladi`, `[data-r="${i}"][data-f=ab]`);
         const tt = x.teacher_id && teacherById(x.teacher_id);
+        if (x.subject === BOSHL && editor && !(tt && tt.lead_class) && !x.lead && bOnly) return fail(`${n}-qatorda sinfni kiriting — o'qituvchi shu sinf rahbari sifatida belgilanadi`, `[data-r="${i}"][data-f=klass]`);
         if (x.subject === BOSHL && editor && !(tt && tt.lead_class) && !x.lead) return fail(`${n}-qator: o'qituvchi qaysi sinf rahbari ekanini kiriting`, `[data-r="${i}"][data-f=lead]`);
       }
       return rows;
