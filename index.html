@@ -979,6 +979,9 @@ tr.unseen td { background: var(--brand-soft); }
 .pl-tag2 { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2); padding: 1px 7px; border-radius: 99px; margin-left: 4px; white-space: nowrap; }
 .pl-gear { padding: 0 6px; margin-left: 4px; }
 
+.attn-card{border:1px solid #f0b429;background:linear-gradient(180deg,rgba(240,180,41,.08),transparent 120px);margin-bottom:14px}
+.attn-card .card-head.click{cursor:pointer}
+
 </style>
 </head>
 <body>
@@ -2586,7 +2589,7 @@ window.METODISTLAR = [
   function dashStaff(page) {
     const t = today();
     const mine = S.tasks.filter(x => x.assigned_to === S.me.id);
-    const active = mine.filter(x => ACTIVE_T.includes(x.status)).sort((a, b) => (a.due_date || "9") < (b.due_date || "9") ? -1 : 1);
+    const active = mine.filter(x => ACTIVE_T.includes(x.status)).sort(byNew);
     const od = mine.filter(isOverdue);
     const ps = periodOf(t); const g = avgGrade(S.me, ps, addD(ps, 13));
     const prev = avgGrade(S.me, addD(ps, -14), addD(ps, -1));
@@ -2645,6 +2648,51 @@ window.METODISTLAR = [
     bindVideoCards(page);
   }
 
+  // ---- Yangi — tepada; asoschi uchun eski, bajarilmagan/ko'rilmaganlar — alohida «Eslatma»
+  const OLD_H = 72;
+  const ageH = ts => ts ? (Date.now() - new Date(ts).getTime()) / 36e5 : 0;
+  const ageD = ts => Math.max(1, Math.floor(ageH(ts) / 24));
+  const byNew = (a, b) => (a.created_at || "") < (b.created_at || "") ? 1 : (a.created_at || "") > (b.created_at || "") ? -1 : 0;
+  const isFounder = () => S.me?.role === "asoschi";
+  function taskAttn(t) {
+    if (!isFounder() || t.status === "yopildi" || ageH(t.created_at) < OLD_H) return null;
+    const mineT = t.created_by === S.me.id || t.assigned_to === S.me.id, why = [];
+    if (t.status === "bajarildi") { if (t.created_by === S.me.id) why.push(["jarayonda", "Qabulingizni kutyapti"]); }
+    else if (ACTIVE_T.includes(t.status)) {
+      if (isOverdue(t)) why.push(["overdue", "Muddati o'tgan"]);
+      if (t.assigned_to !== S.me.id && !seenRec("task", t.id, t.assigned_to)) why.push(["missing", "Ijrochi ko'rmagan"]);
+      else if (t.status === "yangi") why.push(["missing", "Boshlanmagan"]);
+      if (!mineT && !why.some(w => w[0] === "overdue" || w[1] === "Ijrochi ko'rmagan")) return null;
+      if (!why.length && mineT) why.push(["jarayonda", ageD(t.created_at) + " kundan beri bajarilmagan"]);
+    }
+    if (!why.length) return null;
+    if (t.assigned_to === S.me.id) why.push(["yuqori", "Sizga berilgan"]); else if (t.created_by === S.me.id) why.push(["", "Siz bergan"]);
+    return why;
+  }
+  function postAttn(p) {
+    if (!isFounder() || p.status === "hal_qilindi" || ageH(p.created_at) < OLD_H) return null;
+    const why = [];
+    if (p.author_id !== S.me.id && !seenRec("post", p.id, S.me.id)) why.push(["missing", "Siz ko'rmagansiz"]);
+    why.push([p.status === "ochiq" ? "overdue" : "jarayonda", `${ageD(p.created_at)} kundan beri ${p.status === "ochiq" ? "ochiq" : "jarayonda"}`]);
+    if (!p.comment_count) why.push(["missing", "Izoh/javob yo'q"]);
+    return why;
+  }
+  const attnScore = w => w.reduce((a, [c]) => a + (c === "overdue" ? 3 : c === "missing" ? 2 : c === "jarayonda" ? 1 : 0), 0);
+  function attnSplit(list, fn) {
+    const att = [], rest = [];
+    list.forEach(x => { const w = fn(x); (w ? att : rest).push(w ? { x, w } : x); });
+    att.sort((a, b) => attnScore(b.w) - attnScore(a.w) || ((a.x.created_at || "") < (b.x.created_at || "") ? -1 : 1));
+    return { att, rest: rest.sort(byNew) };
+  }
+  function attnCard(att, line, key) {
+    if (!att.length) return "";
+    const open = S.ui["attn_" + key] !== false;
+    return `<div class="card attn-card"><div class="card-head click" data-attn="${key}"><h2>⚠️ Eslatma — e'tibor talab qiladi</h2><span class="spacer"></span><span class="badge">${att.length}</span><span class="small muted" style="margin-left:8px">${open ? "Yopish ▲" : "Ochish ▼"}</span></div>
+      ${open ? `<p class="small muted" style="margin:-4px 0 8px">3 kundan eski, hali bajarilmagan yoki ko'rilmaganlar. Faqat sizga ko'rinadi.</p>${att.map(({ x, w }) => line(x, w)).join("")}` : ""}</div>`;
+  }
+  const attnTags = w => `<div class="row" style="gap:4px;margin-top:4px;flex-wrap:wrap">${w.map(([c, l]) => pill(c, l)).join("")}</div>`;
+  function bindAttn(root, rerender) { $$("[data-attn]", root).forEach(el => el.onclick = () => { const k = "attn_" + el.dataset.attn; S.ui[k] = S.ui[k] === false; rerender(); }); }
+
   // ---- task line (used on dashboards)
   function taskLine(t) {
     return `<div class="list-item click" data-task="${t.id}"><div style="flex:1;min-width:0">
@@ -2665,7 +2713,15 @@ window.METODISTLAR = [
     else if (f.status) list = list.filter(t => t.status === f.status);
     if (f.who) list = list.filter(t => t.assigned_to === f.who);
     if (f.cat) list = list.filter(t => t.category === f.cat);
-    list.sort((a, b) => (isOverdue(b) - isOverdue(a)) || ((a.due_date || "9") < (b.due_date || "9") ? -1 : 1));
+    list.sort(byNew);
+    let attHtml = "";
+    if (isFounder()) {
+      let base = S.tasks.slice(); if (f.who) base = base.filter(t => t.assigned_to === f.who); if (f.cat) base = base.filter(t => t.category === f.cat);
+      const sp = attnSplit(base, taskAttn); const ids = new Set(sp.att.map(a => a.x.id));
+      list = list.filter(t => !ids.has(t.id));
+      attHtml = attnCard(sp.att, (t, w) => `<div class="list-item click" data-task="${t.id}"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div>
+        <div class="small muted">${esc(nameOf(t.assigned_to))} · beruvchi: ${esc(nameOf(t.created_by))} · ${fmtDate(t.created_at)} · muddat: ${fmtDue(t.due_date, t.due_time)}</div>${attnTags(w)}</div>${pill(t.status, TSTAT[t.status])}</div>`, "t");
+    }
     const people = mgr ? assignable() : [];
     page.innerHTML = `
       <div class="filters">
@@ -2673,7 +2729,7 @@ window.METODISTLAR = [
           ${Object.entries(TSTAT).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}<option value="">Barchasi</option></select>
         ${mgr ? `<select id="f-who"><option value="">Barcha ijrochilar</option>${people.map(p => `<option value="${p.id}">${esc(p.full_name)}</option>`).join("")}</select>` : ""}
         <select id="f-cat"><option value="">Barcha turlar</option>${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
-      </div>
+      </div>${attHtml}
       <div class="card"><div class="table-wrap">
         ${list.length ? `<table><thead><tr><th>Topshiriq</th>${mgr ? "<th>Ijrochi</th><th>Ko'rdimi</th>" : ""}<th>Muddat</th><th>Holat</th><th class="hide-sm">Muhimlik</th></tr></thead><tbody>
           ${list.map(t => `<tr class="click ${isNewForMe("task", t) ? "unseen" : ""}" data-task="${t.id}"><td><b>${esc(t.title)}</b> ${isNewForMe("task", t) ? pill("yangi", "Yangi") : ""}<div class="small muted">${esc(CATS[t.category] || t.category)} · beruvchi: ${esc(nameOf(t.created_by))} · ${fmtDate(t.created_at)} ${tmOf(t.created_at)}</div></td>
@@ -2685,7 +2741,8 @@ window.METODISTLAR = [
     if ($("#f-who")) $("#f-who").value = f.who;
     $("#f-cat").value = f.cat;
     ["status", "who", "cat"].forEach(k => { const el = $("#f-" + k); if (el) el.onchange = () => { f[k] = el.value; tasksView(page); }; });
-    $$("tr[data-task]", page).forEach(el => el.onclick = () => openTask(+el.dataset.task || el.dataset.task));
+    $$("tr[data-task], .attn-card [data-task]", page).forEach(el => el.onclick = () => openTask(+el.dataset.task || el.dataset.task));
+    bindAttn(page, () => tasksView(page));
   }
 
   function taskForm(t) {
@@ -3485,7 +3542,7 @@ window.METODISTLAR = [
   const bindPostLines = root => $$("[data-post]", root).forEach(el => el.onclick = () => openPost(+el.dataset.post || el.dataset.post));
   function recentPosts() {
     if (!isStaff()) return "";
-    const list = S.posts.slice(0, 5);
+    const list = S.posts.slice().sort(byNew).slice(0, 5);
     return `<div class="card" style="margin-top:16px"><div class="card-head"><h2>So'nggi masalalar</h2><span class="spacer"></span><a class="btn sm" href="#/masalalar">Barchasi</a></div>
       ${list.length ? list.map(postLine).join("") : `<div class="empty">Hali masala kiritilmagan</div>`}</div>`;
   }
@@ -3523,13 +3580,19 @@ window.METODISTLAR = [
     if (cat === "te") return teView(body);
     if (cat === "metodistlar") { const nb = $("#met-new", page); if (nb) nb.onclick = () => metBookForm("asosiy", S.ui.mday && S.ui.mday >= today() ? S.ui.mday : today(), body); return metView(body); }
     const st = S.ui.pst ?? "";
-    const list = S.posts.filter(p => (!cat || p.category === cat) && (!st || p.status === st));
+    let list = S.posts.filter(p => (!cat || p.category === cat) && (!st || p.status === st)).sort(byNew);
+    let attHtml = "";
+    if (isFounder()) {
+      const sp = attnSplit(S.posts.filter(p => !cat || p.category === cat), postAttn); const ids = new Set(sp.att.map(a => a.x.id));
+      list = list.filter(p => !ids.has(p.id));
+      attHtml = attnCard(sp.att, (p, w) => postLine(p).replace(/<\/div>\s*(<span class="pill[^]*?<\/span>)<\/div>$/, m => m).replace('<div class="small muted" style="margin-top:4px">', attnTags(w) + '<div class="small muted" style="margin-top:4px">'), "p");
+    }
     body.innerHTML = `<div class="filters">
         <select id="p-st"><option value="">Barcha holatlar</option>${Object.entries(PSTAT).map(([k, v]) => `<option value="${k}" ${st === k ? "selected" : ""}>${v}</option>`).join("")}</select>
       </div>
-      <div class="card">${list.length ? list.map(postLine).join("") : `<div class="empty">Bu bo'limda hali masala yo'q</div>`}</div>`;
+      ${attHtml}<div class="card">${list.length ? list.map(postLine).join("") : `<div class="empty">Bu bo'limda hali masala yo'q</div>`}</div>`;
     $("#p-st", body).onchange = e => { S.ui.pst = e.target.value; PAGES.masalalar(page); };
-    bindPostLines(body);
+    bindPostLines(body); bindAttn(body, () => PAGES.masalalar(page));
   };
   function teView(root) {
     const legacy = S.posts.filter(p => p.category === "topshiriq_eslatma");
@@ -3542,7 +3605,7 @@ window.METODISTLAR = [
     const tb = $("#te-body", root);
     if (tab === "t") return tasksView(tb);
     if (tab === "e") return dtView(tb);
-    tb.innerHTML = `<div class="card">${legacy.map(postLine).join("")}</div>`; bindPostLines(tb);
+    tb.innerHTML = `<div class="card">${legacy.slice().sort(byNew).map(postLine).join("")}</div>`; bindPostLines(tb);
   }
 
 
@@ -6014,7 +6077,7 @@ window.METODISTLAR = [
   function dtView(page) {
     const r = S.me.role, mgr = isManager();
     const mine = S.dtasks.filter(t => recipientsOf(t).some(p => p.id === S.me.id));
-    const list = r === "asoschi" ? S.dtasks : r === "ceo" ? S.dtasks : mine;
+    const list = (r === "asoschi" ? S.dtasks : r === "ceo" ? S.dtasks : mine).slice().sort(byNew);
     page.innerHTML = `<p class="small muted" style="margin:0 0 10px">${mgr ? "Bir, ikki yoki barcha bo'limga eslatma yuboriladi. Har bir xodim ko'rgani va bajargani shu yerda ko'rinadi." : "Bo'limingizga yuborilgan eslatmalar. Bajarganingizni belgilang — rahbaringiz tasdiqlaydi."}</p>
       <div class="card">${list.length ? list.map(t => {
         const rec = recipientsOf(t);
