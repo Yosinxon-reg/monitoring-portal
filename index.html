@@ -1247,6 +1247,7 @@ window.LESSONS = [
         const m = me(); if (!m) return [];
         return ok(load().tasks.filter(t => m.role === "asoschi" || t.assigned_to === m.id || t.created_by === m.id || isMember(t.assigned_to)));
       },
+      async listTasksSince(ts) { return ok((await this.listTasks()).filter(t => (t.created_at || "") >= ts)); },
       async createTask(t) {
         const m = me(); const d = load();
         if (!(m.role === "asoschi" || (m.role === "ceo" && (isMember(t.assigned_to) || t.assigned_to === m.id)))) return fail("Bu odamga topshiriq bera olmaysiz");
@@ -1564,6 +1565,7 @@ window.LESSONS = [
         return chk(await sb.from("profiles").update({ full_name, role, ceo_id: ceo_id || null, ...extra }).eq("id", id).select().single());
       },
       async listTasks() { return chk(await sb.from("tasks").select("*").order("created_at", { ascending: false })); },
+      async listTasksSince(ts) { return chk(await sb.from("tasks").select("*").gte("created_at", ts).order("created_at", { ascending: false })); },
       async createTask(t) { return chk(await sb.from("tasks").insert({ ...t, created_by: meCache.id }).select().single()); },
       async updateTask(id, patch) { return chk(await sb.from("tasks").update(patch).eq("id", id).select().single()); },
       async deleteTask(id) { chk(await sb.from("tasks").delete().eq("id", id)); return true; },
@@ -2154,20 +2156,46 @@ window.METODISTLAR = [
     (S.me.role === "ceo" && person(t.assigned_to)?.ceo_id === S.me.id);
 
   // ---------------------------------------------------------- data
+  // Tejamkor yuklash: katta ma'lumot (hisobotlar 62 kun, kuzatuvlar 400 kun, ko'rishlar 120 kun) sessiyada bir marta
+  // (yoki 6 soatda bir) to'liq olinadi, keyin faqat oxirgi kunlar olinib, eskisi bilan birlashtiriladi.
+  const SYNC_FULL = 6 * 3600e3, REP_WIN = 7;
+  const SY = { rep: 0, vidAt: 0, viewsFrom: null, lastSync: 0, dirty: null };
+  // eski sanadagi hisobot yozilsa/baholansa — keyingi yuklashda o'sha sanadan boshlab olinadi
+  ["saveMyReport", "gradeReport", "saveStaffReport"].forEach(k => { const o = db[k]; if (typeof o !== "function") return;
+    db[k] = function (...a) { const d = k === "saveMyReport" ? a[0] && a[0].report_date : a[1]; if (d && (!SY.dirty || d < SY.dirty)) SY.dirty = String(d).slice(0, 10); return o.apply(this, a); }; });
+  const byDateDesc = k => (a, b) => (a[k] || "") < (b[k] || "") ? 1 : (a[k] || "") > (b[k] || "") ? -1 : 0;
+  function mergeReports(fresh, cut) { return (S.reports || []).filter(x => x.report_date < cut).concat(fresh || []).sort(byDateDesc("report_date")); }
+  async function loadReports() {
+    if (!S.reports || !SY.rep || Date.now() - SY.rep > SYNC_FULL) { const r = await db.listReports({ from: window.dateUtil.addDays(-62) }); SY.rep = Date.now(); return r; }
+    let cut = addD(today(), -REP_WIN); if (SY.dirty && SY.dirty < cut) cut = SY.dirty; SY.dirty = null;
+    return mergeReports(await db.listReports({ from: cut }), cut);
+  }
+  function mergeTasks(fresh) {
+    const m = new Map((S.tasks || []).map(t => [t.id, t])); (fresh || []).forEach(t => m.set(t.id, t));
+    return [...m.values()].sort(byDateDesc("created_at"));
+  }
   async function refresh() {
-    const from = window.dateUtil.addDays(-62);
+    const syncAt = Date.now();
+    const vFrom = SY.viewsFrom ? addD(SY.viewsFrom, -1) : window.dateUtil.addDays(-120), vInc = !!SY.viewsFrom;
+    const needVid = !S.videos || Date.now() - SY.vidAt > SYNC_FULL;
     const [profiles, tasks, reports, about, posts, videos] = await Promise.all([
-      db.listProfiles(), db.listTasks(), db.listReports({ from }), Promise.resolve({}),
+      db.listProfiles(), db.listTasks(), loadReports(), Promise.resolve({}),
       isStaff() ? db.listPosts().catch(() => []) : Promise.resolve([]),
-      db.listVideos().catch(() => []),
+      needVid ? db.listVideos().then(v => { SY.vidAt = Date.now(); return v; }).catch(() => S.videos || []) : Promise.resolve(S.videos),
       isStaff() ? db.listStaffInfo().catch(() => []) : Promise.resolve([]),
       isStaff() ? db.listDeptTasks().catch(() => []) : Promise.resolve([]),
       isStaff() ? db.listDeptStatus().catch(() => []) : Promise.resolve([]),
       isStaff() ? db.listLessonViews().catch(() => []) : Promise.resolve([]),
-      isStaff() && db.listViews ? db.listViews(window.dateUtil.addDays(-120)).catch(() => S.views || []) : Promise.resolve([])
+      isStaff() && db.listViews ? db.listViews(vFrom).then(v => { v._ok = 1; return v; }).catch(() => null) : Promise.resolve([])
     ]).then(r => { S.info = Object.fromEntries((r[6] || []).map(x => [x.phone, x])); S.dtasks = r[7] || []; S.dstatus = r[8] || []; S.lviews = r[9] || [];
-      const loc = (S.views || []).filter(v => v._local); S.views = (r[10] || []).concat(loc.filter(v => !(r[10] || []).some(x => x.kind === v.kind && x.item_id === v.item_id && x.user_id === v.user_id))); return r; });
-    Object.assign(S, { profiles, tasks, reports, posts, videos, about: about || {} });
+      const vk = x => x.kind + "|" + x.item_id + "|" + x.user_id;
+      if (r[10]) { const base = vInc ? (S.views || []).filter(v => !v._local) : [], seen = new Set(base.map(vk));
+        const all = base.concat(r[10].filter(v => !seen.has(vk(v)) && seen.add(vk(v))));
+        const ks = new Set(all.map(vk)); const loc = (S.views || []).filter(v => v._local && !ks.has(vk(v)));
+        S.views = all.concat(loc); if (r[10]._ok) SY.viewsFrom = today(); }
+      return r; });
+    Object.assign(S, { profiles, tasks, reports, posts, videos: videos || [], about: about || {} });
+    SY.lastSync = syncAt;
     const me = profiles.find(p => p.id === S.me.id); if (me) S.me = me;
     if (isStaff()) {
       const w0 = weekOf(today());
@@ -3153,7 +3181,7 @@ window.METODISTLAR = [
         saveDraft(); draw(); const k = $(`[data-r="${i + 1}"][data-f=klass]`, root); k && k.focus(); });
       $$("[data-rdel]", root).forEach(b => b.onclick = () => { F.rows.splice(+b.dataset.rdel, 1); if (kind !== "akademik" && !F.rows.length) F.helpOn = false; saveDraft(); draw(); });
       $$("[data-kind]", root).forEach(b => b.onclick = async () => { b.disabled = true;
-        try { await act(() => db.setTeacherKind(b.dataset.kind, b.dataset.v), b.dataset.v === BOG ? "Bog'cha deb belgilandi" : "Boshlang'ich deb belgilandi"); await teachReload();
+        try { await act(() => db.setTeacherKind(b.dataset.kind, b.dataset.v), b.dataset.v === BOG ? "Bog'cha deb belgilandi" : "Boshlang'ich deb belgilandi"); await teachReload(true);
           F.rows.forEach(x => { if (x.teacher_id === b.dataset.kind) x.subject = b.dataset.v; }); draw(); } catch (e) { b.disabled = false; } });
       const ad = $("#mr-add", root); if (ad) ad.onclick = () => { F.rows.push(blankRow({ filial: F.rows[F.rows.length - 1]?.filial || "" })); saveDraft(); draw(); $(`[data-r="${F.rows.length - 1}"][data-f=teacher]`, root).focus(); };
       const hp = $("#mr-help", root); if (hp) hp.onclick = () => { F.helpOn = true; if (!F.rows.length) F.rows.push(blankRow({ filial: F.filials[0] || "" })); draw(); const n = $(`[data-r="0"][data-f=teacher]`, root); n && n.focus(); };
@@ -3770,9 +3798,18 @@ window.METODISTLAR = [
       const sc = tk.startsWith(k) ? 3 : tk.split(" ").some(w => w.startsWith(words[0])) && words.every(w => tk.includes(w)) ? 2 : tk.includes(k) ? 1 : 0;
       return { t, sc }; }).filter(x => x.sc).sort((a, b) => b.sc - a.sc || a.t.full_name.localeCompare(b.t.full_name)).slice(0, limit).map(x => x.t);
   }
-  async function teachReload() {
+  const TS = { t: 0, o: 0 };
+  async function teachReload(force) {
     if (!db.listTeachers) return;
-    try { const [t, o, e] = await Promise.all([db.listTeachers(), db.listTeacherObs(addD(today(), -400)), db.listTeacherEditors ? db.listTeacherEditors() : []]); S.teachers = t; S.tobs = o; S.teditors = e; }
+    try {
+      const now = Date.now(), cut = addD(today(), -10);
+      const fullT = force || !S.teachers || now - TS.t > SYNC_FULL, fullO = force || !S.tobs || now - TS.o > SYNC_FULL;
+      const [t, o, e] = await Promise.all([fullT ? db.listTeachers() : S.teachers, db.listTeacherObs(fullO ? addD(today(), -400) : cut),
+        fullT && db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || [])]);
+      if (fullT) TS.t = now; if (fullO) TS.o = now;
+      S.teachers = t; S.teditors = e;
+      S.tobs = fullO ? o : (S.tobs || []).filter(x => x.day < cut).concat(o).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+    }
     catch (e) { S.teachers = S.teachers || []; S.tobs = S.tobs || []; }
   }
 
@@ -3921,11 +3958,11 @@ window.METODISTLAR = [
       const ex = teacherByName(n); if (ex && ex.id !== t.id) return toast("Bu ism bazada bor — «Birlashtirish»dan foydalaning", true);
       e.target.disabled = true;
       try { await act(() => db.updateTeacher(t.id, { full_name: n, name_key: tkey(n), subject: $("#te-s", m).value.trim(), filial: $("#te-f", m).value, lead_class: $("#te-l", m).value.trim().toUpperCase().replace(/\s+/g, ""),
-          classes: [...new Set($("#te-c", m).value.split(",").map(x => x.trim()).filter(Boolean))] }), "Saqlandi"); closeModal(); await teachReload(); done(); } catch (x) { e.target.disabled = false; }
+          classes: [...new Set($("#te-c", m).value.split(",").map(x => x.trim()).filter(Boolean))] }), "Saqlandi"); closeModal(); await teachReload(true); done(); } catch (x) { e.target.disabled = false; }
     };
     $("#te-del", m).onclick = async e => {
       if (teacherFacts(t).n) return toast("Bu o'qituvchining kuzatuvlari bor — o'chirish o'rniga boshqasi bilan birlashtiring", true);
-      e.target.disabled = true; try { await act(() => db.deleteTeacher(t.id), "O'chirildi"); closeModal(); await teachReload(); done(); } catch (x) { e.target.disabled = false; }
+      e.target.disabled = true; try { await act(() => db.deleteTeacher(t.id), "O'chirildi"); closeModal(); await teachReload(true); done(); } catch (x) { e.target.disabled = false; }
     };
   }
   function teacherMerge(ids, done) {
@@ -3934,7 +3971,7 @@ window.METODISTLAR = [
       ${ts.map((t, i) => `<label class="met-st"><input type="radio" name="keep" value="${t.id}" ${i === 0 ? "checked" : ""}><div style="flex:1"><b>${esc(t.full_name)}</b><div class="small muted">${esc([t.subject, t.filial].filter(Boolean).join(" · ") || "—")} · ${teacherFacts(t).n} kuzatuv</div></div></label>`).join("")}`,
       `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="tm-ok">Birlashtirish</button>`);
     $("#tm-ok", m).onclick = async e => { const keep = $("[name=keep]:checked", m).value; e.target.disabled = true;
-      try { await act(() => db.mergeTeachers(keep, ids.filter(x => x !== keep)), "Birlashtirildi"); closeModal(); await teachReload(); done(); } catch (x) { e.target.disabled = false; } };
+      try { await act(() => db.mergeTeachers(keep, ids.filter(x => x !== keep)), "Birlashtirildi"); closeModal(); await teachReload(true); done(); } catch (x) { e.target.disabled = false; } };
   }
   // ---- Eksport: Excel (.xlsx) va PDF
   function loadXlsx() {
@@ -4421,11 +4458,24 @@ window.METODISTLAR = [
     return `<details class="viewers"><summary>👁 <b>${vs.length}</b> kishi ko'rdi</summary>
       ${vs.length ? `<div class="viewers-list">${vs.map(v => { const q = person(v.user_id) || { full_name: nameOf(v.user_id) }; return `<div class="vw">${avatar(q.full_name, photoOf(q))}<div><b>${esc(q.full_name)}</b><div class="small muted">${fmtDate(v.seen_at)} ${tmOf(v.seen_at)}</div></div></div>`; }).join("")}</div>` : `<div class="small muted" style="padding:6px 0">Hali hech kim ko'rmagan</div>`}</details>`;
   }
-  // Har 90 soniyada yangi topshiriq/eslatmalarni tekshirish (sahifani buzmasdan)
-  setInterval(async () => {
-    if (!S.me || !isStaff() || document.hidden) return;
-    try { await refresh(); updateNav(); dueBanner(); } catch (e) {}
-  }, 90e3);
+  // Yengil tekshiruv: har 2 daqiqada faqat YANGI topshiriqlar va oxirgi 2 kun hisobotlari.
+  // Foydalanuvchi 10 daqiqa harakatsiz bo'lsa yoki sahifa yopiq turgan bo'lsa — umuman so'rov yuborilmaydi.
+  let lastAct = Date.now(), polling = false;
+  ["click", "keydown", "touchstart", "scroll", "mousemove"].forEach(ev => document.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true, capture: true }));
+  async function pollLight() {
+    if (polling || !S.me || !isStaff() || !SY.lastSync) return; polling = true;
+    try {
+      const syncAt = Date.now(), since = new Date(SY.lastSync - 15 * 60e3).toISOString(), cut = addD(today(), -1);
+      const [nt, rp, cr] = await Promise.all([
+        db.listTasksSince ? db.listTasksSince(since) : db.listTasks(),
+        db.listReports({ from: cut }),
+        isManager() ? db.listCeoReports(today(), today()).catch(() => S.creps || []) : Promise.resolve(null)]);
+      S.tasks = db.listTasksSince ? mergeTasks(nt) : nt; S.reports = mergeReports(rp, cut); if (cr) S.creps = cr;
+      SY.lastSync = syncAt; updateNav(); dueBanner();
+    } catch (e) {} finally { polling = false; }
+  }
+  setInterval(() => { if (!document.hidden && Date.now() - lastAct < 10 * 60e3) pollLight(); }, 120e3);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && SY.lastSync && Date.now() - SY.lastSync > 120e3) { lastAct = Date.now(); pollLight(); } });
 
   function postForm(p) {
     const cur = p?.category || (PCATS[S.ui.pcat] && S.ui.pcat !== "topshiriq_eslatma" ? S.ui.pcat : "general");
