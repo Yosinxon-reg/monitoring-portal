@@ -969,6 +969,16 @@ tr.unseen td { background: var(--brand-soft); }
 @media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .pl-top .stats.st5 { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 560px) { .pl-top .stats.st5 { grid-template-columns: repeat(2, 1fr); } .cr-score > b { font-size: 28px; } }
 
+/* ===== 31: reja mosligi, jiddiy holat tasdig'i, o'qituvchi holati ===== */
+.pm-box { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.pm-box.ok { background: var(--ok-soft); color: var(--ok); }
+.pm-box.bad { background: var(--warn-soft); color: var(--text); border-left: 4px solid var(--warn); }
+.ir-box { margin-top: 12px; border-left: 4px solid var(--bad); }
+.ir-box .list-item { align-items: center; flex-wrap: wrap; }
+.ts-box { background: var(--surface-2); border-radius: 10px; padding: 12px; margin-bottom: 6px; }
+.pl-tag2 { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2); padding: 1px 7px; border-radius: 99px; margin-left: 4px; white-space: nowrap; }
+.pl-gear { padding: 0 6px; margin-left: 4px; }
+
 </style>
 </head>
 <body>
@@ -1470,6 +1480,13 @@ window.LESSONS = [
       async listTeacherObs(from, subs) { return ok((load().tobs || []).filter(o => o.day >= from && (!subs || !subs.length || subs.includes(o.subject)))); },
       async setStaffSubjects(uid, subs) { const d = load(); const m = me(); if (!m || !(m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"))) return fail("Ruxsat yo'q");
         const p = d.profiles.find(x => x.id === uid); if (p) p.subjects = subs || []; save(); return ok(true); },
+      async listTeacherPlans() { return ok(load().tplan || []); },
+      async setTeacherPlan(teacher_id, month, plan, note) { const d = load(); d.tplan = (d.tplan || []).filter(x => !(x.teacher_id === teacher_id && x.month === month));
+        if (plan !== null && plan !== undefined) d.tplan.push({ teacher_id, month, plan, note: note || "" }); save(); return ok(true); },
+      async listIssueReviews(from, to) { return ok((load().irev || []).filter(x => x.report_date >= from && x.report_date <= to)); },
+      async setIssueReview(author_id, report_date, idx, verdict) { const d = load(); d.irev = (d.irev || []).filter(x => !(x.author_id === author_id && x.report_date === report_date && x.idx === idx));
+        d.irev.push({ author_id, report_date, idx, verdict, reviewed_by: me().id }); save(); return ok(true); },
+      async listActivity(from, to) { return ok([]); },
       async listCeoRatings(from, to) { const m = me(); return ok((load().crates || []).filter(r => r.month >= from && r.month <= to && (m.role === "asoschi" || r.ceo_id === m.id))); },
       async setCeoRating(month, ceo_id, score, note) { const d = load(); const m = me(); if (m.role !== "asoschi") return fail("Ruxsat yo'q"); d.crates = (d.crates || []).filter(r => !(r.month === month && r.ceo_id === ceo_id));
         d.crates.push({ month, ceo_id, score, note: note || "", updated_at: new Date().toISOString() }); save(); return ok(true); },
@@ -1684,6 +1701,12 @@ window.LESSONS = [
       async listTeachers(subs) { let q = sb.from("teachers").select("*").order("full_name").limit(5000); if (subs && subs.length) q = q.in("subject", subs); return chk(await q); },
       async listTeacherObs(from, subs) { let q = sb.from("teacher_obs").select("*").gte("day", from).order("day").limit(20000); if (subs && subs.length) q = q.in("subject", subs); return chk(await q); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
+      async listTeacherPlans() { const r = await sb.from("teacher_plan").select("*").gte("month", new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)); return r.error ? [] : r.data; },
+      async setTeacherPlan(teacher_id, month, plan, note) { if (plan === null || plan === undefined) { chk(await sb.from("teacher_plan").delete().eq("teacher_id", teacher_id).eq("month", month)); return true; }
+        chk(await sb.from("teacher_plan").upsert({ teacher_id, month, plan, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "teacher_id,month" })); return true; },
+      async listIssueReviews(from, to) { const r = await sb.from("issue_reviews").select("*").gte("report_date", from).lte("report_date", to); return r.error ? [] : r.data; },
+      async setIssueReview(author_id, report_date, idx, verdict) { chk(await sb.from("issue_reviews").upsert({ author_id, report_date, idx, verdict, reviewed_at: new Date().toISOString() }, { onConflict: "author_id,report_date,idx" })); return true; },
+      async listActivity(from, to) { const r = await sb.from("staff_activity").select("user_id,day").gte("day", from).lte("day", to); return r.error ? [] : r.data; },
       async listCeoRatings(from, to) { const r = await sb.from("ceo_ratings").select("*").gte("month", from).lte("month", to); return r.error ? [] : r.data; },
       async setCeoRating(month, ceo_id, score, note) { chk(await sb.from("ceo_ratings").upsert({ month, ceo_id, score, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "month,ceo_id" })); return true; },
       async getSettings() { const r = await sb.from("portal_settings").select("key,value"); return r.error ? {} : Object.fromEntries((r.data || []).map(x => [x.key, x.value])); },
@@ -3156,9 +3179,9 @@ window.METODISTLAR = [
             <div class="ar-hint" data-hint="${i}">${tt ? teacherHint(tt) : x.teacher.trim() ? `<span class="th-new">Yangi o'qituvchi — hisobot yuborilganda bazaga avtomatik qo'shiladi</span>` : ""}</div></div>
           <div class="field"><label>Fan *</label>${scSubs.length && !bOnly ? (scSubs.length === 1 ? `<input value="${esc(scSubs[0])}" disabled title="Sizga biriktirilgan fan">` : `<select data-r="${i}" data-f="subject"><option value="">— fan —</option>${scSubs.map(v => `<option ${v === subj ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`) : bOk ? `<select data-r="${i}" data-f="subject">${[BOSHL, BOG].map(v => `<option ${v === subj ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>` : bOnly ? `<input value="${esc(BOSHL)}" disabled title="Siz faqat boshlang'ich o'qituvchilarni kuzatasiz">` : `<select data-r="${i}" data-f="subject">${subjOptions(x.subject)}</select>`}</div>
           <div class="field"><label>Filial *</label><select data-r="${i}" data-f="filial">${filOpts(x.filial)}</select></div>
-          <div class="field"><label>Sinf</label><input data-r="${i}" data-f="klass" value="${esc(x.klass || "")}" list="mr-kl-${i}" placeholder="5-A">
+          <div class="field"><label>Sinf *</label><input data-r="${i}" data-f="klass" value="${esc(x.klass || "")}" list="mr-kl-${i}" placeholder="5-A">
             <datalist id="mr-kl-${i}">${((tt && tt.classes) || []).map(c => `<option value="${esc(c)}">`).join("")}</datalist></div>
-          <div class="field"><label>Nechanchi soat</label><select data-r="${i}" data-f="soat"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${String(x.soat) === String(n) ? "selected" : ""}>${n}-soat</option>`).join("")}</select></div>
+          <div class="field"><label>Nechanchi soat${subj === BOG ? "" : " *"}</label><select data-r="${i}" data-f="soat"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${String(x.soat) === String(n) ? "selected" : ""}>${n}-soat</option>`).join("")}</select></div>
           <div class="field"><label>Intizomiy <span class="muted">/${IB_MAX}</span></label>${subj === BOG ? `<input class="num" disabled placeholder="—" title="Bog'chada intizomiy ball qo'yilmaydi"><span class="ar-na">bog'chada qo'yilmaydi</span>` : `<input data-r="${i}" data-f="ib" type="number" step="0.5" min="0" max="${IB_MAX}" value="${esc(x.ib ?? "")}" class="num">`}</div>
           <div class="field"><label>Akademik <span class="muted">/${abMax(subj)}</span></label>${akad || !subj ? `<input data-r="${i}" data-f="ab" type="number" step="0.5" min="0" max="${abMax(subj)}" value="${esc(x.ab ?? "")}" class="num">` : `<input class="num" disabled placeholder="—" title="Bu fanda akademik ball qo'yilmaydi"><span class="ar-na">bu fanda qo'yilmaydi</span>`}</div>
           <div class="field"><label>Sana</label><input data-r="${i}" data-f="date" type="date" value="${esc(x.date || date)}" max="${t}"></div>
@@ -3167,7 +3190,7 @@ window.METODISTLAR = [
           ? bOnly ? `🏫 <span class="small">Sinf rahbarligi <b>«Sinf»</b> maydonidagi sinfdan avtomatik belgilanadi</span>`
           : `<label class="small" style="margin:0">🏫 Qaysi sinf rahbari? *</label><input data-r="${i}" data-f="lead" value="${esc(x.lead || "")}" placeholder="Masalan: 3-B" style="max-width:140px"><span class="small muted">bir marta kiritiladi, keyin eslab qolinadi</span>`
           : `<span class="small muted">🏫 Sinf rahbarligi hali kiritilmagan (Munisa yoki Dilshoda kiritadi)</span>`}</div>` : ""}
-        ${boshl ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-ls="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
+        ${boshl ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi *:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-ls="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
         ${tt && (tt.classes || []).length ? `<div class="ar-kl"><span class="small muted">Sinflari (taxminiy):</span>${tt.classes.map(c => `<button type="button" class="chip-btn sm ${x.klass === c ? "on" : ""}" data-kl="${i}" data-v="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
         <div class="ar-act"><button type="button" class="btn sm" data-rdup="${i}" title="Shu o'qituvchining keyingi darsi">⧉ Shu o'qituvchi, keyingi sinf</button>${F.rows.length > 1 || kind !== "akademik" ? `<button type="button" class="btn sm ghost" data-rdel="${i}">O'chirish</button>` : ""}</div>
       </div>`; };
@@ -3301,6 +3324,9 @@ window.METODISTLAR = [
         if (!x.subject) return fail(`${n}-qatorda fanni tanlang`, `[data-r="${i}"][data-f=subject]`);
         if (scSubs.length && !bOnly && !scSubs.includes(x.subject)) return fail(`${n}-qator: sizga faqat ${scSubs.join(", ")} biriktirilgan`, `[data-r="${i}"][data-f=subject]`);
         if (!x.filial) return fail(`${n}-qatorda filialni tanlang`, `[data-r="${i}"][data-f=filial]`);
+        if (!x.klass) return fail(`${n}-qatorda sinfni kiriting (masalan: 5-A)`, `[data-r="${i}"][data-f=klass]`);
+        if (!x.soat && x.subject !== BOG) return fail(`${n}-qatorda nechanchi soat ekanini tanlang`, `[data-r="${i}"][data-f=soat]`);
+        if (x.subject === BOSHL && !x.lesson) return fail(`${n}-qator: boshlang'ich ustozning qaysi darsi ko'rilganini tanlang`, `[data-ls="${i}"]`);
         if (x.ib !== null && (x.ib < 0 || x.ib > IB_MAX)) return fail(`${n}-qator: intizomiy ball 0 dan ${IB_MAX} gacha bo'ladi`, `[data-r="${i}"][data-f=ib]`);
         if (x.ab !== null && (x.ab < 0 || x.ab > abMax(x.subject))) return fail(`${n}-qator: akademik ball 0 dan ${abMax(x.subject)} gacha bo'ladi`, `[data-r="${i}"][data-f=ab]`);
         const tt = x.teacher_id && teacherById(x.teacher_id);
@@ -3351,24 +3377,41 @@ window.METODISTLAR = [
     const kItems = itemsFor(p).filter(it => !it.ceoOnly || S.me.role === "asoschi");
     const kMan = k => KD.daily.find(x => x.day === date && x.user_id === p.id && x.criterion === k);
     const autoV = it => grade ? rnd(grade / 10 * it.max) : "—";
+    try { await kpiPrep(date, date); } catch (e) {}
+    const pm = planMatch(p, date, r), rmK = deptOf(p) === "akademik" ? "reja" : deptOf(p) === "intizomiy" ? "filial" : null, rmIt = rmK && kItems.find(x => x.k === rmK);
+    const ser = (r && r.data && r.data.kind === "intizomiy" ? (r.data.issues || []) : []).map((h, k) => ({ h, k })).filter(x => x.h.sev === "jiddiy");
+    const irOf = k => ((S.kx && S.kx.irev) || []).find(x => x.author_id === p.id && String(x.report_date).slice(0, 10) === date && +x.idx === k);
+    let pmNote = null;
+    const kpiPh = it => { if (it.auto === "reja") return pm && !pm.ok && deptOf(p) === "akademik" ? 0 : autoV(it); const v = levelAuto(p, it, "kun", date, KD, null); return v === null || v === undefined ? "—" : v; };
     const m = openModal(`${esc(p.full_name)} — ${fmtDate(date)}`, `
       <div class="rc-plan" style="margin-top:0"><b>Shu kungi reja:</b> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
+      ${pm && rmIt ? (pm.ok ? `<div class="pm-box ok">✅ Haftalik reja bajarildi — rejada: <b>${esc(pm.pf.join(", "))}</b>, hisobotda: <b>${esc(pm.rf.join(", "))}</b></div>`
+        : `<div class="pm-box bad"><div>⚠ <b>Haftalik reja bilan mos emas</b> — rejada: <b>${esc(pm.pf.join(", "))}</b>, hisobotda: <b>${esc(pm.rf.join(", ") || "filial ko'rsatilmagan")}</b>. «${esc(rmIt.s)}» mezoniga 0 ball qo'yiladi. Sababli bo'lsa — ruxsat bering.</div>
+          <div class="row" style="gap:8px;margin-top:8px"><input id="pm-note" placeholder="Izoh (ixtiyoriy): nega rejadan farq qildi" style="flex:1;min-width:180px"><button type="button" class="btn sm primary" id="pm-ok">✓ Ruxsat berish — maksimal ball</button></div></div>`) : ""}
       <div class="card rep-box">${isWritten(r) ? `<div class="small muted" style="margin-bottom:8px">Xodim yozgan · ${fmtDate(r.updated_at || r.created_at)} ${tmOf(r.updated_at || r.created_at)}</div>${reportView(r)}` : `<div class="empty" style="padding:14px">Xodim bu kun uchun hisobot yubormagan</div>`}</div>
+      ${ser.length ? `<div class="card ir-box"><div class="card-head"><h2>⚠ Jiddiy holatlarni tasdiqlang</h2><span class="spacer"></span><span class="small muted">KPI'da faqat siz tasdiqlagan jiddiy holat 4 ball, qolgani o'rta (2 ball)</span></div>
+        ${ser.map(({ h, k }) => { const v = irOf(k)?.verdict; return `<div class="list-item"><div style="flex:1;min-width:0"><b>${esc(holType(h))}</b> <span class="small muted">· ${esc([h.filial, h.place, h.who].filter(Boolean).join(" · "))}</span>${h.note ? `<div class="small">${esc(h.note)}</div>` : ""}</div>
+          <div class="seg"><button type="button" data-irv="${k}" data-v="tasdiq" class="${v === "tasdiq" ? "active" : ""}">✓ Rostan jiddiy</button><button type="button" data-irv="${k}" data-v="rad" class="${v === "rad" ? "active" : ""}">Jiddiy emas</button></div></div>`; }).join("")}</div>` : ""}
       <div class="field" style="margin-top:14px"><label>Baho (1–10) * <span class="muted">— KPI'ga avtomatik o'tadi</span></label><div class="grade-pick">${Array.from({ length: 10 }, (_, i) => `<button type="button" data-g="${i + 1}" class="${grade === i + 1 ? "on" : ""}">${i + 1}</button>`).join("")}</div></div>
       <div class="field staff-band"><label>💬 Izoh <span class="muted">(xodim ko'radi)</span></label><textarea id="rv-note" rows="3" placeholder="Masalan: 7-A sinf baholashida dalil yetarli emas, keyingi safar izoh yozing">${esc(r?.staff_note || "")}</textarea></div>
-      ${kItems.length ? `<details class="rv-kpi"><summary>Bugungi KPI ballari <span class="muted">(«avto» mezon bahodan o'zi qo'yiladi)</span></summary><div class="kpi-day-grid" style="margin-top:8px">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
-        <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" value="${scoreOf(mv) ?? ""}" placeholder="${it.auto === "reja" ? autoV(it) : "—"}"></div>`; }).join("")}</div></details>` : ""}
+      ${kItems.length ? `<details class="rv-kpi" ${pm && !pm.ok ? "open" : ""}><summary>Bugungi KPI ballari <span class="muted">(«avto» mezon bahodan o'zi qo'yiladi)</span></summary><div class="kpi-day-grid" style="margin-top:8px">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
+        <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" value="${scoreOf(mv) ?? ""}" placeholder="${kpiPh(it)}" title="${esc(it.auto ? autoWhy(p, it, "kun", date, null) : "")}"></div>`; }).join("")}</div></details>` : ""}
       <div class="field"><label>Ertangi reja — ${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)} <span class="muted">(ixtiyoriy)</span></label><textarea id="rv-plan" rows="2">${esc(tomorrow || "")}</textarea></div>
       <div class="err-text" id="rv-err"></div>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="rv-save">Baholash</button>`);
     $(".modal", $("#modal-root")).style.maxWidth = "900px";
+    const pmb = $("#pm-ok", m); if (pmb) pmb.onclick = () => { const i = $(`[data-kd="${rmK}"]`, m); if (i) i.value = rmIt.max; pmNote = $("#pm-note", m).value.trim(); pmb.textContent = "✓ Ruxsat berildi — «Baholash»ni bosing"; pmb.disabled = true; const dt = $(".rv-kpi", m); if (dt) dt.open = true; };
+    $$("[data-irv]", m).forEach(b => b.onclick = async () => { const k = +b.dataset.irv, v = b.dataset.v; b.disabled = true;
+      try { await db.setIssueReview(p.id, date, k, v); S._kxKey = null; S.kx = S.kx || { irev: [], act: [] };
+        S.kx.irev = (S.kx.irev || []).filter(x => !(x.author_id === p.id && String(x.report_date).slice(0, 10) === date && +x.idx === k)).concat([{ author_id: p.id, report_date: date, idx: k, verdict: v }]);
+        $$(`[data-irv="${k}"]`, m).forEach(x => x.classList.toggle("active", x.dataset.v === v)); toast(v === "tasdiq" ? "Jiddiy holat tasdiqlandi" : "«Jiddiy emas» deb belgilandi"); } catch (e) { toast(e.message, true); } b.disabled = false; });
     $$("[data-g]", m).forEach(b => b.onclick = () => { grade = +b.dataset.g; $$("[data-g]", m).forEach(x => x.classList.toggle("on", x === b));
-      kItems.filter(it => it.auto === "reja").forEach(it => { const i = $(`[data-kd="${it.k}"]`, m); if (i) i.placeholder = autoV(it); }); });
+      kItems.filter(it => it.auto === "reja").forEach(it => { const i = $(`[data-kd="${it.k}"]`, m); if (i) i.placeholder = kpiPh(it); }); });
     $("#rv-save", m).onclick = async e => {
       if (!grade) return ($("#rv-err", m).textContent = "Bahoni tanlang (1–10)");
       e.target.disabled = true;
       try {
         await db.gradeReport(p.id, date, { grade, staff_note: $("#rv-note", m).value.trim() });
-        for (const it of kItems) { const i = $(`[data-kd="${it.k}"]`, m); if (!i) continue; const v = i.value === "" ? null : Math.max(0, Math.min(it.max, +i.value)); const mv = kMan(it.k); if (v !== scoreOf(mv)) await db.setKpiAt("kun", date, p.id, it.k, v, mv?.note || ""); }
+        for (const it of kItems) { const i = $(`[data-kd="${it.k}"]`, m); if (!i) continue; const v = i.value === "" ? null : Math.max(0, Math.min(it.max, +i.value)); const mv = kMan(it.k); const nt = it.k === rmK && pmNote !== null ? (pmNote || "Rejadan farq — rahbar ruxsat berdi") : (mv?.note || ""); if (v !== scoreOf(mv) || nt !== (mv?.note || "")) await db.setKpiAt("kun", date, p.id, it.k, v, nt); }
         const ch = await saveDay(p, nd, $("#rv-plan", m).value.trim());
         toast("Baholandi — KPI'ga o'tdi" + (ch ? " · ertangi reja yangilandi" : "")); await refresh(); render();
       } catch (err) { e.target.disabled = false; $("#rv-err", m).textContent = err.message; }
@@ -3858,7 +3901,8 @@ window.METODISTLAR = [
   function teacherFacts(t) {
     const ob = obsOf(t.id);
     const last = ob[0];
-    const days = last ? dayDiff(last.day, today()) : null;
+    const g0 = last ? (t.off_to && t.off_to > last.day && t.off_to < today() ? t.off_to : last.day) : null;
+    const days = g0 ? dayDiff(g0, today()) : null;
     return { n: ob.length, last, days, ib: avg(ob.map(o => o.ib)), ab: avg(ob.map(o => o.ab)), long: days === null || days > LONG_DAYS };
   }
   function teacherHint0(t) {
@@ -3870,14 +3914,14 @@ window.METODISTLAR = [
   }
   // 7 kundan ko'p kuzatilmagan o'qituvchilar
   function longUnseen(filial) {
-    return (S.teachers || []).map(t => ({ t, f: teacherFacts(t) })).filter(x => x.f.long && (!filial || x.t.filial === filial))
+    return (S.teachers || []).filter(t => tLive(t)).map(t => ({ t, f: teacherFacts(t) })).filter(x => x.f.long && (!filial || x.t.filial === filial))
       .sort((a, b) => (b.f.days ?? 9999) - (a.f.days ?? 9999) || a.t.full_name.localeCompare(b.t.full_name));
   }
   // Taxminiy variantlar (yozilayotgan ism bo'yicha)
   function teacherMatches(q, limit = 8, only = null) {
     const k = tkey(q); if (!k) return [];
     const words = k.split(" ");
-    return (S.teachers || []).filter(t => !only || only(t)).map(t => { const tk = t.name_key || tkey(t.full_name);
+    return (S.teachers || []).filter(t => !tArch(t) && (!only || only(t))).map(t => { const tk = t.name_key || tkey(t.full_name);
       const sc = tk.startsWith(k) ? 3 : tk.split(" ").some(w => w.startsWith(words[0])) && words.every(w => tk.includes(w)) ? 2 : tk.includes(k) ? 1 : 0;
       return { t, sc }; }).filter(x => x.sc).sort((a, b) => b.sc - a.sc || a.t.full_name.localeCompare(b.t.full_name)).slice(0, limit).map(x => x.t);
   }
@@ -3887,10 +3931,11 @@ window.METODISTLAR = [
     try {
       const now = Date.now(), cut = addD(today(), -10);
       const fullT = force || !S.teachers || now - TS.t > SYNC_FULL, fullO = force || !S.tobs || now - TS.o > SYNC_FULL;
-      const [t, o, e] = await Promise.all([fullT ? db.listTeachers(mySubs()) : S.teachers, db.listTeacherObs(fullO ? addD(today(), -400) : cut, mySubs()),
-        fullT && db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || [])]);
+      const [t, o, e, tp] = await Promise.all([fullT ? db.listTeachers(mySubs()) : S.teachers, db.listTeacherObs(fullO ? addD(today(), -400) : cut, mySubs()),
+        fullT && db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || []),
+        fullT && db.listTeacherPlans ? db.listTeacherPlans().catch(() => S.tplan || []) : Promise.resolve(S.tplan || [])]);
       if (fullT) TS.t = now; if (fullO) TS.o = now;
-      S.teachers = t; S.teditors = e;
+      S.teachers = t; S.teditors = e; S.tplan = tp || [];
       S.tobs = fullO ? o : (S.tobs || []).filter(x => x.day < cut).concat(o).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
     }
     catch (e) { S.teachers = S.teachers || []; S.tobs = S.tobs || []; }
@@ -3924,19 +3969,20 @@ window.METODISTLAR = [
     const upto = me < t ? me : t, cur = ms <= t && t <= me;
     const total = schoolDays(ms, me), passed = ms > t ? 0 : schoolDays(ms, upto), left = me <= t ? 0 : schoolDays(addD(t, 1), me);
     const pace = total ? passed / total : 1;
-    const teachers = (S.teachers || []).filter(x => inSubs(subs, x.subject) && (!o.fil || x.filial === o.fil) && (!o.subj || canonSubj(x.subject) === o.subj));
+    const teachers = (S.teachers || []).filter(x => !tArch(x) && inSubs(subs, x.subject) && (!o.fil || x.filial === o.fil) && (!o.subj || canonSubj(x.subject) === o.subj));
     const ids = new Set(teachers.map(x => x.id));
     const byT = {}, lastAll = {};
     (S.tobs || []).forEach(x => { if (!ids.has(x.teacher_id) || x.day > upto) return;
       if (x.day >= ms) (byT[x.teacher_id] = byT[x.teacher_id] || []).push(x);
       if (!lastAll[x.teacher_id] || x.day > lastAll[x.teacher_id].day) lastAll[x.teacher_id] = x; });
     const rows = teachers.map(tt => { const ob = byT[tt.id] || []; const days = [...new Set(ob.map(x => x.day))].sort();
-      const n = days.length, plan = tPlanOf(tt), need = Math.max(0, plan - n), last = lastAll[tt.id] || null;
+      const pf = tPlanFor(tt, ms); const n = days.length, plan = pf.plan, need = Math.max(0, plan - n), last = lastAll[tt.id] || null;
+      const lo = tt.off_from && tt.off_to ? schoolDays(tt.off_from > addD(t, 1) ? tt.off_from : addD(t, 1), tt.off_to < me ? tt.off_to : me) : 0, leftT = Math.max(0, left - lo);
       const gap = last ? schoolDays(addD(last.day, 1), t) : null;
-      const behind = n < Math.floor(plan * pace + 1e-9), tight = need > 0 && (need - 1) * GAP_DAYS + 1 > left;
-      const risk = cur && need > 0 && (tight || (behind && pace >= 0.34));
+      const behind = n < Math.floor(plan * pace + 1e-9), tight = need > 0 && (need - 1) * GAP_DAYS + 1 > leftT;
+      const risk = cur && need > 0 && !tOff(tt, t) && (tight || (behind && pace >= 0.34));
       return { t: tt, n, plan, need, days, last, gap, risk, over: n > OVER_N, obsN: ob.length,
-        authors: [...new Set(ob.map(x => x.author_id))], st: n >= plan ? "done" : n ? "part" : "zero" }; });
+        authors: [...new Set(ob.map(x => x.author_id))], st: n >= plan ? "done" : n ? "part" : "zero", ov: !!pf.ov, off: !!pf.off, offNow: tOff(tt, t) }; }).filter(r => r.plan > 0 || r.n > 0);
     const sumPlan = rows.reduce((a, r) => a + r.plan, 0), got = rows.reduce((a, r) => a + Math.min(r.n, r.plan), 0);
     const by = {}; rows.forEach(r => (byT[r.t.id] || []).forEach(x => { const b = by[x.author_id] = by[x.author_id] || { id: x.author_id, n: 0, t: new Set() }; b.n++; b.t.add(x.teacher_id); }));
     return { ms, me, at: t, total, passed, left, pace, cur, rows, sumPlan, got, pct: hpct(got, sumPlan),
@@ -3952,7 +3998,8 @@ window.METODISTLAR = [
     if (!tt) return "";
     const t = today(), ms = mStart(t), mine = x => x.author_id === S.me?.id && x.day === t;
     const ob = (S.tobs || []).filter(x => x.teacher_id === tt.id && !mine(x));
-    const n = new Set(ob.filter(x => x.day >= ms).map(x => x.day)).size, plan = tPlanOf(tt);
+    const n = new Set(ob.filter(x => x.day >= ms).map(x => x.day)).size, plan = tPlanFor(tt, ms).plan;
+    if (tOff(tt, t)) return ` · <span class="th-warn">${tStatusTxt(tt, t)}</span>`;
     const last = ob.reduce((a, x) => !a || x.day > a.day ? x : a, null);
     const gap = last ? schoolDays(addD(last.day, 1), t) : null;
     const st = n >= plan ? "ok" : n ? "mid" : "no";
@@ -3966,7 +4013,7 @@ window.METODISTLAR = [
   function planRecommend(opts = {}) {
     const t = today(), P = planCalc(mStart(t), { fil: opts.fil || "" });
     const skip = opts.skip || new Set();
-    return P.rows.filter(r => r.need > 0 && !skip.has(r.t.id) && (r.gap === null || r.gap >= GAP_DAYS) && (!opts.only || opts.only(r.t)))
+    return P.rows.filter(r => r.need > 0 && !skip.has(r.t.id) && tLive(r.t) && (r.gap === null || r.gap >= GAP_DAYS) && (!opts.only || opts.only(r.t)))
       .sort((a, b) => (b.risk - a.risk) || (a.n - b.n) || ((b.gap ?? 999) - (a.gap ?? 999)) || a.t.full_name.localeCompare(b.t.full_name)).slice(0, opts.limit || 8);
   }
   const planBadge = () => { if (!S.me || S.me.role !== "xodim" || deptOf(S.me) !== "akademik" || !(S.teachers || []).length) return 0;
@@ -3995,7 +4042,7 @@ window.METODISTLAR = [
         <select id="pl-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
         ${subjList.length > 1 ? `<select id="pl-s" style="width:auto"><option value="">Barcha fanlar</option>${subjList.map(s => `<option ${s === subj ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>` : ""}
         <span class="spacer"></span>${canPlanPdf() ? `<button class="btn" id="pl-pdf">⬇ Oy yakuni PDF</button>` : ""}</div>
-      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir o'qituvchi oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi.</p>
+      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir o'qituvchi oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi. Bo'shagan ustozlar rejada yo'q, vaqtincha ishlamaganlarning rejasi ishlamagan kunlariga qarab kamayadi${canPlanAdmin() ? " (⚙ — holati va rejani o'zgartirish)" : ""}.</p>
       ${!P.rows.length ? `<div class="card empty">Bu tanlov bo'yicha bazada o'qituvchi yo'q</div>` : `
       <div class="pl-top">
         <div class="card pl-main"><div class="small muted">Oylik reja bajarilishi — ${mLabel(ms)}</div>
@@ -4006,7 +4053,7 @@ window.METODISTLAR = [
           ${stat("Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${stat("Qisman", `<span class="pl-c mid">${P.part}</span>`)}${stat("Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
           ${stat("Xavf ostida", `<span class="pl-c no">${P.cur ? P.risk.length : "—"}</span>`)}${stat("Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
       ${P.cur && P.risk.length ? `<div class="card pl-risk"><div class="card-head"><h2>⏳ Rejaga ulgurmasligi mumkin</h2><span class="spacer"></span><span class="small muted">Oy oxirigacha ${P.left} ish kuni qoldi · oraliq ${GAP_DAYS} ish kuni hisobida</span></div>
-        ${P.risk.slice(0, 30).map(r => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(r.t.full_name)}</div><div class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}${r.last ? ` · oxirgi: ${fmtDate(r.last.day)}` : " · hali kuzatilmagan"}</div></div>${plCount(r)}<span class="small muted" style="white-space:nowrap">yana ${r.need} marta</span></div>`).join("")}
+        ${P.risk.slice(0, 30).map(r => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(r.t.full_name)}</div><div class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}${r.last ? ` · oxirgi: ${fmtDate(r.last.day)}` : " · hali kuzatilmagan"}</div></div>${plCount(r)}<span class="small muted" style="white-space:nowrap">yana ${r.need} marta</span>${canPlanAdmin() ? `<button type="button" class="btn sm" data-tst="${r.t.id}">⚙ Holati / reja</button>` : ""}</div>`).join("")}
         ${P.risk.length > 30 ? `<div class="small muted" style="padding-top:8px">… yana ${P.risk.length - 30} ta</div>` : ""}</div>` : ""}
       ${P.over.length ? `<div class="card pl-over"><div class="card-head"><h2>⚖ Muvozanat</h2><span class="spacer"></span><span class="small muted">${OVER_N} martadan ko'p ko'rilganlar</span></div>
         <p class="small" style="margin:0 0 8px">Bu ustozlar oyida ${OVER_N} martadan ko'p ko'rilgan${P.zero ? `, shu paytda <b>${P.zero} ta</b> ustoz hali umuman ko'rilmagan` : ""}.</p>
@@ -4014,7 +4061,7 @@ window.METODISTLAR = [
       <div class="card"><div class="card-head"><h2>O'qituvchilar</h2><span class="spacer"></span>
         <div class="chips">${chip("all", "Hammasi", P.rows.length)}${chip("zero", "Ko'rilmagan", P.zero)}${chip("part", "Qisman", P.part)}${chip("done", "Bajarilgan", P.done)}${P.cur ? chip("risk", "Xavf", P.risk.length) : ""}${P.over.length ? chip("over", "Ortiqcha", P.over.length) : ""}</div></div>
         <div class="table-wrap"><table class="pl-tbl"><thead><tr><th>#</th><th>O'qituvchi</th><th>Fan</th><th>Filial</th><th>Bu oy</th><th class="hide-sm">Holat</th><th>Oxirgi kuzatuv</th><th class="hide-sm">Kim ko'rgan</th></tr></thead><tbody>
-        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.risk ? ` <span class="pl-tag">xavf</span>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
+        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2">reja: ${r.plan}</span>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
           <td>${plCount(r)}</td><td class="hide-sm">${plDots(r)}</td><td>${r.last ? `${fmtDate(r.last.day)} <span class="small muted">· ${esc(shortName(r.last.author_id))}</span>` : `<span class="muted">—</span>`}</td>
           <td class="hide-sm small">${r.authors.map(a => esc(shortName(a))).join(", ") || "—"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">Bu filtr bo'yicha o'qituvchi yo'q</td></tr>`}</tbody></table></div></div>
       ${canPlanPdf() && P.byAuthor.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Xodimlar bo'yicha — ${mLabel(ms)}</h2></div>
@@ -4025,6 +4072,7 @@ window.METODISTLAR = [
     const sel = (id, k) => { const el = $(id, root); if (el) el.onchange = e => { S.ui[k] = e.target.value; rerun(); }; };
     sel("#pl-m", "plM"); sel("#pl-f", "plF"); sel("#pl-s", "plS");
     $$("[data-plq]", root).forEach(b => b.onclick = () => { S.ui.plQ = b.dataset.plq; rerun(); });
+    $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, rerun); });
     const pdf = $("#pl-pdf", root); if (pdf) pdf.onclick = () => planPdf(ms, fil);
     const sd = $("#pl-subs", root); if (sd) sd.ontoggle = () => { S.ui.plSubOpen = sd.open; };
     $$("[data-psub]", root).forEach(b => b.onclick = async () => { const p = person(b.dataset.psub); if (!p) return;
@@ -4205,6 +4253,187 @@ window.METODISTLAR = [
     const c = new Date(r.created_at || r.updated_at).getTime(); return isNaN(c) ? null : c + EDIT_H * 3600e3 - Date.now(); };
   const fmtLeft = ms => { if (ms === null) return ""; const m = Math.max(0, Math.round(ms / 60e3)), h = Math.floor(m / 60); return h ? `${h} soat ${m % 60} daqiqa` : `${m} daqiqa`; };
 
+
+  // =====================================================================
+  // 31: KPI avtomatik mezonlari · o'qituvchi holati (arxiv / vaqtincha) · ustoz oylik rejasini o'zgartirish
+  // =====================================================================
+  // ---- O'qituvchi holati
+  const tArch = t => !!t && t.status === "arxiv";
+  const tOff = (t, d) => !!t && !!t.off_from && !!t.off_to && t.off_from <= d && d <= t.off_to;
+  const tLive = (t, d = today()) => !!t && !tArch(t) && !tOff(t, d);
+  const OFF_WHY = ["Ta'til", "Kasallik", "Dekret ta'tili", "Malaka oshirish", "Vaqtincha boshqa ishda", "Boshqa sabab"];
+  const LEFT_WHY_T = ["Ishdan bo'shagan", "Boshqa maktabga o'tgan", "Shartnoma tugagan", "Boshqa sabab"];
+  const tStatusTxt = (t, d = today()) => tArch(t) ? `🗄 Bo'shagan${t.left_at ? " · " + fmtDate(t.left_at) : ""}` : tOff(t, d) ? `⏸ ${esc(t.off_reason || "Vaqtincha ishlamayapti")} · ${fmtDate(t.off_to)} gacha` : "";
+  // Oylik reja: qo'lda o'zgartirilgan (teacher_plan) yoki ishlamagan kunlarga mutanosib kamaytirilgan
+  function tPlanFor(t, ms) {
+    const me = mEndOf(ms);
+    const ov = (S.tplan || []).find(x => x.teacher_id === t.id && String(x.month).slice(0, 10) === ms);
+    if (ov && ov.plan !== null && ov.plan !== undefined && ov.plan !== "") return { plan: +ov.plan, ov: true, note: ov.note || "" };
+    const base = canonSubj(t.subject) === BOG ? PLAN_BOG : PLAN_BASE;
+    if (t.off_from && t.off_to && t.off_from <= me && t.off_to >= ms) {
+      const tot = schoolDays(ms, me); let off = 0;
+      for (let d = t.off_from > ms ? t.off_from : ms; d <= (t.off_to < me ? t.off_to : me); d = addD(d, 1)) if (isSchoolDay(d)) off++;
+      return { plan: tot ? Math.round(base * (tot - off) / tot) : base, off: true };
+    }
+    return { plan: base };
+  }
+  function tStatusModal(t, done) {
+    const cur = tArch(t) ? "arxiv" : (t.off_from && t.off_to && t.off_to >= today()) ? "tatil" : "faol";
+    const t0 = today(), ms0 = mStart(t0), ms1 = mStart(addD(mEndOf(ms0), 1));
+    const ovOf = ms => (S.tplan || []).find(x => x.teacher_id === t.id && String(x.month).slice(0, 10) === ms);
+    const m = openModal(`${esc(t.full_name)} — holati va reja`, `
+      <p class="small muted" style="margin-top:0">${esc([canonSubj(t.subject), t.filial].filter(Boolean).join(" · ") || "—")}</p>
+      <div class="field"><label>Holati</label><div class="seg" id="ts-seg">${[["faol", "✅ Ishlayapti"], ["tatil", "⏸ Vaqtincha ishlamayapti"], ["arxiv", "🗄 Bo'shagan (arxiv)"]].map(([k, l]) => `<button type="button" data-tsv="${k}" class="${k === cur ? "active" : ""}">${l}</button>`).join("")}</div></div>
+      <div id="ts-tatil" class="ts-box"><div class="grid2"><div class="field"><label>Qachondan *</label><input type="date" id="ts-f" value="${esc(t.off_from || t0)}"></div><div class="field"><label>Qachongacha *</label><input type="date" id="ts-t" value="${esc(t.off_to || "")}"></div></div>
+        <div class="field"><label>Sababi</label><select id="ts-r">${OFF_WHY.map(x => `<option ${x === t.off_reason ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
+        <p class="small muted" style="margin:0">Shu muddatda ustoz «uzoq kuzatilmagan» hisoblanmaydi, oylik rejasi ishlamagan kunlarga qarab avtomatik kamayadi.</p></div>
+      <div id="ts-arxiv" class="ts-box"><div class="grid2"><div class="field"><label>Bo'shagan sana</label><input type="date" id="ts-l" value="${esc(t.left_at || t0)}"></div>
+        <div class="field"><label>Sababi</label><select id="ts-lr">${LEFT_WHY_T.map(x => `<option ${x === t.off_reason ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div></div>
+        <p class="small muted" style="margin:0">Ustoz bazadan o'chmaydi — arxivga o'tadi, eski kuzatuvlari va reytingdagi natijalari saqlanadi. Istalgan vaqt qayta tiklash mumkin.</p></div>
+      <div class="field" style="margin-top:14px"><label>Shu ustozning oylik ko'rish rejasi <span class="muted">(bo'sh — avtomatik: ${canonSubj(t.subject) === BOG ? PLAN_BOG : PLAN_BASE} marta)</span></label>
+        <div class="grid2">${[ms0, ms1].map((ms, i) => { const ov = ovOf(ms); return `<div class="row" style="gap:8px"><span class="small" style="min-width:110px">${mLabel(ms)}${i ? "" : " (joriy)"}</span><input type="number" min="0" max="15" class="num" data-tsp="${ms}" value="${ov && ov.plan !== null ? ov.plan : ""}" placeholder="${tPlanFor(t, ms).plan}" style="width:80px"><span class="small muted">marta</span></div>`; }).join("")}</div>
+        <input id="ts-pn" value="${esc((ovOf(ms0) || ovOf(ms1) || {}).note || "")}" placeholder="Izoh (ixtiyoriy): nima uchun reja o'zgardi" style="margin-top:8px"></div>
+      <div class="err-text" id="ts-err"></div>`,
+      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="ts-ok">Saqlash</button>`);
+    let st = cur;
+    const sync = () => { $$("[data-tsv]", m).forEach(b => b.classList.toggle("active", b.dataset.tsv === st)); $("#ts-tatil", m).style.display = st === "tatil" ? "" : "none"; $("#ts-arxiv", m).style.display = st === "arxiv" ? "" : "none"; };
+    $$("[data-tsv]", m).forEach(b => b.onclick = () => { st = b.dataset.tsv; sync(); }); sync();
+    $("#ts-ok", m).onclick = async e => {
+      const er = x => { $("#ts-err", m).textContent = x; };
+      let patch;
+      if (st === "faol") patch = { status: "faol", off_from: null, off_to: null, off_reason: "", left_at: null };
+      else if (st === "tatil") { const f = $("#ts-f", m).value, to = $("#ts-t", m).value; if (!f || !to) return er("Muddatni kiriting (qachondan — qachongacha)"); if (to < f) return er("Tugash sanasi boshlanishidan oldin bo'lmasin");
+        patch = { status: "faol", off_from: f, off_to: to, off_reason: $("#ts-r", m).value, left_at: null }; }
+      else patch = { status: "arxiv", off_from: null, off_to: null, off_reason: $("#ts-lr", m).value, left_at: $("#ts-l", m).value || today() };
+      e.target.disabled = true;
+      try {
+        await db.updateTeacher(t.id, patch);
+        const note = $("#ts-pn", m).value.trim();
+        for (const inp of $$("[data-tsp]", m)) { const ms = inp.dataset.tsp, v = inp.value.trim(), ov = ovOf(ms);
+          const nv = v === "" ? null : Math.max(0, Math.min(15, Math.round(+v)));
+          if (nv !== (ov && ov.plan !== null && ov.plan !== undefined ? +ov.plan : null) || (nv !== null && note !== (ov?.note || ""))) await db.setTeacherPlan(t.id, ms, nv, note); }
+        toast(st === "arxiv" ? `${t.full_name} arxivga o'tkazildi` : st === "tatil" ? `${t.full_name}: vaqtincha ishlamayapti deb belgilandi` : "Saqlandi");
+        closeModal(); await teachReload(true); done && done();
+      } catch (x) { e.target.disabled = false; er(x.message || "Xatolik"); }
+    };
+  }
+
+  // ---- KPI: avtomatik mezonlar
+  const AUTO_WIN = new Set(["topsh", "qayta", "soni", "sifat"]);
+  const SONI_PER_DAY = 6;            // intizomiy: ish kuni uchun to'liq ball beradigan holat og'irligi (yengil 1, o'rta 2, tasdiqlangan jiddiy 4)
+  const LOW_RATIO = 0.6;             // past ball: maksimalning 60% idan kam
+  const REVISIT_DAYS = 14;           // past ball olgan ustozni qayta ko'rish muddati
+  const repFind = (p, d, reps) => (reps || S.reports || []).find(x => x.author_id === p.id && x.report_date === d) || null;
+  const filKey = s => subjKey(s).split(" ")[0];
+  function reportFilials(r) {
+    const d = (r && r.data) || {}; const out = new Set();
+    (d.filials || []).forEach(f => f && out.add(f)); (d.rows || []).forEach(x => x.filial && out.add(x.filial)); (d.issues || []).forEach(x => x.filial && out.add(x.filial));
+    return [...out];
+  }
+  // Haftalik rejadagi filial(lar) bilan hisobotdagi filial(lar) mosligi
+  function planMatch(p, d, r) {
+    const plan = dayPlan(p, d); if (!plan || !plan.trim() || !r || !isWritten(r)) return null;
+    const pk = subjKey(plan); const pf = FILIALLAR.filter(f => pk.includes(filKey(f)));
+    if (!pf.length) return null;
+    const rf = reportFilials(r);
+    return { ok: rf.some(f => pf.some(x => filKey(x) === filKey(f))), pf, rf, plan };
+  }
+  // 1) Hisobotni vaqtida topshirish: 18:00 gacha — 1; shu kuni kechroq — 0,75; ertasi kuni — 0,5; undan keyin yoki yo'q — 0
+  function vaqtDay(p, d, reps) {
+    if (!isWorkdayOn(p, d) || d < KPI_ANCHOR) return null;
+    const r = repFind(p, d, reps), t = today();
+    if (!r || !isWritten(r)) return d < t ? 0 : null;
+    const ts = r.created_at || r.updated_at, cd = localOf(ts);
+    if (cd < d) return 1;
+    if (cd === d) return tmOf(ts) <= "18:00" ? 1 : 0.75;
+    return cd === addD(d, 1) ? 0.5 : 0;
+  }
+  const actSet = () => { const s = new Set(); ((S.kx && S.kx.act) || []).forEach(a => s.add(a.user_id + "|" + String(a.day).slice(0, 10))); return s; };
+  const avg01 = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+  const pctTxt = v => v === null ? "—" : Math.round(v * 100) + "%";
+  function autoWin(p, it, from, to, reps) {
+    const t = today(), upto = to < t ? to : t, k = it.auto;
+    if (k === "topsh") {
+      const mine = (S.tasks || []).filter(x => x.assigned_to === p.id && x.created_by !== p.id);
+      // A) muddatida bajarish
+      const A = []; mine.forEach(x => { if (!x.due_date || x.due_date < from || x.due_date > upto) return;
+        const done = ["bajarildi", "yopildi"].includes(x.status);
+        if (done) { const dd = localOf(x.done_at || x.updated_at || x.created_at); A.push(dd <= x.due_date ? 1 : 0.5); } else if (x.due_date < t) A.push(0); });
+      // B) yangi topshiriqni ochish tezligi, C) «jarayonda»ga o'tkazish tezligi
+      const B = [], C = [], now = Date.now();
+      mine.forEach(x => { const cd = localOf(x.created_at); if (cd < from || cd > to) return; const c0 = new Date(x.created_at).getTime();
+        const sv = (S.views || []).filter(v => v.kind === "task" && String(v.item_id) === String(x.id) && v.user_id === p.id).map(v => new Date(v.seen_at).getTime()).sort((a, b) => a - b)[0];
+        const age = (now - c0) / 36e5;
+        if (sv) { const h = (sv - c0) / 36e5; B.push(h <= 2 ? 1 : h <= 8 ? 0.75 : h <= 24 ? 0.5 : 0.25); } else if (age > 24) B.push(0);
+        if (x.started_at) { const h = (new Date(x.started_at).getTime() - c0) / 36e5; C.push(h <= 24 ? 1 : h <= 48 ? 0.5 : 0.2); }
+        else if (x.status === "yangi" && age > 48) C.push(0); });
+      // D) ish kunlari portalda faol bo'lish
+      const as = actSet(); let wd = 0, ac = 0;
+      for (let d = from; d <= upto; d = addD(d, 1)) { if (!isWorkdayOn(p, d) || d < KPI_ANCHOR) continue; wd++;
+        const r = repFind(p, d, reps);
+        if (as.has(p.id + "|" + d) || (r && isWritten(r) && localOf(r.created_at) === d) || (S.views || []).some(v => v.user_id === p.id && localOf(v.seen_at) === d)) ac++; }
+      const D = wd ? ac / wd : null;
+      const parts = [avg01(A), avg01(B), avg01(C), D].filter(x => x !== null);
+      if (!parts.length) return null;
+      const r = parts.reduce((s, x) => s + x, 0) / parts.length;
+      return { v: rnd(r * it.max), why: `Muddatida: ${pctTxt(avg01(A))} (${A.length}) · ochish tezligi: ${pctTxt(avg01(B))} · jarayonga o'tkazish: ${pctTxt(avg01(C))} · faol kunlar: ${wd ? ac + "/" + wd : "—"}` };
+    }
+    if (k === "qayta") {
+      const all = (S.tobs || []).slice().sort((a, b) => a.day < b.day ? -1 : 1);
+      const mine = all.filter(o => o.author_id === p.id && o.day >= from && o.day <= to);
+      const seen = new Set(); let tot = 0, longN = 0;
+      mine.forEach(o => { const key = o.teacher_id + "|" + o.day; if (seen.has(key)) return; seen.add(key); tot++;
+        const prev = all.filter(x => x.teacher_id === o.teacher_id && x.day < o.day).pop();
+        const tt = teacherById(o.teacher_id); let gapFrom = prev ? prev.day : null;
+        if (gapFrom && tt && tt.off_to && tt.off_to > gapFrom && tt.off_to < o.day) gapFrom = tt.off_to;
+        if (!prev || dayDiff(gapFrom, o.day) > LONG_DAYS) longN++; });
+      const r15 = tot ? Math.min(1, (longN / tot) / 0.5) : null;
+      const lowOf = o => o.ab !== null && o.ab !== undefined && o.ab !== "" ? +o.ab < LOW_RATIO * abMax(o.subject) : (o.ib !== null && o.ib !== undefined && o.ib !== "" && +o.ib < LOW_RATIO * IB_MAX);
+      const lows = all.filter(o => o.author_id === p.id && o.day >= addD(from, -REVISIT_DAYS) && o.day <= to && lowOf(o));
+      const F = []; lows.forEach(o => { const dl = addD(o.day, REVISIT_DAYS);
+        const fu = all.some(x => x.author_id === p.id && x.teacher_id === o.teacher_id && x.day > o.day && x.day <= dl);
+        if (fu) F.push(1); else if (dl < (upto < t ? addD(upto, 1) : t) && dl >= from) F.push(0); });
+      const r16 = avg01(F);
+      const parts = [r15, r16].filter(x => x !== null); if (!parts.length) return null;
+      return { v: rnd(parts.reduce((s, x) => s + x, 0) / parts.length * it.max), why: `Uzoq ko'rilmaganlarga e'tibor: ${longN}/${tot} kuzatuv · past balldan keyin qayta ko'rish: ${F.length ? F.filter(Boolean).length + "/" + F.length : "—"}` };
+    }
+    if (k === "soni" || k === "sifat") {
+      const rs = (reps || S.reports || []).filter(r => r.author_id === p.id && r.report_date >= from && r.report_date <= to && r.data && r.data.kind === "intizomiy");
+      const issues = []; rs.forEach(r => (r.data.issues || []).forEach((h, i) => issues.push({ h, i, d: r.report_date })));
+      if (k === "soni") {
+        let wd = 0; for (let d = from; d <= upto; d = addD(d, 1)) if (isWorkdayOn(p, d) && d >= KPI_ANCHOR) wd++;
+        if (!wd) return null;
+        const irv = (S.kx && S.kx.irev) || [];
+        let pts = 0, ok = 0, pend = 0;
+        issues.forEach(({ h, i, d }) => { if (h.sev === "jiddiy") { const v = irv.find(x => x.author_id === p.id && String(x.report_date).slice(0, 10) === d && +x.idx === i);
+            if (v && v.verdict === "tasdiq") { pts += 4; ok++; } else { pts += 2; if (!v) pend++; } } else pts += h.sev === "orta" ? 2 : 1; });
+        return { v: rnd(Math.min(1, pts / (SONI_PER_DAY * wd)) * it.max), why: `${issues.length} holat · ${pts} ball (${wd} ish kuni × ${SONI_PER_DAY} = to'liq) · tasdiqlangan jiddiy: ${ok}${pend ? ` · tasdiq kutilmoqda: ${pend}` : ""}` };
+      }
+      if (!issues.length) return null;
+      const full = issues.filter(({ h }) => h.type && (h.type !== "Boshqa" || (h.other || "").trim()) && h.place && h.who && h.sev && h.res && (h.note || "").trim().length >= 10).length;
+      return { v: rnd(full / issues.length * it.max), why: `${full}/${issues.length} holat to'liq yozilgan (turi, joyi, kim, og'irligi, natijasi va kamida 10 harfli izoh)` };
+    }
+    return null;
+  }
+  // Tushuntirish (KPI jadvalida katak ustiga sichqoncha olib borilganda)
+  function autoWhy(p, it, lvl, d, reps) {
+    const [f, to] = lvl === "kun" ? [d, d] : lvl === "hafta" ? [d, addD(d, 6)] : [d, addD(d, 13)];
+    if (AUTO_WIN.has(it.auto)) { const r = autoWin(p, it, f, to, reps); return r ? r.why : "Ma'lumot yo'q"; }
+    if (it.auto === "vaqt") { const v = []; for (let x = f; x <= to; x = addD(x, 1)) { const s = vaqtDay(p, x, reps); if (s !== null) v.push(s); }
+      return v.length ? `${v.length} ish kuni: 18:00 gacha — ${v.filter(x => x === 1).length}, kechroq — ${v.filter(x => x === 0.75).length}, ertasi kuni — ${v.filter(x => x === 0.5).length}, yo'q — ${v.filter(x => x === 0).length}` : "Ish kuni yo'q"; }
+    if (it.auto === "rejamos" || (it.auto === "reja" && deptOf(p) === "akademik")) { let ok = 0, bad = 0; for (let x = f; x <= to; x = addD(x, 1)) { const m = planMatch(p, x, repFind(p, x, reps)); if (m) m.ok ? ok++ : bad++; }
+      return `Haftalik reja bilan mos: ${ok} kun · mos emas: ${bad} kun (rahbar ruxsat bersa — maksimal ball)`; }
+    return "";
+  }
+  async function kpiPrep(from, to) {
+    const key = from + "|" + to;
+    if (!(S._kxKey === key && Date.now() - (S._kxAt || 0) < 60e3)) {
+      const [ir, ac] = await Promise.all([db.listIssueReviews ? db.listIssueReviews(from, to).catch(() => []) : Promise.resolve([]), db.listActivity ? db.listActivity(from, to).catch(() => []) : Promise.resolve([])]);
+      S.kx = { irev: ir || [], act: ac || [] }; S._kxKey = key; S._kxAt = Date.now();
+    }
+    for (let w = weekOf(from); w <= to; w = addD(w, 7)) { try { await ensurePlans(w); } catch (e) {} }
+  }
+
   const teacherHint = t => t ? teacherHint0(t) + planMini(t) : "";
 
   // ---- O'qituvchilar sahifasi (Monitoring bo'limi rahbari va Akademik bo'lim rahbari)
@@ -4280,12 +4509,13 @@ window.METODISTLAR = [
     const fil = S.ui.tfil || "";
     const list = longUnseen(fil);
     root.innerHTML = `<div class="row" style="gap:10px;margin-bottom:14px"><select id="tx-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
-        <span class="small muted">Oxirgi kuzatuvdan ${LONG_DAYS} kundan ko'p vaqt o'tgan yoki hali kuzatilmagan o'qituvchilar</span></div>
+        <span class="small muted">Oxirgi kuzatuvdan ${LONG_DAYS} kundan ko'p vaqt o'tgan yoki hali kuzatilmagan o'qituvchilar. Bo'shagan va vaqtincha ishlamayotganlar bu ro'yxatda yo'q${canMetAdmin() ? " — ⚙ orqali o'tkazing" : ""}.</span></div>
       <div class="card">${list.length ? list.map(({ t, f }) => `<div class="list-item click" data-tid="${t.id}"><div style="flex:1;min-width:0"><div class="t">${esc(t.full_name)}</div>
           <div class="small muted">${esc([t.subject, t.filial, (t.classes || []).join(", ")].filter(Boolean).join(" · "))}${f.last ? ` · oxirgi: ${fmtDate(f.last.day)} (${esc(shortName(f.last.author_id))})` : ""}</div></div>
-          ${f.days === null ? pill("missing", "Hali kuzatilmagan") : pill(f.days > 14 ? "missing" : "jarayonda", `${f.days} kun`)}</div>`).join("") : `<div class="empty">Hamma o'qituvchi oxirgi ${LONG_DAYS} kunda kuzatilgan ✓</div>`}</div>`;
+          ${f.days === null ? pill("missing", "Hali kuzatilmagan") : pill(f.days > 14 ? "missing" : "jarayonda", `${f.days} kun`)}${canMetAdmin() ? `<button type="button" class="btn sm" data-tst="${t.id}">⚙ Holati</button>` : ""}</div>`).join("") : `<div class="empty">Hamma o'qituvchi oxirgi ${LONG_DAYS} kunda kuzatilgan ✓</div>`}</div>`;
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachLong(root); };
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
+    $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, () => teachLong(root)); });
   }
   function teachBase(root, page) {
     const q = S.ui.tq || "";
@@ -4294,10 +4524,11 @@ window.METODISTLAR = [
     const subjOf = t => canonSubj(t.subject) || "Fani kiritilmagan";
     const subjSort = (a, b) => { const ia = SUBJ_ORDER.indexOf(a), ib = SUBJ_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); };
     const draw = () => {
-      const all = S.teachers || [];
+      const allT = S.teachers || [], arch = allT.filter(tArch);
+      const all = S.ui.tbArch ? arch : allT.filter(t => !tArch(t));
       const fil = S.ui.tbF || "", sub = S.ui.tbS || "";
       const head0 = `<div class="row" style="gap:10px;margin-bottom:12px"><input id="tb-q" value="${esc(q)}" placeholder="O'qituvchini qidirish (barcha filiallar)…" style="max-width:340px"><span class="spacer"></span>
-          <span class="small muted" id="tb-n">${sel.size ? `${sel.size} ta tanlandi` : "Bir odam ikki xil yozilgan bo'lsa, belgilab birlashtiring"}</span><button class="btn" id="tb-merge" ${sel.size < 2 ? "disabled" : ""}>Birlashtirish</button></div>`;
+          <span class="small muted" id="tb-n">${sel.size ? `${sel.size} ta tanlandi` : "Bir odam ikki xil yozilgan bo'lsa, belgilab birlashtiring"}</span><button class="btn" id="tb-merge" ${sel.size < 2 ? "disabled" : ""}>Birlashtirish</button><button class="btn ${S.ui.tbArch ? "primary" : ""}" id="tb-arch" title="Bo'shagan ustozlar">🗄 Arxiv (${arch.length})</button></div>${S.ui.tbArch ? `<div class="note" style="margin:0 0 12px">🗄 Arxiv — bo'shagan ustozlar. Kuzatuvlari saqlangan. Qayta tiklash uchun «⚙ Holati» → «Ishlayapti».</div>` : ""}`;
       const crumb = `<div class="tb-crumb"><button type="button" data-tbc="0" class="${!fil ? "on" : ""}">🏫 Filiallar</button>${fil ? `<span>›</span><button type="button" data-tbc="1" class="${fil && !sub ? "on" : ""}">${esc(fil === "*" ? "Barcha filiallar" : fil)}</button>` : ""}${sub ? `<span>›</span><button type="button" class="on">${esc(sub === "*" ? "Barcha fanlar" : sub)}</button>` : ""}</div>`;
       let bodyHtml;
       if (!q && !fil) {
@@ -4315,8 +4546,8 @@ window.METODISTLAR = [
         const list = all.filter(t => q ? tkey(t.full_name).includes(tkey(q)) : (fil === "*" || t.filial === fil) && (sub === "*" || subjOf(t) === sub)).sort((a, b) => a.full_name.localeCompare(b.full_name));
         bodyHtml = (q ? `<p class="small muted" style="margin:0 0 10px">Qidiruv natijasi — barcha filiallar va fanlar bo'yicha</p>` : crumb + `<p class="small muted" style="margin:0 0 10px">${list.length} ta o'qituvchi</p>`) +
           `<div class="card"><div class="table-wrap">${list.length ? `<table><thead><tr><th style="width:32px"></th><th>O'qituvchi</th><th>Fan</th><th>Filial</th><th class="hide-sm">Sinflari</th><th>Kuzatuv</th><th></th></tr></thead><tbody>
-          ${list.map(t => { const f = teacherFacts(t); return `<tr><td><input type="checkbox" data-ts="${t.id}" ${sel.has(t.id) ? "checked" : ""} style="width:auto;margin:0"></td><td><b class="click" data-tid="${t.id}">${esc(t.full_name)}</b>${t.lead_class ? `<div class="small muted">sinf rahbari ${esc(t.lead_class)}</div>` : ""}</td><td>${esc(canonSubj(t.subject) || "—")}</td><td>${esc(t.filial || "—")}</td>
-            <td class="hide-sm small">${esc((t.classes || []).join(", ") || "—")}</td><td>${f.n}</td><td style="text-align:right"><button class="btn sm" data-te="${t.id}">Tahrirlash</button></td></tr>`; }).join("")}</tbody></table>`
+          ${list.map(t => { const f = teacherFacts(t); return `<tr><td><input type="checkbox" data-ts="${t.id}" ${sel.has(t.id) ? "checked" : ""} style="width:auto;margin:0"></td><td><b class="click" data-tid="${t.id}">${esc(t.full_name)}</b>${tStatusTxt(t) ? `<div class="small muted">${tStatusTxt(t)}</div>` : ""}${t.lead_class ? `<div class="small muted">sinf rahbari ${esc(t.lead_class)}</div>` : ""}</td><td>${esc(canonSubj(t.subject) || "—")}</td><td>${esc(t.filial || "—")}</td>
+            <td class="hide-sm small">${esc((t.classes || []).join(", ") || "—")}</td><td>${f.n}</td><td style="text-align:right">${canMetAdmin() ? `<button class="btn sm" data-tst="${t.id}">⚙ Holati</button> ` : ""}<button class="btn sm" data-te="${t.id}">Tahrirlash</button></td></tr>`; }).join("")}</tbody></table>`
           : `<div class="empty">${q ? "Topilmadi" : all.length ? "Bu tanlov bo'yicha o'qituvchi yo'q" : "Baza hali bo'sh — xodimlar hisobot yozganda o'qituvchilar avtomatik qo'shiladi"}</div>`}</div></div>`;
       }
       root.innerHTML = head0 + bodyHtml;
@@ -4326,8 +4557,10 @@ window.METODISTLAR = [
       $$("[data-tbc]", root).forEach(b => b.onclick = () => { if (b.dataset.tbc === "0") { S.ui.tbF = ""; S.ui.tbS = ""; } else S.ui.tbS = ""; draw(); });
       $$("[data-ts]", root).forEach(c => c.onchange = () => { c.checked ? sel.add(c.dataset.ts) : sel.delete(c.dataset.ts); $("#tb-n", root).textContent = sel.size ? `${sel.size} ta tanlandi` : ""; $("#tb-merge", root).disabled = sel.size < 2; });
       $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
+      $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, () => render()); });
       $$("[data-te]", root).forEach(b => b.onclick = () => teacherEdit(teacherById(b.dataset.te), () => PAGES.oqituvchilar(page)));
       $("#tb-merge", root).onclick = () => teacherMerge([...sel], () => PAGES.oqituvchilar(page));
+      $("#tb-arch", root).onclick = () => { S.ui.tbArch = !S.ui.tbArch; S.ui.tbF = S.ui.tbArch ? "*" : ""; S.ui.tbS = S.ui.tbArch ? "*" : ""; S.ui.tq = ""; draw(); };
     };
     draw();
   }
@@ -4976,20 +5209,20 @@ window.METODISTLAR = [
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, ichki tartib, xolis aloqa, kiyinish qoidalari" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Tasdiqlangan taklif yoki jarayonni yaxshilashga dalilli hissa" }] },
     intizomiy: { title: "Intizomiy nazorat xodimlari", items: [
-      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, d: "Ish vaqtiga rioya: kechikmasdan kelish, belgilangan vaqtda ketish" },
-      { k: "soni", l: "Topilgan muammolar soni", s: "Soni", max: 20, hint: "posts", d: "Kuzatuvda aniqlangan va portalga kiritilgan muammolar soni" },
-      { k: "sifat", l: "Topilgan muammolar sifati", s: "Sifat", max: 30, d: "Muammoning ahamiyati, asosliligi, dalili (video/vaqt) va aniq tavsifi" },
+      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobotni vaqtida topshirish (18:00 gacha — to'liq, kechroq — 75%, ertasi kuni — 50%). Kechikib kelgan bo'lsa rahbar kamaytiradi" },
+      { k: "soni", l: "Topilgan muammolar soni", s: "Soni", max: 20, hint: "posts", auto: "soni", d: "Avtomatik: holatlar soni va og'irligi — yengil 1, o'rta 2, bo'lim rahbari tasdiqlagan jiddiy 4 ball; ish kuniga 6 ball — to'liq. Rahbar o'zgartira oladi" },
+      { k: "sifat", l: "Topilgan muammolar sifati", s: "Sifat", max: 30, auto: "sifat", d: "Avtomatik: to'liq yozilgan holatlar ulushi (turi, joyi, kim bilan bog'liq, og'irligi, natijasi va aniq izoh). Rahbar o'zgartira oladi" },
       { k: "etika", l: "Umumjamoaviy etika va xulq odobi, kiyinish odobi va tashqi ko'rinish", s: "Etika", max: 10, d: "Jamoadagi muomala, xulq-odob, kiyinish qoidalari va tashqi ko'rinish" },
-      { k: "filial", l: "Biriktirilgan filiallar bilan ishlash ko'nikmasi", s: "Filial", max: 10, d: "Biriktirilgan filiallardagi mavjud muammolarni bilishi, rahbariyati va o'qituvchilarini tanishi" },
-      { k: "ochiqlik", l: "Rahbariyat tomonidan berilgan vazifalarga ochiqligi", s: "Ochiqlik", max: 10, auto: "reja", d: "Kunlik hisobot bahosidan avtomatik (baho/10 × 10); rahbar o'zgartira oladi" },
+      { k: "filial", l: "Biriktirilgan filiallar bilan ishlash ko'nikmasi", s: "Filial", max: 10, auto: "rejamos", d: "Avtomatik: haftalik rejadagi filialga borgani (hisobotdagi filial bilan mos). Mos kelmagan kun — 0, rahbar ruxsat bersa — maksimal" },
+      { k: "ochiqlik", l: "Rahbariyat tomonidan berilgan vazifalarga ochiqligi", s: "Ochiqlik", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "kreativ", l: "Kreativ fikrlash va tashabbuskorlik ko'nikmalari", s: "Kreativ", max: 10, hint: "taklif", d: "Umumstrategik muammolarni aniqlashi va ularga mos yechimlar berishi" }] },
     akademik: { title: "Akademik kuzatuv xodimlari", items: [
-      { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlik va haftalikda — hisobot bahosidan. CEO o'zgartira oladi" },
+      { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlik va haftalikda — hisobot bahosidan. Haftalik rejadagi filialga bormagan kun — 0 (rahbar ruxsat bersa — maksimal). CEO o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 30, d: "Rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi" },
       { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 15, d: "Konkret holat, pedagogik xulosa, bajarilishi mumkin bo'lgan tavsiya" },
-      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, d: "To'liq, tekshiruvga yaroqli va o'z vaqtida hisobot" },
-      { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, d: "Belgilangan holatlar bo'yicha taqqoslash va natijani qayd qilish" },
-      { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, axloq, maxfiylik, kiyinish qoidalari" },
+      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 18:00 gacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
+      { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, auto: "qayta", d: "Avtomatik: uzoq (7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
+      { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] }
   };
   const CEO_EXTRA = { k: "jamoa", l: "Jamoaning faolligi", s: "Jamoa", max: 20, ceoOnly: true, d: "Hozircha asoschi qo'yadi, keyinchalik avtomatlashadi" };
@@ -5072,8 +5305,12 @@ window.METODISTLAR = [
   const scoreOf = r => r && r.score !== null && r.score !== undefined && r.score !== "" ? +r.score : null;
   // Kunlik: CEO qo'ygani; bo'lmasa "Reja" — shu kungi hisobot bahosidan
   function dayAuto(p, it, d, reps) {
+    if (it.auto === "vaqt") { const x = vaqtDay(p, d, reps); return x === null ? null : rnd(x * it.max); }
+    if (it.auto === "rejamos") { const pm = planMatch(p, d, repFind(p, d, reps)); return pm ? (pm.ok ? it.max : 0) : null; }
+    if (AUTO_WIN.has(it.auto)) { const w = autoWin(p, it, d, d, reps); return w ? w.v : null; }
     if (it.auto !== "reja") return null;
     const r = (reps || S.reports).find(x => x.author_id === p.id && x.report_date === d);
+    if (deptOf(p) === "akademik") { const pm = planMatch(p, d, r); if (pm && !pm.ok) return 0; }
     return r && r.grade !== null && r.grade !== undefined && r.grade !== "" ? rnd(+r.grade / 10 * it.max) : null;
   }
   const dayVal = (p, it, d, K, reps) => scoreOf(manAt(K, "kun", d, p.id, it.k)) ?? dayAuto(p, it, d, reps);
@@ -5081,7 +5318,10 @@ window.METODISTLAR = [
   const weekVal = (p, it, ws, K, reps) => scoreOf(manAt(K, "hafta", ws, p.id, it.k)) ?? weekAuto(p, it, ws, K, reps);
   const bosqAuto = (p, it, ps, K, reps) => avgOf([weekVal(p, it, ps, K, reps), weekVal(p, it, addD(ps, 7), K, reps)]);
   function levelAuto(p, it, lvl, d, K, reps) {
-    if (lvl === "bosqich" && it.k === "reja" && deptOf(p) === "akademik") { const v = planKpi(p, it, d); if (v !== null) return v; }
+    if (AUTO_WIN.has(it.auto)) { const [f, to] = lvl === "kun" ? [d, d] : lvl === "hafta" ? [d, addD(d, 6)] : [d, addD(d, 13)]; const w = autoWin(p, it, f, to, reps); return w ? w.v : null; }
+    if (lvl === "bosqich" && it.k === "reja" && deptOf(p) === "akademik") { const v = planKpi(p, it, d); if (v !== null) { let ok = 0, ev = 0;
+      for (let x = d; x <= addD(d, 13); x = addD(x, 1)) { const pm = planMatch(p, x, repFind(p, x, reps)); if (!pm) continue; ev++; if (pm.ok || scoreOf(manAt(K, "kun", x, p.id, "reja")) === it.max) ok++; }
+      return rnd(v * (ev ? ok / ev : 1)); } }
     return lvl === "kun" ? dayAuto(p, it, d, reps) : lvl === "hafta" ? weekAuto(p, it, d, K, reps) : bosqAuto(p, it, d, K, reps);
   }
   function kpiRow(p, lvl, d, K, awardId, reps) {
@@ -5091,7 +5331,7 @@ window.METODISTLAR = [
       const man = manAt(K, lvl, d, p.id, it.k);
       const av = levelAuto(p, it, lvl, d, K, reps);
       const val = picked ? it.max : scoreOf(man) ?? av;
-      return { it, man, au: { v: av }, val };
+      return { it, man, au: { v: av, why: it.auto ? autoWhy(p, it, lvl, d, reps) : "" }, val };
     });
     const sum = cells.reduce((a, c) => a + (c.val || 0), 0);
     const maxT = items.reduce((a, it) => a + it.max, 0);
@@ -5138,6 +5378,7 @@ window.METODISTLAR = [
     const to = lvl === "kun" ? d : lvl === "hafta" ? addD(d, 6) : addD(d, 13);
     const [K, aw, reps] = await Promise.all([db.listKpiRange(d, to), lvl === "bosqich" ? db.listAwards(d, d) : Promise.resolve([]), db.listReports({ from: d, to }).catch(() => S.reports)]);
     const awardId = aw[0]?.user_id || null;
+    await kpiPrep(d, to);
     const isA = S.me.role === "asoschi";
     const periods = []; for (let i = 0; i < 26; i++) { const x = addD(cur, -14 * i); if (x >= KPI_ANCHOR) periods.push(x); }
     const weeks = []; for (let i = -1; i < 12; i++) { const w = addD(weekOf(t), -7 * i); if (w >= KPI_ANCHOR) weeks.push(w); }
@@ -5169,7 +5410,7 @@ window.METODISTLAR = [
             ${x.cells.map(c => { const ed = !x.picked && canRate(x.p) && (!c.it.ceoOnly || isA);
               const note = c.man && c.man.note ? c.man.note : "";
               const nb = (ed || note) ? `<button type="button" class="kpi-nb ${note ? "has" : ""}" data-nu="${x.p.id}" data-nc="${c.it.k}" title="${note ? esc(note) : "Izoh yozish"}">${note ? "💬" : "+"}</button>` : "";
-              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}">`
+              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}" title="${esc(c.au.why || "")}">`
                 : `<span class="${scoreOf(c.man) === null && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
             <td><b>${x.sum}</b><span class="small muted">/${x.maxT}</span></td>
             <td>${lvl === "bosqich" && canRate(x.p) && !x.picked && !(isA && byFounder(x.p)) ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}
@@ -5211,7 +5452,7 @@ window.METODISTLAR = [
       ${x.cells.map(c => { const ed = edit && (!c.it.ceoOnly || isA); const note = c.man?.note || "";
         const src = x.picked ? "Asoschi tanlovi" : scoreOf(c.man) !== null ? "Rahbar qo'ygan" : c.au.v !== null ? autoL : "Qo'yilmagan";
         return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(c.it.d)}</div></td>
-          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
+          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}" title="${esc(c.au.why || "")}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
           <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
           <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}
       <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b></td></tr>
@@ -5385,7 +5626,7 @@ window.METODISTLAR = [
             <div class="field"><label>Intizomiy <span class="muted">/${IB_MAX}</span></label>${subj === BOG ? `<input class="num" disabled placeholder="—">` : `<input data-rm="${i}" data-f="ib" type="number" step="0.5" min="0" max="${IB_MAX}" value="${esc(x.ib)}" class="num">`}</div>
             <div class="field"><label>Akademik <span class="muted">/${abMax(subj)}</span></label>${akad || !subj ? `<input data-rm="${i}" data-f="ab" type="number" step="0.5" min="0" max="${abMax(subj)}" value="${esc(x.ab)}" class="num">` : `<input class="num" disabled placeholder="—"><span class="ar-na">bu fanda qo'yilmaydi</span>`}</div>
           </div>
-          ${subj === BOSHL ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-rml="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
+          ${subj === BOSHL ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi *:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-rml="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
           <div class="ar-act"><button type="button" class="btn sm ghost" data-rmd="${i}">O'chirish</button></div></div>`; }).join("")}</div>${dl}
         <button type="button" class="btn sm" id="rhm-add" style="margin-top:10px">+ Ko'rgan darsimni qo'shish</button></div>`; };
     const helpCard = () => {
