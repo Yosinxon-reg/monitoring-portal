@@ -3439,7 +3439,7 @@ window.METODISTLAR = [
     const ser = (r && r.data && r.data.kind === "intizomiy" ? (r.data.issues || []) : []).map((h, k) => ({ h, k })).filter(x => x.h.sev === "jiddiy");
     const irOf = k => ((S.kx && S.kx.irev) || []).find(x => x.author_id === p.id && String(x.report_date).slice(0, 10) === date && +x.idx === k);
     let pmNote = null;
-    const kpiPh = it => { if (it.auto === "reja") return pm && !pm.ok && deptOf(p) === "akademik" ? 0 : autoV(it); const v = levelAuto(p, it, "kun", date, KD, null); return v === null || v === undefined ? "—" : v; };
+    const kpiPh = it => { if (it.auto === "reja") return pm && !pm.ok && deptOf(p) === "akademik" ? 0 : autoV(it); const v = levelAuto(p, it, "kun", date, KD, null); return v === null || v === undefined ? (it.auto === "keldi" ? "qo'ying" : "—") : v; };
     const m = openModal(`${esc(p.full_name)} — ${fmtDate(date)}`, `
       <div class="rc-plan" style="margin-top:0"><b>Shu kungi reja:</b> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
       ${pm && rmIt ? (pm.ok ? `<div class="pm-box ok">✅ Haftalik reja bajarildi — rejada: <b>${esc(pm.pf.join(", "))}</b>, hisobotda: <b>${esc(pm.rf.join(", "))}</b></div>`
@@ -4411,6 +4411,13 @@ window.METODISTLAR = [
     if (cd === d) return tmOf(ts) <= "18:00" ? 1 : 0.75;
     return cd === addD(d, 1) ? 0.5 : 0;
   }
+  // Ishga kelganlik: shu kuni hisobot yozgan yoki portalda faol bo'lgan bo'lsa — keldi (1). Aks holda — null: kelmagan/kechikkanga rahbar o'zi ball qo'yadi
+  function keldiDay(p, d, reps) {
+    if (!isWorkdayOn(p, d) || d < KPI_ANCHOR || d > today()) return null;
+    const r = repFind(p, d, reps);
+    const came = (r && isWritten(r)) || actSet().has(p.id + "|" + d) || (S.views || []).some(v => v.user_id === p.id && localOf(v.seen_at) === d);
+    return came ? 1 : null;
+  }
   const actSet = () => { const s = new Set(); ((S.kx && S.kx.act) || []).forEach(a => s.add(a.user_id + "|" + String(a.day).slice(0, 10))); return s; };
   const avg01 = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
   const pctTxt = v => v === null ? "—" : Math.round(v * 100) + "%";
@@ -4482,6 +4489,8 @@ window.METODISTLAR = [
   function autoWhy(p, it, lvl, d, reps) {
     const [f, to] = lvl === "kun" ? [d, d] : lvl === "hafta" ? [d, addD(d, 6)] : [d, addD(d, 13)];
     if (AUTO_WIN.has(it.auto)) { const r = autoWin(p, it, f, to, reps); return r ? r.why : "Ma'lumot yo'q"; }
+    if (it.auto === "keldi") { let c = 0, n = 0; for (let x = f; x <= to; x = addD(x, 1)) { if (!isWorkdayOn(p, x) || x < KPI_ANCHOR || x > today()) continue; keldiDay(p, x, reps) ? c++ : n++; }
+      return `Ishga kelgan kun — to'liq ball: ${c} kun${n ? ` · kelmagan / ma'lumot yo'q: ${n} kun — ballni rahbar o'zi qo'yadi` : ""}. Kechikkan kuni ballni rahbar o'zi qo'yadi`; }
     if (it.auto === "vaqt") { const v = []; for (let x = f; x <= to; x = addD(x, 1)) { const s = vaqtDay(p, x, reps); if (s !== null) v.push(s); }
       return v.length ? `${v.length} ish kuni: 18:00 gacha — ${v.filter(x => x === 1).length}, kechroq — ${v.filter(x => x === 0.75).length}, ertasi kuni — ${v.filter(x => x === 0.5).length}, yo'q — ${v.filter(x => x === 0).length}` : "Ish kuni yo'q"; }
     if (it.auto === "rejamos" || (it.auto === "reja" && deptOf(p) === "akademik")) { let ok = 0, bad = 0; for (let x = f; x <= to; x = addD(x, 1)) { const m = planMatch(p, x, repFind(p, x, reps)); if (m) m.ok ? ok++ : bad++; }
@@ -5272,7 +5281,7 @@ window.METODISTLAR = [
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, ichki tartib, xolis aloqa, kiyinish qoidalari" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Tasdiqlangan taklif yoki jarayonni yaxshilashga dalilli hissa" }] },
     intizomiy: { title: "Intizomiy nazorat xodimlari", items: [
-      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobotni vaqtida topshirish (18:00 gacha — to'liq, kechroq — 75%, ertasi kuni — 50%). Kechikib kelgan bo'lsa rahbar kamaytiradi" },
+      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, auto: "keldi", d: "Ishga kelgan kun — to'liq ball. Kechikib kelgan yoki kelmagan xodimga avtomatik ball qo'yilmaydi — bo'lim rahbari ballni o'zi qo'yadi" },
       { k: "soni", l: "Topilgan muammolar soni", s: "Soni", max: 20, hint: "posts", auto: "soni", d: "Avtomatik: holatlar soni va og'irligi — yengil 1, o'rta 2, bo'lim rahbari tasdiqlagan jiddiy 4 ball; ish kuniga 6 ball — to'liq. Rahbar o'zgartira oladi" },
       { k: "sifat", l: "Topilgan muammolar sifati", s: "Sifat", max: 30, auto: "sifat", d: "Avtomatik: to'liq yozilgan holatlar ulushi (turi, joyi, kim bilan bog'liq, og'irligi, natijasi va aniq izoh). Rahbar o'zgartira oladi" },
       { k: "etika", l: "Umumjamoaviy etika va xulq odobi, kiyinish odobi va tashqi ko'rinish", s: "Etika", max: 10, d: "Jamoadagi muomala, xulq-odob, kiyinish qoidalari va tashqi ko'rinish" },
@@ -5369,6 +5378,7 @@ window.METODISTLAR = [
   // Kunlik: CEO qo'ygani; bo'lmasa "Reja" — shu kungi hisobot bahosidan
   function dayAuto(p, it, d, reps) {
     if (it.auto === "vaqt") { const x = vaqtDay(p, d, reps); return x === null ? null : rnd(x * it.max); }
+    if (it.auto === "keldi") return keldiDay(p, d, reps) ? it.max : null;
     if (it.auto === "rejamos") { const pm = planMatch(p, d, repFind(p, d, reps)); return pm ? (pm.ok ? it.max : 0) : null; }
     if (AUTO_WIN.has(it.auto)) { const w = autoWin(p, it, d, d, reps); return w ? w.v : null; }
     if (it.auto !== "reja") return null;
@@ -5473,7 +5483,7 @@ window.METODISTLAR = [
             ${x.cells.map(c => { const ed = !x.picked && canRate(x.p) && (!c.it.ceoOnly || isA);
               const note = c.man && c.man.note ? c.man.note : "";
               const nb = (ed || note) ? `<button type="button" class="kpi-nb ${note ? "has" : ""}" data-nu="${x.p.id}" data-nc="${c.it.k}" title="${note ? esc(note) : "Izoh yozish"}">${note ? "💬" : "+"}</button>` : "";
-              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}" title="${esc(c.au.why || "")}">`
+              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? (c.it.auto === "keldi" ? "qo'ying" : "—")}" title="${esc(c.au.why || "")}">`
                 : `<span class="${scoreOf(c.man) === null && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
             <td><b>${x.sum}</b><span class="small muted">/${x.maxT}</span></td>
             <td>${lvl === "bosqich" && canRate(x.p) && !x.picked && !(isA && byFounder(x.p)) ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}
@@ -5515,7 +5525,7 @@ window.METODISTLAR = [
       ${x.cells.map(c => { const ed = edit && (!c.it.ceoOnly || isA); const note = c.man?.note || "";
         const src = x.picked ? "Asoschi tanlovi" : scoreOf(c.man) !== null ? "Rahbar qo'ygan" : c.au.v !== null ? autoL : "Qo'yilmagan";
         return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(c.it.d)}</div></td>
-          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? "—"}" title="${esc(c.au.why || "")}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
+          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? (c.it.auto === "keldi" ? "qo'ying" : "—")}" title="${esc(c.au.why || "")}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
           <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
           <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}
       <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b></td></tr>
