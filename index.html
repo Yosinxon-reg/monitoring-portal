@@ -3376,7 +3376,7 @@ window.METODISTLAR = [
       return `<details class="card ar-long" style="margin-top:16px" ${S.ui.luOpen ? "open" : ""}><summary><b>${LONG_DAYS} kundan ko'p kuzatilmagan o'qituvchilar</b> ${lu.length ? `<span class="badge">${lu.length}</span>` : `<span class="small muted">— yo'q</span>`}</summary>
         <div class="row" style="gap:8px;margin:10px 0"><select id="lu-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === (S.ui.luFil || "") ? "selected" : ""}>${esc(f)}</option>`).join("")}</select><span class="small muted">Ertangi rejangizni tuzishda foydali</span></div>
         ${lu.slice(0, 40).map(({ t: q, f }) => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(q.full_name)}</div><div class="small muted">${esc([canonSubj(q.subject), q.filial].filter(Boolean).join(" · "))}${f.last ? ` · oxirgi: ${fmtDate(f.last.day)}` : ""}</div></div>
-          ${f.days === null ? pill("missing", "Kuzatilmagan") : pill("jarayonda", f.days + " kun")}<button type="button" class="btn sm" data-luadd="${q.id}">+ Qo'shish</button></div>`).join("")}</details>`; };
+          ${!f.inMonth ? pill("missing", "Bu oy kuzatilmagan") : pill("jarayonda", f.gap + " kun")}<button type="button" class="btn sm" data-luadd="${q.id}">+ Qo'shish</button></div>`).join("")}</details>`; };
     const recBlock = () => { if (!canPlan() || !(S.teachers || []).length || date !== t) return "";
       const skip = new Set(F.rows.map(x => x.teacher_id).filter(Boolean));
       const rec = planRecommend({ fil: S.ui.luFil || "", skip, only: bOnly ? (q => [BOSHL, ...(bOk ? [BOG] : [])].includes(canonSubj(q.subject))) : null, limit: 8 });
@@ -4083,9 +4083,13 @@ window.METODISTLAR = [
   function teacherFacts(t) {
     const ob = obsOf(t.id);
     const last = ob[0];
-    const g0 = last ? (t.off_to && t.off_to > last.day && t.off_to < today() ? t.off_to : last.day) : null;
-    const days = g0 ? dayDiff(g0, today()) : null;
-    return { n: ob.length, last, days, ib: avg(ob.map(o => o.ib)), ab: avg(ob.map(o => o.ab)), long: days === null || days > LONG_DAYS };
+    const t0 = today(), m0 = t0.slice(0, 8) + "01";
+    const g0 = last ? (t.off_to && t.off_to > last.day && t.off_to < t0 ? t.off_to : last.day) : null;
+    const days = g0 ? dayDiff(g0, t0) : null;
+    // Uzoq kuzatilmagan: joriy oy bo'yicha — oxirgi kuzatuvdan (bu oyda bo'lmasa — oy boshidan) 7 kundan ko'p o'tsa
+    let gFrom = m0; if (g0 && g0 > gFrom) gFrom = g0;
+    const gap = dayDiff(gFrom, t0), inMonth = !!(last && last.day >= m0);
+    return { n: ob.length, last, days, gap, inMonth, ib: avg(ob.map(o => o.ib)), ab: avg(ob.map(o => o.ab)), long: gap > LONG_DAYS };
   }
   function teacherHint0(t) {
     if (!t) return "";
@@ -4097,7 +4101,7 @@ window.METODISTLAR = [
   // 7 kundan ko'p kuzatilmagan o'qituvchilar
   function longUnseen(filial) {
     return (S.teachers || []).filter(t => tLive(t)).map(t => ({ t, f: teacherFacts(t) })).filter(x => x.f.long && (!filial || x.t.filial === filial))
-      .sort((a, b) => (b.f.days ?? 9999) - (a.f.days ?? 9999) || a.t.full_name.localeCompare(b.t.full_name));
+      .sort((a, b) => b.f.gap - a.f.gap || (b.f.days ?? 9999) - (a.f.days ?? 9999) || a.t.full_name.localeCompare(b.t.full_name));
   }
   // Taxminiy variantlar (yozilayotgan ism bo'yicha)
   function teacherMatches(q, limit = 8, only = null) {
@@ -4575,7 +4579,8 @@ window.METODISTLAR = [
         const prev = all.filter(x => x.teacher_id === o.teacher_id && x.day < o.day).pop();
         const tt = teacherById(o.teacher_id); let gapFrom = prev ? prev.day : null;
         if (gapFrom && tt && tt.off_to && tt.off_to > gapFrom && tt.off_to < o.day) gapFrom = tt.off_to;
-        if (!prev || dayDiff(gapFrom, o.day) > LONG_DAYS) longN++; });
+        const om = o.day.slice(0, 8) + "01"; if (!gapFrom || gapFrom < om) gapFrom = om;
+        if (dayDiff(gapFrom, o.day) > LONG_DAYS) longN++; });
       const r15 = tot ? Math.min(1, (longN / tot) / 0.5) : null;
       const lowOf = o => o.ab !== null && o.ab !== undefined && o.ab !== "" ? +o.ab < LOW_RATIO * abMax(o.subject) : (o.ib !== null && o.ib !== undefined && o.ib !== "" && +o.ib < LOW_RATIO * IB_MAX);
       const lows = all.filter(o => o.author_id === p.id && o.day >= addD(from, -REVISIT_DAYS) && o.day <= to && lowOf(o));
@@ -4700,10 +4705,10 @@ window.METODISTLAR = [
     const fil = S.ui.tfil || "";
     const list = longUnseen(fil);
     root.innerHTML = `<div class="row" style="gap:10px;margin-bottom:14px"><select id="tx-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
-        <span class="small muted">Oxirgi kuzatuvdan ${LONG_DAYS} kundan ko'p vaqt o'tgan yoki hali kuzatilmagan o'qituvchilar. Bo'shagan va vaqtincha ishlamayotganlar bu ro'yxatda yo'q${canMetAdmin() ? " — ⚙ orqali o'tkazing" : ""}.</span></div>
+        <span class="small muted">Joriy oy bo'yicha: shu oyda oxirgi kuzatuvdan (bu oyda hali kuzatilmagan bo'lsa — oyning 1-sanasidan) ${LONG_DAYS} kundan ko'p vaqt o'tgan o'qituvchilar. Bo'shagan va vaqtincha ishlamayotganlar bu ro'yxatda yo'q${canMetAdmin() ? " — ⚙ orqali o'tkazing" : ""}.</span></div>
       <div class="card">${list.length ? list.map(({ t, f }) => `<div class="list-item click" data-tid="${t.id}"><div style="flex:1;min-width:0"><div class="t">${esc(t.full_name)}</div>
           <div class="small muted">${esc([t.subject, t.filial, (t.classes || []).join(", ")].filter(Boolean).join(" · "))}${f.last ? ` · oxirgi: ${fmtDate(f.last.day)} (${esc(shortName(f.last.author_id))})` : ""}</div></div>
-          ${f.days === null ? pill("missing", "Hali kuzatilmagan") : pill(f.days > 14 ? "missing" : "jarayonda", `${f.days} kun`)}${canMetAdmin() ? `<button type="button" class="btn sm" data-tst="${t.id}">⚙ Holati</button>` : ""}</div>`).join("") : `<div class="empty">Hamma o'qituvchi oxirgi ${LONG_DAYS} kunda kuzatilgan ✓</div>`}</div>`;
+          ${!f.inMonth ? pill("missing", "Bu oy kuzatilmagan") : pill(f.gap > 14 ? "missing" : "jarayonda", `${f.gap} kun`)}${canMetAdmin() ? `<button type="button" class="btn sm" data-tst="${t.id}">⚙ Holati</button>` : ""}</div>`).join("") : `<div class="empty">Uzoq kuzatilmagan o'qituvchi yo'q ✓</div>`}</div>`;
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachLong(root); };
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
     $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, () => teachLong(root)); });
@@ -5412,7 +5417,7 @@ window.METODISTLAR = [
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 30, d: "Rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi" },
       { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 15, d: "Konkret holat, pedagogik xulosa, bajarilishi mumkin bo'lgan tavsiya" },
       { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 18:00 gacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
-      { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, auto: "qayta", d: "Avtomatik: uzoq (7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
+      { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] }
   };
