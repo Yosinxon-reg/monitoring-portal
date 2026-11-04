@@ -7326,7 +7326,8 @@ window.METODISTLAR = [
     if (S.me.role === "asoschi" || ["akademik", "intizomiy"].includes(deptOf(S.me))) await teachReload();
     if (curRoute() !== "filiallar") return;
     const body = $("#fp-body", page);
-    const H = holFlat(reps, creps).filter(h => h.day >= from && h.day <= t);
+    // Xarita va turlar uchun «Boshqa» ichidagi erkin matnlar bitta «Boshqa» ustuniga yig'iladi (batafsili ochiq muammolar ro'yxatida)
+    const H = holFlat(reps, creps).filter(h => h.day >= from && h.day <= t).map(h => ({ ...h, t: h.type === "Boshqa" || !HOL_TUR.includes(h.type) ? "Boshqa" : h.type, tFull: h.t }));
     const O = (S.tobs || []).filter(o => o.day >= from && o.day <= t);
     const fils = fil ? [fil] : FILIALLAR;
     const card = f => { const L = H.filter(h => h.filial === f), M = itMetrics(L), ob = O.filter(o => o.filial === f);
@@ -7356,7 +7357,7 @@ window.METODISTLAR = [
     body.innerHTML = `${card(fil)}
       <div class="cols" style="margin-top:16px">
         <div class="card"><div class="card-head"><h2>Muammo turlari</h2></div>${L.length ? itTop(L, h => h.t).map(([k, v]) => `<div class="bar-row"><span>${esc(k)}</span><div class="progress"><i style="width:${Math.round(v / L.length * 100)}%;background:var(--bad)"></i></div><b>${v}</b></div>`).join("") : `<div class="empty">Holat yo'q</div>`}</div>
-        <div class="card"><div class="card-head"><h2>Hal qilinmagan muammolar (${open.length})</h2></div>${open.slice(0, 30).map(h => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(h.t)}${h.room ? ` · ${esc(h.room)}-xona` : ""}</div><div class="small muted">${fmtDate(h.day)} · ${esc(h.place || "")} · ${esc(nameOf(h.author))}${h.note ? " · " + esc(h.note) : ""}</div></div>${pill(h.res === "vada" ? "yangi" : "missing", natShort(h.res))}</div>`).join("") || `<div class="empty">Hammasi hal qilingan ✅</div>`}</div>
+        <div class="card"><div class="card-head"><h2>Hal qilinmagan muammolar (${open.length})</h2></div>${open.slice(0, 30).map(h => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(h.tFull || h.t)}${h.room ? ` · ${esc(h.room)}-xona` : ""}</div><div class="small muted">${fmtDate(h.day)} · ${esc(h.place || "")} · ${esc(nameOf(h.author))}${h.note ? " · " + esc(h.note) : ""}</div></div>${pill(h.res === "vada" ? "yangi" : "missing", natShort(h.res))}</div>`).join("") || `<div class="empty">Hammasi hal qilingan ✅</div>`}</div>
       </div>
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>🔥 Xonalar bo'yicha takroriy muammolar</h2></div>
         ${roomRows.length ? heatTable(roomRows, types, (r, ty) => L.filter(h => String(h.room || "").trim().toUpperCase() === r && h.t === ty).length, r => r + "-xona") : `<div class="empty small">Xona ko'rsatilgan holatlar hali yo'q. Intizomiy hisobotda «Qayerda» ostidagi «Xona / qavat» maydonini to'ldirsangiz, xarita shu yerda chiqadi.</div>`}</div>
