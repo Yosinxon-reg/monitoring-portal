@@ -982,6 +982,15 @@ tr.unseen td { background: var(--brand-soft); }
 .attn-card{border:1px solid #f0b429;background:linear-gradient(180deg,rgba(240,180,41,.08),transparent 120px);margin-bottom:14px}
 .attn-card .card-head.click{cursor:pointer}
 
+/* Hisobot va reyting: guruh tablari; ikkinchi (amal kutilayotgan) sanoq */
+.nav .badge.soft, .nav a.active .badge.soft { background: rgba(255,255,255,.14); color: #cfe0f5; margin-left: 6px; font-weight: 600; }
+.nav .badge + .badge.soft { margin-left: 4px; }
+.grp-tabs { margin-bottom: 18px; flex-wrap: wrap; }
+.grp-tabs a { text-decoration: none; color: inherit; }
+.grp-tabs { flex-wrap: nowrap; gap: 6px; border-bottom: 0; background: var(--surface-2, #eef3fa); padding: 5px; border-radius: 12px; }
+.grp-tabs a { padding: 9px 14px; font-weight: 600; color: var(--muted); border-radius: 9px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.grp-tabs a.active { background: var(--surface, #fff); color: var(--brand); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
 </style>
 </head>
 <body>
@@ -1700,6 +1709,10 @@ window.LESSONS = [
     const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
     let meCache = null;
     const chk = ({ data, error }) => { if (error) throw new Error(trErr(error.message)); return data; };
+    // Supabase bir so'rovda ko'pi bilan 1000 qator qaytaradi — qolganlari jimgina tushib qolardi. Sahifalab hammasini olamiz.
+    const PG = 1000;
+    async function pageAll(mk) { const out = []; for (let i = 0; i < 200000; i += PG) { const rows = chk(await mk().range(i, i + PG - 1)) || []; out.push(...rows); if (rows.length < PG) break; } return out; }
+    async function pageSoft(mk) { try { return await pageAll(mk); } catch (e) { return []; } }
     function trErr(m) {
       if (/Invalid login/i.test(m)) return "Login yoki parol noto'g'ri";
       if (/row-level security/i.test(m)) return "Bu amal uchun ruxsatingiz yo'q";
@@ -1760,16 +1773,16 @@ window.LESSONS = [
         if (!id) throw new Error("Foydalanuvchi yaratilmadi");
         return chk(await sb.from("profiles").update({ full_name, role, ceo_id: ceo_id || null, ...extra }).eq("id", id).select().single());
       },
-      async listTasks() { return chk(await sb.from("tasks").select("*").order("created_at", { ascending: false })); },
+      async listTasks() { return pageAll(() => sb.from("tasks").select("*").order("created_at", { ascending: false }).order("id")); },
       async listTasksSince(ts) { return chk(await sb.from("tasks").select("*").gte("created_at", ts).order("created_at", { ascending: false })); },
       async createTask(t) { return chk(await sb.from("tasks").insert({ ...t, created_by: meCache.id }).select().single()); },
       async updateTask(id, patch) { return chk(await sb.from("tasks").update(patch).eq("id", id).select().single()); },
       async deleteTask(id) { chk(await sb.from("tasks").delete().eq("id", id)); return true; },
       async listReports({ from, to } = {}) {
-        let q = sb.from("daily_reports").select("*").order("report_date", { ascending: false });
-        if (from) q = q.gte("report_date", from);
-        if (to) q = q.lte("report_date", to);
-        return chk(await q);
+        return pageAll(() => { let q = sb.from("daily_reports").select("*").order("report_date", { ascending: false }).order("id");
+          if (from) q = q.gte("report_date", from);
+          if (to) q = q.lte("report_date", to);
+          return q; });
       },
       async saveMyReport(r) {
         const ex = chk(await sb.from("daily_reports").select("id,status,grade").eq("author_id", meCache.id).eq("report_date", r.report_date).maybeSingle());
@@ -1792,14 +1805,14 @@ window.LESSONS = [
         return chk(await sb.from("daily_reports").upsert(body, { onConflict: "author_id,report_date" }).select().single());
       },
       async touch() { try { await sb.rpc("touch_last_seen"); } catch (e) {} return true; },
-      async listViews(from) { return chk(await sb.from("item_views").select("kind,item_id,user_id,seen_at").gte("seen_at", from).limit(20000)); },
+      async listViews(from) { return pageAll(() => sb.from("item_views").select("kind,item_id,user_id,seen_at").gte("seen_at", from).order("seen_at").order("item_id").order("user_id")); },
       async markSeen(kind, item_id) { chk(await sb.from("item_views").upsert({ kind, item_id, user_id: meCache.id }, { onConflict: "kind,item_id,user_id", ignoreDuplicates: true })); return true; },
-      async listLessonViews() { return chk(await sb.from("lesson_views").select("*")); },
+      async listLessonViews() { return pageAll(() => sb.from("lesson_views").select("*").order("user_id").order("lesson_id")); },
       async markLesson(id) { chk(await sb.from("lesson_views").upsert({ user_id: meCache.id, lesson_id: id }, { onConflict: "user_id,lesson_id", ignoreDuplicates: true })); return true; },
-      async listDeptTasks() { return chk(await sb.from("dept_tasks").select("*").order("created_at", { ascending: false })); },
+      async listDeptTasks() { return pageAll(() => sb.from("dept_tasks").select("*").order("created_at", { ascending: false }).order("id")); },
       async createDeptTask(t) { return chk(await sb.from("dept_tasks").insert({ ...t, created_by: meCache.id }).select().single()); },
       async deleteDeptTask(id) { chk(await sb.from("dept_tasks").delete().eq("id", id)); return true; },
-      async listDeptStatus() { return chk(await sb.from("dept_task_status").select("*")); },
+      async listDeptStatus() { return pageAll(() => sb.from("dept_task_status").select("*").order("task_id").order("user_id")); },
       async setDeptStatus(task_id, user_id, patch) {
         return chk(await sb.from("dept_task_status").upsert({ task_id, user_id, ...patch }, { onConflict: "task_id,user_id" }).select().single());
       },
@@ -1815,20 +1828,21 @@ window.LESSONS = [
       },
       async listSelfLogs(from, to, uid) { let q = sb.from("self_logs").select("*").gte("log_date", from).lte("log_date", to).order("log_date", { ascending: false }); if (uid) q = q.eq("user_id", uid); return chk(await q); },
       async saveSelfLog(date, body) { chk(await sb.from("self_logs").upsert({ user_id: meCache.id, log_date: date, body }, { onConflict: "user_id,log_date" })); return true; },
-      async listCeoReports(from, to) { return chk(await sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date")); },
+      async listCeoReports(from, to) { return pageAll(() => sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date").order("ceo_id")); },
       async saveCeoReport(date, kind, data, summary) {
         chk(await sb.from("ceo_reports").upsert({ report_date: date, ceo_id: meCache.id, kind, data, summary }, { onConflict: "report_date,ceo_id" })); return true;
       },
       // ---- O'qituvchilar bazasi va kuzatuvlar
-      async listTeachers(subs) { let q = sb.from("teachers").select("*").order("full_name").limit(5000); if (subs && subs.length) q = q.in("subject", subs); return chk(await q); },
-      async listTeacherObs(from, subs) { let q = sb.from("teacher_obs").select("*").gte("day", from).order("day").limit(20000); if (subs && subs.length) q = q.in("subject", subs); return chk(await q); },
+      async listTeachers(subs) { return pageAll(() => { let q = sb.from("teachers").select("*").order("full_name").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; }); },
+      async listTeacherObs(from, subs) { return pageAll(() => { let q = sb.from("teacher_obs").select("*").gte("day", from).order("day").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; }); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
       async listTeacherPlans() { const r = await sb.from("teacher_plan").select("*").gte("month", new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)); return r.error ? [] : r.data; },
       async setTeacherPlan(teacher_id, month, plan, note) { if (plan === null || plan === undefined) { chk(await sb.from("teacher_plan").delete().eq("teacher_id", teacher_id).eq("month", month)); return true; }
         chk(await sb.from("teacher_plan").upsert({ teacher_id, month, plan, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "teacher_id,month" })); return true; },
-      async listIssueReviews(from, to) { const r = await sb.from("issue_reviews").select("*").gte("report_date", from).lte("report_date", to); return r.error ? [] : r.data; },
+      async listIssueReviews(from, to) { return pageSoft(() => sb.from("issue_reviews").select("*").gte("report_date", from).lte("report_date", to).order("report_date").order("author_id").order("idx")); },
       async setIssueReview(author_id, report_date, idx, verdict) { chk(await sb.from("issue_reviews").upsert({ author_id, report_date, idx, verdict, reviewed_at: new Date().toISOString() }, { onConflict: "author_id,report_date,idx" })); return true; },
-      async listActivity(from, to) { const r = await sb.from("staff_activity").select("user_id,day").gte("day", from).lte("day", to); return r.error ? [] : r.data; },
+      async listAbsences(f, t) { const r = await sb.rpc("staff_absences", { f, t }); return r.error ? [] : (r.data || []); },
+      async listActivity(from, to) { return pageSoft(() => sb.from("staff_activity").select("user_id,day").gte("day", from).lte("day", to).order("day").order("user_id")); },
       async listCeoRatings(from, to) { const r = await sb.from("ceo_ratings").select("*").gte("month", from).lte("month", to); return r.error ? [] : r.data; },
       async setCeoRating(month, ceo_id, score, note) { chk(await sb.from("ceo_ratings").upsert({ month, ceo_id, score, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "month,ceo_id" })); return true; },
       async getSettings() { const r = await sb.from("portal_settings").select("key,value"); return r.error ? {} : Object.fromEntries((r.data || []).map(x => [x.key, x.value])); },
@@ -1855,9 +1869,11 @@ window.LESSONS = [
       async listMetFeedback() { const r = await sb.from("metod_feedback").select("*").order("created_at", { ascending: false }).limit(1000); return r.error ? [] : r.data; },
       async sendMetFeedback(booking_id, f) { chk(await sb.from("metod_feedback").insert({ booking_id, ...f })); return true; },
       async listKpiRange(from, to) {
-        const [a, b, c, w] = await Promise.all([sb.from("kpi_scores").select("*").gte("period_start", from).lte("period_start", to), sb.from("kpi_final").select("*").gte("period_start", from).lte("period_start", to),
-          sb.from("kpi_daily").select("*").gte("day", from).lte("day", to), sb.from("kpi_week").select("*").gte("week_start", from).lte("week_start", to)]);
-        return { scores: chk(a), finals: chk(b), daily: c.error ? [] : c.data, week: w.error ? [] : w.data };
+        const [a, b, c, w] = await Promise.all([pageAll(() => sb.from("kpi_scores").select("*").gte("period_start", from).lte("period_start", to).order("period_start").order("user_id").order("criterion")),
+          pageAll(() => sb.from("kpi_final").select("*").gte("period_start", from).lte("period_start", to).order("period_start").order("user_id")),
+          pageSoft(() => sb.from("kpi_daily").select("*").gte("day", from).lte("day", to).order("day").order("user_id").order("criterion")),
+          pageSoft(() => sb.from("kpi_week").select("*").gte("week_start", from).lte("week_start", to).order("week_start").order("user_id").order("criterion"))]);
+        return { scores: a, finals: b, daily: c, week: w };
       },
       async setKpiAt(lvl, date, user_id, criterion, score, note) {
         if (lvl === "bosqich") return this.setKpiScore(date, user_id, criterion, score, note);
@@ -1867,8 +1883,8 @@ window.LESSONS = [
         chk(await sb.from(tbl).upsert(body, { onConflict: col + ",user_id,criterion" })); return true;
       },
       async listKpi(period) {
-        const [a, b] = await Promise.all([sb.from("kpi_scores").select("*").eq("period_start", period), sb.from("kpi_final").select("*").eq("period_start", period)]);
-        return { scores: chk(a), finals: chk(b) };
+        const [a, b] = await Promise.all([pageAll(() => sb.from("kpi_scores").select("*").eq("period_start", period).order("user_id").order("criterion")), pageAll(() => sb.from("kpi_final").select("*").eq("period_start", period).order("user_id"))]);
+        return { scores: a, finals: b };
       },
       async setKpiScore(period, user_id, criterion, score, note) {
         if (score === null && note !== undefined && !note) { chk(await sb.from("kpi_scores").delete().match({ period_start: period, user_id, criterion })); return true; }
@@ -2343,7 +2359,9 @@ window.METODISTLAR = [
     bg.addEventListener("click", e => { if (e.target === bg || e.target.hasAttribute("data-close")) closeModal(); });
     return $(".modal", root);
   }
-  const closeModal = () => ($("#modal-root").innerHTML = "");
+  // Oyna yopilganda: ichida biror narsa «ko'rildi» bo'lgan bo'lsa — sahifadagi «yangi» belgilar va sanoqlar darhol yangilanadi
+  const closeModal = () => { const had = $("#modal-root").innerHTML !== ""; $("#modal-root").innerHTML = "";
+    if (had && S.ui && S.ui.seenDirty && S.me && !S._rendering) { S.ui.seenDirty = false; const pg = $("#page"); if (pg) drawPage(pg, curRoute()); } };
   document.addEventListener("keydown", e => e.key === "Escape" && closeModal());
 
   // People the current manager oversees (for dashboards / reviews)
@@ -2410,6 +2428,7 @@ window.METODISTLAR = [
       try { S.plans = await db.listPlans(addD(w0, -7), addD(w0, 7)); } catch (e) { S.plans = []; }
       if (isManager()) { try { S.creps = await db.listCeoReports(today(), today()); } catch (e) { S.creps = []; } }
       if (S.me.role === "asoschi" || ["akademik", "intizomiy"].includes(deptOf(S.me))) await teachReload();
+      if (db.listAbsences) { try { S.abs = new Set((await db.listAbsences(addD(today(), -75), today())).map(a => a.user_id + "|" + String(a.day).slice(0, 10))); } catch (e) { S.abs = S.abs || new Set(); } }
       if (db.listLeaves) { try { S.leaves = await db.listLeaves(addD(today(), -62), addD(today(), 120)); } catch (e) { S.leaves = S.leaves || []; } }
       if (db.listMetRules) { try { S.mrules = await db.listMetRules(); } catch (e) { S.mrules = S.mrules || []; } }
       if (db.listMetBookings) { try { await metReload(); } catch (e) { S.mpcs = S.mpcs || []; S.mbook = S.mbook || []; } }
@@ -2438,22 +2457,21 @@ window.METODISTLAR = [
       const pendMine = S.dtasks.filter(t => recipientsOf(t).some(p => p.id === S.me.id) && !dtStatus(t, S.me).self_done && dtStatus(t, S.me).status === "kutilmoqda").length;
       const toConf = isManager() ? S.dtasks.reduce((a, t) => a + recipientsOf(t).filter(p => canRate(p) && dtStatus(t, p).status === "kutilmoqda" && dtStatus(t, p).self_done).length, 0) : 0;
       const toAcc = isManager() ? S.tasks.filter(x => x.status === "bajarildi" && canManageTask(x)).length : 0;
-      items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: (unseenMine().length + toConf + toAcc) || "" });
+      items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: unseenMine().length || "", badge2: (toConf + toAcc) || "", b2t: "Tasdiqlash / qabul qilish kutilmoqda" });
       const myRepDue = isSelfReporter(S.me) && isWorkday(S.me) && ["due", "late"].includes(dueState(S.me)) && !isWritten(repOf(S.me, today()));
-      items.push({ id: "hisobotlar", label: isSelfReporter(S.me) ? "Kunlik hisobotim" : r === "xodim" ? "Kunlik baholarim" : "Hisobotlar va baholar", icon: "report",
-        badge: myRepDue ? "!" : r === "ceo" ? (toGrade().length || "") : (toReview || "") });
+      const GB = S._grpBadges = {};
+      GB.hisobotlar = myRepDue ? "!" : r === "ceo" ? (toGrade().length || "") : (toReview || "");
       if (r === "asoschi" || rhKindOf(S.me)) {
         const tdy = today(); const mineRh = (S.creps || []).filter(x => x.report_date === tdy);
-        items.push({ id: "rahbar-hisobot", label: r === "asoschi" ? "Rahbarlar hisoboti" : "Rahbarga hisobot", icon: "report",
-          badge: r === "asoschi" ? (mineRh.length || "") : (!mineRh.some(x => x.ceo_id === S.me.id) && dowOf(tdy) <= 6 ? "!" : "") });
+        GB["rahbar-hisobot"] = r === "asoschi" ? (mineRh.filter(x => !seenRec("crep", x.ceo_id + "|" + x.report_date, S.me.id)).length || "") : (!mineRh.some(x => x.ceo_id === S.me.id) && dowOf(tdy) <= 6 ? "!" : "");
       }
+      const gbs = Object.values(GB).filter(Boolean);
+      items.push({ id: "hisob-reyting", href: grpTabs()[0].id, label: "Hisobot va reyting", icon: "report", badge: gbs.includes("!") ? "!" : (gbs.reduce((a, x) => a + (+x || 0), 0) || "") });
       items.push({ id: "reja", label: "Haftalik reja", icon: "meet" });
       items.push({ id: "statistika", label: "Statistika", icon: "pie", sec: "Tahlil" });
       if (canIntzStat()) items.push({ id: "intizomiy-tahlil", label: "Intizomiy tahlil", icon: "chart" });
       if (canMetAdmin()) items.push({ id: "oqituvchilar", label: "O'qituvchilar", icon: "chart", badge: longUnseen().length || "" });
       if (canPlan()) items.push({ id: "oylik-reja", label: "Oylik reja", icon: "meet", badge: planBadge() || "" });
-      if (r === "asoschi" || (r === "ceo" && S.crVisible)) items.push({ id: "rahbar-reyting", label: r === "asoschi" ? "Rahbarlar reytingi" : "Mening reytingim", icon: "trophy" });
-      if (!isPersonal(S.me)) items.push({ id: "kpi", label: "KPI va reyting", icon: "trophy" });
     }
     if (r === "asoschi") items.push({ id: "xodimlar", label: "Foydalanuvchilar", icon: "users", sec: "Jamoa" });
     if (r === "ceo") items.push({ id: "xodimlar", label: "Jamoam", icon: "users", sec: "Jamoa" });
@@ -2464,27 +2482,46 @@ window.METODISTLAR = [
     return items;
   }
   const route = () => (location.hash.replace(/^#\/?/, "") || "bosh").split("?")[0];
-  const navHtml = (items, cur) => items.map(i => `${i.sec ? `<div class="nav-sec">${esc(i.sec)}</div>` : ""}<a href="#/${i.id}" class="${i.id === cur ? "active" : ""}">${ic(i.icon)}<span>${esc(i.label)}</span>${i.badge ? `<span class="badge">${i.badge}</span>` : ""}</a>`).join("");
+  const navHtml = (items, cur) => items.map(i => `${i.sec ? `<div class="nav-sec">${esc(i.sec)}</div>` : ""}<a href="#/${i.href || i.id}" class="${i.id === cur ? "active" : ""}">${ic(i.icon)}<span>${esc(i.label)}</span>${i.badge ? `<span class="badge">${i.badge}</span>` : ""}${i.badge2 ? `<span class="badge soft" title="${esc(i.b2t || "")}">✓${i.badge2}</span>` : ""}</a>`).join("");
+  // Hisobot va reyting: xodimlar/rahbarlar hisoboti va reytingi bitta bo'limda, yuqoridagi tablar orqali o'tiladi
+  function grpTabs() {
+    if (!S.me || !isStaff()) return [];
+    const r = S.me.role, out = [];
+    out.push({ id: "hisobotlar", label: r === "asoschi" ? "Xodimlar hisoboti" : r === "ceo" ? "Jamoam hisobotlari" : isSelfReporter(S.me) ? "Kunlik hisobotim" : "Kunlik baholarim" });
+    if (r === "asoschi" || rhKindOf(S.me)) out.push({ id: "rahbar-hisobot", label: r === "asoschi" ? "Rahbarlar hisoboti" : "Rahbarga hisobot" });
+    if (!isPersonal(S.me)) out.push({ id: "kpi", label: r === "xodim" ? "KPI va reytingim" : "Xodimlar reytingi" });
+    if (r === "asoschi" || (r === "ceo" && S.crVisible)) out.push({ id: "rahbar-reyting", label: r === "asoschi" ? "Rahbarlar reytingi" : "Mening reytingim" });
+    return out;
+  }
+  const grpOf = id => grpTabs().some(t => t.id === id);
+  const navCur = cur => grpOf(cur) ? "hisob-reyting" : cur;
+  const curRoute = () => { const c = route(); return c === "topshiriqlar" || c === "eslatmalar" ? "masalalar" : c; };
+  function drawPage(page, cur) {
+    if (!grpOf(cur)) { if (!navItems().some(i => i.id === cur)) cur = "bosh"; return (PAGES[cur] || PAGES.bosh)(page); }
+    const tabs = grpTabs(); const badges = S._grpBadges || {};
+    page.innerHTML = `<div class="tabs grp-tabs">${tabs.map(t => `<a href="#/${t.id}" class="${t.id === cur ? "active" : ""}">${esc(t.label)}${badges[t.id] ? ` <span class="badge">${badges[t.id]}</span>` : ""}</a>`).join("")}</div><div id="grp-body"></div>`;
+    return PAGES[cur]($("#grp-body", page));
+  }
   function updateNav() {
     const nav = $(".nav"); if (!nav || !S.me) return;
-    let cur = route(); const items = navItems(); if (!items.some(i => i.id === cur)) cur = "bosh";
-    nav.innerHTML = navHtml(items, cur);
+    let cur = route(); const items = navItems(); if (!items.some(i => i.id === cur) && !grpOf(cur)) cur = "bosh";
+    nav.innerHTML = navHtml(items, navCur(cur));
     $$(".nav a").forEach(a => a.addEventListener("click", () => { S.navOpen = false; }));
   }
 
   function render() {
-    closeModal();
+    S._rendering = true; closeModal(); S._rendering = false; if (S.ui) S.ui.seenDirty = false;
     if (!S.me) return renderLogin();
     if (S.me.role === "kutilmoqda") return renderPending();
     const items = navItems();
     let cur = route();
     if (cur === "topshiriqlar" || cur === "eslatmalar") { S.ui.pcat = "te"; S.ui.teTab = cur === "topshiriqlar" ? "t" : "e"; history.replaceState(null, "", "#/masalalar"); cur = "masalalar"; }
-    if (!items.some(i => i.id === cur)) cur = "bosh";
+    if (!items.some(i => i.id === cur) && !grpOf(cur)) cur = "bosh";
     app.innerHTML = `
       <div class="shell">
         <aside class="sidebar ${S.navOpen ? "open" : ""}">
           <div class="brand"><div class="brand-mark"></div><div><div class="brand-name">REGISTON</div><div class="brand-sub">Monitoring bo'limi</div></div></div>
-          <nav class="nav">${navHtml(items, cur)}</nav>
+          <nav class="nav">${navHtml(items, navCur(cur))}</nav>
           <a class="me-mini" href="#/profil">${avatar(S.me.full_name, photoOf(S.me))}<div style="min-width:0"><div class="name">${esc(S.me.full_name || "")}</div><div class="ttl">${esc(titleOf(S.me))}</div></div></a>
         </aside>
         <div class="main">
@@ -2507,7 +2544,7 @@ window.METODISTLAR = [
     $(".main").addEventListener("click", e => { if (S.navOpen && !e.target.closest("#menu-btn")) { S.navOpen = false; $(".sidebar").classList.remove("open"); } });
     const rd = $("#reset-demo"); if (rd) rd.onclick = async () => { await db.resetDemo(); await refresh(); toast("Demo ma'lumotlar tiklandi"); render(); };
     const page = $("#page");
-    (PAGES[cur] || PAGES.bosh)(page);
+    drawPage(page, cur);
     dueBanner();
     const hlPages = cur === "masalalar" ? ["masalalar", "topshiriqlar", "eslatmalar"] : [cur];
     const hl = isStaff() ? lessonsFor(S.me).filter(l => (l.pages || []).some(x => hlPages.includes(x))) : [];
@@ -3668,6 +3705,26 @@ window.METODISTLAR = [
 
   // ---- Masalalar: topshiriqlar, eslatmalar va masalalar bitta joyda
   const POST_CATS = Object.entries(PCATS).filter(([k]) => k !== "topshiriq_eslatma");
+  // Kategoriya yonidagi belgi: ko'k doira — faqat O'QILMAGANLAR soni; o'qilgandan keyin yo'qoladi. Kulrang matn — ochiq (hal qilinmagan) masalalar
+  function mzTail(k) {
+    if (k === "te") { const n = unseenMine().length; const act = S.tasks.filter(t => (S.me.role !== "xodim" || t.assigned_to === S.me.id) && (ACTIVE_T.includes(t.status) || t.status === "bajarildi")).length;
+      return n ? `<span class="badge">${n}</span>` : act ? `<span class="small muted">${act} faol</span>` : ""; }
+    if (k === "metodistlar") { const mp = metPending().length, bn = (S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length;
+      return mp ? `<span class="badge">${mp}</span>` : bn ? `<span class="small muted">${bn} bron</span>` : ""; }
+    const nw = S.posts.filter(p => (!k || p.category === k) && isNewForMe("post", p)).length;
+    const op = S.posts.filter(p => (!k || p.category === k) && p.status !== "hal_qilindi").length;
+    return nw ? `<span class="new-dot">${nw}</span>` : op ? `<span class="small muted">${op} ochiq</span>` : "";
+  }
+  // Ro'yxatda ko'rsatilgan (ekranda o'qilgan) yangi masala, topshiriq va eslatmalar 1,5 soniyadan keyin «ko'rildi» bo'ladi
+  function mzAutoSeen(page) {
+    if (curRoute() !== "masalalar" || !page.isConnected) return;
+    const ks = { post: "data-post", task: "data-task", dtask: "data-dt" }; let n = 0;
+    Object.entries(ks).forEach(([kind, at]) => $$(`#mz-body .unseen[${at}]`, page).forEach(el => { const raw = el.getAttribute(at); const id = isNaN(+raw) ? raw : +raw;
+      const x = kind === "post" ? S.posts.find(q => q.id === id) : kind === "task" ? S.tasks.find(q => q.id === id) : S.dtasks.find(q => q.id === id);
+      if (x && isNewForMe(kind, x)) { markSeen(kind, x.id); n++; } }));
+    if (!n) return; S.ui.seenDirty = false;
+    $$("[data-tail]", page).forEach(el => { el.innerHTML = mzTail(el.dataset.tail); });
+  }
   PAGES.masalalar = page => {
     if (!isStaff()) return PAGES.bosh(page);
     const cat = S.ui.pcat ?? "te";
@@ -3683,15 +3740,15 @@ window.METODISTLAR = [
     page.innerHTML = head("Masalalar", mgr ? "Topshiriqlar, eslatmalar va masalalar — bitta joyda. Har bir xodim ko'rgani va bajargani ko'rinib turadi." : "Sizga kelgan topshiriq va eslatmalar hamda bo'lim masalalari — bitta joyda.", `<div class="row" style="gap:8px">${right}</div>`) + `
       <div class="posts-layout">
         <div class="card cat-list">
-          <button class="cat-row te-row ${cat === "te" ? "active" : ""}" data-cat="te"><div class="cat-dot" style="background:#8e4ec6">✓</div><span>${S.me.role === "xodim" ? "Topshiriq va eslatmalarim" : "Topshiriqlar va eslatmalar"}</span><span class="spacer"></span>${teBadge ? `<span class="badge">${teBadge}</span>` : teActive ? `<span class="small muted">${teActive}</span>` : ""}</button>
+          <button class="cat-row te-row ${cat === "te" ? "active" : ""}" data-cat="te"><div class="cat-dot" style="background:#8e4ec6">✓</div><span>${S.me.role === "xodim" ? "Topshiriq va eslatmalarim" : "Topshiriqlar va eslatmalar"}</span><span class="spacer"></span><span data-tail="te">${mzTail("te")}</span></button>
           <div class="cat-sep"></div>
-          <button class="cat-row ${cat === "" ? "active" : ""}" data-cat=""><div class="cat-dot" style="background:var(--brand)">≡</div><span>Barcha masalalar</span><span class="spacer"></span>${newIn("") ? `<span class="new-dot">${newIn("")}</span>` : `<span class="small muted">${S.posts.filter(p => p.status !== "hal_qilindi").length}</span>`}</button>
-          ${POST_CATS.map(([k, [label]]) => `<button class="cat-row ${cat === k ? "active" : ""}" data-cat="${k}">${catBadge(k, 30)}<span>${esc(label)}</span><span class="spacer"></span>${k === "metodistlar" ? (metPending().length ? `<span class="badge">${metPending().length}</span>` : (S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length ? `<span class="small muted">${(S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length} bron</span>` : "")
-            : newIn(k) ? `<span class="new-dot">${newIn(k)}</span>` : counts(k) ? `<span class="small muted">${counts(k)}</span>` : ""}</button>`).join("")}
+          <button class="cat-row ${cat === "" ? "active" : ""}" data-cat=""><div class="cat-dot" style="background:var(--brand)">≡</div><span>Barcha masalalar</span><span class="spacer"></span><span data-tail="">${mzTail("")}</span></button>
+          ${POST_CATS.map(([k, [label]]) => `<button class="cat-row ${cat === k ? "active" : ""}" data-cat="${k}">${catBadge(k, 30)}<span>${esc(label)}</span><span class="spacer"></span><span data-tail="${k}">${mzTail(k)}</span></button>`).join("")}
         </div>
         <div id="mz-body"></div>
       </div>`;
     $$("[data-cat]", page).forEach(b => b.onclick = () => { S.ui.pcat = b.dataset.cat; PAGES.masalalar(page); });
+    clearTimeout(S._mzSeenT); S._mzSeenT = setTimeout(() => mzAutoSeen(page), 1500);
     if ($("#new-post", page)) $("#new-post", page).onclick = () => postForm();
     if ($("#new-task", page)) $("#new-task", page).onclick = () => taskForm();
     if ($("#new-dt", page)) $("#new-dt", page).onclick = () => dtForm();
@@ -4310,7 +4367,7 @@ window.METODISTLAR = [
     { k: "tezlik", l: "Xodimlar hisobotini baholash tezligi", max: 15, d: "Xodim hisobotlarining 24 soat ichida baholangan ulushi" },
     { k: "oz", l: "O'z rahbar hisobotini vaqtida yuborishi", max: 15, d: "«Rahbarga hisobot» — ish kunlari bo'yicha, o'sha kuni yoki ertasi kuni" },
     { k: "natija", l: "Bo'lim natijasi", max: 25, d: "Akademik: oylik reja bajarilishi (3 / bog'cha 4). Intizomiy: holatlar hal qilinishi (70%) va takrorlar kamligi (30%)" },
-    { k: "topshiriq", l: "Topshiriqlar muddatida bajarilishi", max: 10, d: "Rahbarga va bo'lim xodimlariga berilgan, muddati shu oyga tushgan topshiriqlar" },
+    { k: "topshiriq", l: "Topshiriqlar muddatida bajarilishi", max: 10, d: "Rahbarga va bo'lim xodimlariga berilgan, muddati shu oyga tushgan topshiriq va eslatmalar (muddatsizi — 3 kun ichida). Bajarilishi bilan ball darhol o'zgaradi" },
     { k: "asoschi", l: "Monitoring bo'limi rahbari bahosi", max: 15, d: "Oyda bir marta qo'yiladi" }];
   const crStart = () => KPI_ANCHOR;
   const crDesc = (it, c) => it.k !== "natija" ? it.d : deptOf(c) === "akademik" ? "Oylik reja bajarilishi (har ustoz 3, bog'cha 4 marta) — bugungacha kutilgan sur'atga nisbatan" : "Holatlar hal qilinishi (70%) va takrorlar kamligi (30%)";
@@ -4322,11 +4379,13 @@ window.METODISTLAR = [
     const mem = S.profiles.filter(p => p.role === "xodim" && p.ceo_id === c.id && p.active);
     const memIds = new Set(mem.map(p => p.id));
     const repMap = {}; ctx.reps.forEach(r => { repMap[r.author_id + "|" + r.report_date] = r; });
+    const absC = absOfCreps(ctx.creps); const absent = (id, d) => absC.has(id + "|" + d) || isAbsent(id, d);
     const R = {};
-    // 1) hisobot intizomi
-    { let tot = 0, on = 0; mem.forEach(p => { for (let d = from; d <= upto; d = addD(d, 1)) { if (!isWorkdayOn(p, d) || (p.start_date && d < p.start_date)) continue; tot++;
+    // 1) hisobot intizomi — kelmagan (rahbar belgilagan) va ta'tildagi kunlar rahbarga ta'sir qilmaydi
+    { let tot = 0, on = 0, ab = 0; mem.forEach(p => { for (let d = from; d <= upto; d = addD(d, 1)) { if (!isWorkdayOn(p, d) || (p.start_date && d < p.start_date)) continue;
+        if (absent(p.id, d) && !(repMap[p.id + "|" + d] && isWritten(repMap[p.id + "|" + d]))) { ab++; continue; } tot++;
         const r = repMap[p.id + "|" + d]; if (r && isWritten(r) && localOf(r.created_at || r.updated_at) <= addD(d, 1)) on++; } });
-      R.intizom = tot ? { r: on / tot, why: `${on} / ${tot} ish kuni vaqtida` } : { r: null, why: "ish kunlari hali yo'q" }; }
+      R.intizom = tot ? { r: on / tot, why: `${on} / ${tot} ish kuni vaqtida${ab ? ` · ${ab} kelmagan kun hisobga olinmadi` : ""}` } : { r: null, why: "ish kunlari hali yo'q" }; }
     // 2) baholash tezligi
     { let n = 0, g = 0; const now = Date.now();
       ctx.reps.forEach(r => { if (!memIds.has(r.author_id) || r.report_date < from || r.report_date > me || !isWritten(r)) return;
@@ -4349,11 +4408,8 @@ window.METODISTLAR = [
       else R.natija = { r: null, why: "holatlar kiritilmagan" };
     }
     // 5) topshiriqlar
-    { const ids = new Set([c.id, ...memIds]); let n = 0, g = 0;
-      (S.tasks || []).forEach(x => { if (!ids.has(x.assigned_to) || !x.due_date || x.due_date < ms || x.due_date > me) return;
-        const done = ["bajarildi", "yopildi"].includes(x.status);
-        if (done) { n++; if (localOf(x.updated_at || x.created_at) <= x.due_date) g++; } else if (x.due_date < t) n++; });
-      R.topshiriq = n ? { r: g / n, why: `${g} / ${n} topshiriq muddatida` } : { r: null, why: "muddati shu oyga tushgan topshiriq yo'q" }; }
+    { const ids = new Set([c.id, ...memIds]); const T = taskScore(x => ids.has(x), ms, me);
+      R.topshiriq = T.n ? { r: T.g / T.n, why: `${rnd(T.g)} / ${T.n} topshiriq va eslatma muddatida` } : { r: null, why: "shu oyga tushgan topshiriq yo'q" }; }
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
@@ -4361,6 +4417,20 @@ window.METODISTLAR = [
     const av = items.filter(x => x.v !== null), sum = rnd(av.reduce((a, x) => a + x.v, 0)), maxA = av.reduce((a, x) => a + x.it.max, 0);
     const final = maxA ? rnd(sum / maxA * 100) : null;
     return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: R.asoschi.r === null, members: mem.length };
+  }
+  // Topshiriq va eslatmalarni muddatida bajarish (0..1 ball har biriga). Muddatsiz topshiriq — 3 kun ichida.
+  const doneDay = x => localOf(x.done_at || x.updated_at || x.created_at);
+  function taskScore(isMine, from, to) {
+    const t = today(); let n = 0, g = 0;
+    (S.tasks || []).forEach(x => { if (!isMine(x.assigned_to) || x.created_by === x.assigned_to) return;
+      const due = x.due_date || addD(localOf(x.created_at), 3); if (due < from || due > to) return;
+      const done = ["bajarildi", "yopildi"].includes(x.status);
+      if (done) { n++; g += doneDay(x) <= due ? 1 : 0.5; } else if (due < t) n++; });
+    (S.dtasks || []).forEach(x => { const due = x.due_date || addD(localOf(x.created_at), 3); if (due < from || due > to) return;
+      recipientsOf(x).filter(p => isMine(p.id)).forEach(p => { const st = dtStatus(x, p);
+        if (st.status === "bajarildi" || (st.self_done && st.status !== "bajarilmadi")) { n++; g += 1; }
+        else if (st.status === "bajarilmadi" || due < t) n++; }); });
+    return { n, g };
   }
   async function crLoad(ms) {
     const pms = mStart(addD(ms, -1)), me = mEndOf(ms);
@@ -4535,8 +4605,12 @@ window.METODISTLAR = [
     return cd === addD(d, 1) ? 0.5 : 0;
   }
   // Ishga kelganlik: shu kuni hisobot yozgan yoki portalda faol bo'lgan bo'lsa — keldi (1). Aks holda — null: kelmagan/kechikkanga rahbar o'zi ball qo'yadi
+  // Bo'lim rahbari «Bugun kelmadi» deb belgilagan kun (rahbarga hisobotdan)
+  const isAbsent = (uid, d) => !!(S.abs && S.abs.has(uid + "|" + d));
+  const absOfCreps = creps => { const out = new Set(); (creps || []).forEach(c => ((c.data && c.data.staff) || []).forEach(x => { if (x && x.absent) out.add(x.id + "|" + String(c.report_date).slice(0, 10)); })); return out; };
   function keldiDay(p, d, reps) {
     if (!isWorkdayOn(p, d) || d < KPI_ANCHOR || d > today()) return null;
+    if (isAbsent(p.id, d)) return 0;
     const r = repFind(p, d, reps);
     const came = (r && isWritten(r)) || actSet().has(p.id + "|" + d) || (S.views || []).some(v => v.user_id === p.id && localOf(v.seen_at) === d);
     return came ? 1 : null;
@@ -4549,9 +4623,8 @@ window.METODISTLAR = [
     if (k === "topsh") {
       const mine = (S.tasks || []).filter(x => x.assigned_to === p.id && x.created_by !== p.id);
       // A) muddatida bajarish
-      const A = []; mine.forEach(x => { if (!x.due_date || x.due_date < from || x.due_date > upto) return;
-        const done = ["bajarildi", "yopildi"].includes(x.status);
-        if (done) { const dd = localOf(x.done_at || x.updated_at || x.created_at); A.push(dd <= x.due_date ? 1 : 0.5); } else if (x.due_date < t) A.push(0); });
+      const A = []; const TS = taskScore(id => id === p.id, from, upto); for (let i = 0; i < TS.n; i++) A.push(i < TS.g ? 1 : 0);
+      if (TS.n && TS.g % 1) A[Math.floor(TS.g)] = TS.g % 1;
       // B) yangi topshiriqni ochish tezligi, C) «jarayonda»ga o'tkazish tezligi
       const B = [], C = [], now = Date.now();
       mine.forEach(x => { const cd = localOf(x.created_at); if (cd < from || cd > to) return; const c0 = new Date(x.created_at).getTime();
@@ -4613,8 +4686,8 @@ window.METODISTLAR = [
   function autoWhy(p, it, lvl, d, reps) {
     const [f, to] = lvl === "kun" ? [d, d] : lvl === "hafta" ? [d, addD(d, 6)] : [d, addD(d, 13)];
     if (AUTO_WIN.has(it.auto)) { const r = autoWin(p, it, f, to, reps); return r ? r.why : "Ma'lumot yo'q"; }
-    if (it.auto === "keldi") { let c = 0, n = 0; for (let x = f; x <= to; x = addD(x, 1)) { if (!isWorkdayOn(p, x) || x < KPI_ANCHOR || x > today()) continue; keldiDay(p, x, reps) ? c++ : n++; }
-      return `Ishga kelgan kun — to'liq ball: ${c} kun${n ? ` · kelmagan / ma'lumot yo'q: ${n} kun — ballni rahbar o'zi qo'yadi` : ""}. Kechikkan kuni ballni rahbar o'zi qo'yadi`; }
+    if (it.auto === "keldi") { let c = 0, n = 0, a = 0; for (let x = f; x <= to; x = addD(x, 1)) { if (!isWorkdayOn(p, x) || x < KPI_ANCHOR || x > today()) continue; const k = keldiDay(p, x, reps); k ? c++ : k === 0 ? a++ : n++; }
+      return `Ishga kelgan kun — to'liq ball: ${c} kun${a ? ` · rahbar «kelmadi» deb belgilagan: ${a} kun — 0 ball` : ""}${n ? ` · ma'lumot yo'q: ${n} kun — ballni rahbar o'zi qo'yadi` : ""}. Kechikkan kuni ballni rahbar o'zi qo'yadi`; }
     if (it.auto === "vaqt") { const v = []; for (let x = f; x <= to; x = addD(x, 1)) { const s = vaqtDay(p, x, reps); if (s !== null) v.push(s); }
       return v.length ? `${v.length} ish kuni: 18:00 gacha — ${v.filter(x => x === 1).length}, kechroq — ${v.filter(x => x === 0.75).length}, ertasi kuni — ${v.filter(x => x === 0.5).length}, yo'q — ${v.filter(x => x === 0).length}` : "Ish kuni yo'q"; }
     if (it.auto === "rejamos" || (it.auto === "reja" && deptOf(p) === "akademik")) { let ok = 0, bad = 0; for (let x = f; x <= to; x = addD(x, 1)) { const m = planMatch(p, x, repFind(p, x, reps)); if (m) m.ok ? ok++ : bad++; }
@@ -5259,7 +5332,8 @@ window.METODISTLAR = [
   function markSeen(kind, id) {
     if (!S.me || !isStaff() || seenRec(kind, id, S.me.id)) return;
     S.views.push({ kind, item_id: String(id), user_id: S.me.id, seen_at: new Date().toISOString(), _local: true });
-    db.markSeen && db.markSeen(kind, String(id)).catch(() => {});
+    db.markSeen && db.markSeen(kind, String(id)).catch(() => { setTimeout(() => db.markSeen(kind, String(id)).catch(() => {}), 4000); });
+    S.ui.seenDirty = true;
     setTimeout(() => { updateNav(); dueBanner(); }, 0);
   }
   function seenTag(kind, id, uid, long) {
@@ -5405,7 +5479,7 @@ window.METODISTLAR = [
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, d: "Davomat, ichki tartib, xolis aloqa, kiyinish qoidalari" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Tasdiqlangan taklif yoki jarayonni yaxshilashga dalilli hissa" }] },
     intizomiy: { title: "Intizomiy nazorat xodimlari", items: [
-      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, auto: "keldi", d: "Ishga kelgan kun — to'liq ball. Kechikib kelgan yoki kelmagan xodimga avtomatik ball qo'yilmaydi — bo'lim rahbari ballni o'zi qo'yadi" },
+      { k: "vaqt", l: "Ishga o'z vaqtida kelishi va ketishi", s: "Vaqt", max: 10, auto: "keldi", d: "Ishga kelgan kun — to'liq ball. Bo'lim rahbari «kelmadi» deb belgilagan kun — 0 (faqat shu xodimning o'ziga ta'sir qiladi). Kechikib kelgan kuni ballni rahbar o'zi qo'yadi" },
       { k: "soni", l: "Topilgan muammolar soni", s: "Soni", max: 20, hint: "posts", auto: "soni", d: "Avtomatik: holatlar soni va og'irligi — yengil 1, o'rta 2, bo'lim rahbari tasdiqlagan jiddiy 4 ball; ish kuniga 6 ball — to'liq. Rahbar o'zgartira oladi" },
       { k: "sifat", l: "Topilgan muammolar sifati", s: "Sifat", max: 30, auto: "sifat", d: "Avtomatik: to'liq yozilgan holatlar ulushi (turi, joyi, kim bilan bog'liq, og'irligi, natijasi va aniq izoh). Rahbar o'zgartira oladi" },
       { k: "etika", l: "Umumjamoaviy etika va xulq odobi, kiyinish odobi va tashqi ko'rinish", s: "Etika", max: 10, d: "Jamoadagi muomala, xulq-odob, kiyinish qoidalari va tashqi ko'rinish" },
@@ -5502,7 +5576,7 @@ window.METODISTLAR = [
   // Kunlik: CEO qo'ygani; bo'lmasa "Reja" — shu kungi hisobot bahosidan
   function dayAuto(p, it, d, reps) {
     if (it.auto === "vaqt") { const x = vaqtDay(p, d, reps); return x === null ? null : rnd(x * it.max); }
-    if (it.auto === "keldi") return keldiDay(p, d, reps) ? it.max : null;
+    if (it.auto === "keldi") { const k = keldiDay(p, d, reps); return k === null ? null : k ? it.max : 0; }
     if (it.auto === "rejamos") { const pm = planMatch(p, d, repFind(p, d, reps)); return pm ? (pm.ok ? it.max : 0) : null; }
     if (AUTO_WIN.has(it.auto)) { const w = autoWin(p, it, d, d, reps); return w ? w.v : null; }
     if (it.auto !== "reja") return null;
@@ -5760,6 +5834,7 @@ window.METODISTLAR = [
     const isA = S.me.role === "asoschi";
     const kind = rhKindOf(S.me);
     if (!isA && !kind) return PAGES.bosh(page);
+    if (isA) { (S.creps || []).filter(x => x.report_date === today()).forEach(x => markSeen("crep", x.ceo_id + "|" + x.report_date)); S.ui.seenDirty = false; }
     const tab = isA ? "jamlanma" : (S.ui.rhTab || "yozish");
     page.innerHTML = head(isA ? "Rahbarlar hisoboti" : "Rahbarga hisobot",
       isA ? "Bo'lim rahbarlarining har kungi hisoboti va xodimlar bo'yicha haftalik, 2 haftalik, oylik va yillik jamlanma."
@@ -6163,7 +6238,7 @@ window.METODISTLAR = [
       </div>`;
     const label = rhLabel(lvl, from, to);
     $$("[data-rs]", root).forEach(el => el.onclick = () => rhStaffModal(el.dataset.rs, kind, reps, label));
-    $$("[data-rd]", root).forEach(el => el.onclick = () => { S.ui.rhLvl = "kun"; S.ui.rhAnchor = el.dataset.rd; PAGES["rahbar-hisobot"]($("#page")); });
+    $$("[data-rd]", root).forEach(el => el.onclick = () => { S.ui.rhLvl = "kun"; S.ui.rhAnchor = el.dataset.rd; drawPage($("#page"), "rahbar-hisobot"); });
     $$("[data-rb]", root).forEach(el => el.onclick = () => { const n = el.dataset.rb; const B = BR[n];
       openModal(`${esc(n)} — masalalar`, `<p class="small muted" style="margin-top:0">${esc(label)} · ${B.posts} ta post, ${B.obs} ta kuzatuv</p>
         ${B.issues.length ? `<div class="table-wrap"><table><thead><tr><th>Sana</th><th>Masala</th></tr></thead><tbody>${B.issues.map(i => `<tr><td class="small" style="white-space:nowrap">${fmtDate(i.d)}</td><td>${esc(i.t)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Masala kiritilmagan</div>`}`); });
