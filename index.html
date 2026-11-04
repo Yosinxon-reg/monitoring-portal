@@ -4439,7 +4439,7 @@ window.METODISTLAR = [
     { k: "tezlik", l: "Xodimlar hisobotini baholash tezligi", max: 15, d: "Xodim hisobotlarining 24 soat ichida baholangan ulushi" },
     { k: "oz", l: "O'z rahbar hisobotini vaqtida yuborishi", max: 15, d: "«Rahbarga hisobot» — ish kunlari bo'yicha, o'sha kuni yoki ertasi kuni" },
     { k: "natija", l: "Bo'lim natijasi", max: 25, d: "Akademik: oylik reja bajarilishi (3 / bog'cha 4). Intizomiy: holatlar hal qilinishi (70%) va takrorlar kamligi (30%)" },
-    { k: "topshiriq", l: "Topshiriqlar muddatida bajarilishi", max: 10, d: "Rahbarga va bo'lim xodimlariga berilgan, muddati shu oyga tushgan topshiriq va eslatmalar (muddatsizi — 3 kun ichida). Bajarilishi bilan ball darhol o'zgaradi" },
+    { k: "topshiriq", l: "Topshiriqlar muddatida bajarilishi", max: 10, d: "Rahbarga va bo'lim xodimlariga SHU OYDA berilgan topshiriq va eslatmalar (muddatsizi — 3 kun ichida). Keyingi oyga o'tmaydi; bajarilishi bilan ball darhol o'zgaradi" },
     { k: "asoschi", l: "Monitoring bo'limi rahbari bahosi", max: 15, d: "Oyda bir marta qo'yiladi" }];
   const crStart = () => KPI_ANCHOR;
   const crDesc = (it, c) => it.k !== "natija" ? it.d : deptOf(c) === "akademik" ? "Oylik reja bajarilishi (har ustoz 3, bog'cha 4 marta) — bugungacha kutilgan sur'atga nisbatan" : "Holatlar hal qilinishi (70%) va takrorlar kamligi (30%)";
@@ -4481,7 +4481,7 @@ window.METODISTLAR = [
     }
     // 5) topshiriqlar
     { const ids = new Set([c.id, ...memIds]); const T = taskScore(x => ids.has(x), ms, me);
-      R.topshiriq = T.n ? { r: T.g / T.n, why: `${rnd(T.g)} / ${T.n} topshiriq va eslatma muddatida` } : { r: null, why: "shu oyga tushgan topshiriq yo'q" }; }
+      R.topshiriq = T.n ? { r: T.g / T.n, why: `${rnd(T.g)} / ${T.n} topshiriq va eslatma muddatida` } : { r: null, why: "shu oyda berilgan topshiriq yo'q" }; }
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
@@ -4491,14 +4491,16 @@ window.METODISTLAR = [
     return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: R.asoschi.r === null, members: mem.length };
   }
   // Topshiriq va eslatmalarni muddatida bajarish (0..1 ball har biriga). Muddatsiz topshiriq — 3 kun ichida.
+  // Har bir topshiriq faqat o'zi BERILGAN oy (KPI davri) hisobiga kiradi — keyingi oyga o'tmaydi.
   const doneDay = x => localOf(x.done_at || x.updated_at || x.created_at);
   function taskScore(isMine, from, to) {
     const t = today(); let n = 0, g = 0;
     (S.tasks || []).forEach(x => { if (!isMine(x.assigned_to) || x.created_by === x.assigned_to) return;
-      const due = x.due_date || addD(localOf(x.created_at), 3); if (due < from || due > to) return;
+      const cd = localOf(x.created_at); if (cd < from || cd > to) return; // topshiriq faqat BERILGAN oyiga (davriga) ta'sir qiladi
+      const due = x.due_date || addD(cd, 3);
       const done = ["bajarildi", "yopildi"].includes(x.status);
       if (done) { n++; g += doneDay(x) <= due ? 1 : 0.5; } else if (due < t) n++; });
-    (S.dtasks || []).forEach(x => { const due = x.due_date || addD(localOf(x.created_at), 3); if (due < from || due > to) return;
+    (S.dtasks || []).forEach(x => { const cd = localOf(x.created_at); if (cd < from || cd > to) return; const due = x.due_date || addD(cd, 3);
       recipientsOf(x).filter(p => isMine(p.id)).forEach(p => { const st = dtStatus(x, p);
         if (st.status === "bajarildi" || (st.self_done && st.status !== "bajarilmadi")) { n++; g += 1; }
         else if (st.status === "bajarilmadi" || due < t) n++; }); });
