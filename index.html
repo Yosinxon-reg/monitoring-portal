@@ -1094,7 +1094,11 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
     for (var i = 0; i < ATTRS.length; i++) { var v = el.getAttribute(ATTRS[i]); if (v) { var y = yA(v); if (y !== v) el.setAttribute(ATTRS[i], y); } }
     if (el.tagName === "INPUT" && /^(button|submit|reset)$/i.test(el.type || "")) { var b = el.value, yb = yA(b); if (yb !== b) el.value = yb; }
   }
-  function txt(n) { var v = n.data, y = yA(v); if (y !== v) n.data = y; }
+  // <option> ning qiymati (value) ko'rsatilmagan bo'lsa — matni qiymat bo'ladi. Matn o'girilganda qiymat o'zgarib, bazaga yangi harflar
+  // bilan tushmasligi uchun asl matnni value'ga yozib qo'yamiz (2026-11-04 tuzatish: filial va holat turlari «Fağona», «Çilonzor» bo'lib qolardi)
+  function txt(n) { var v = n.data, y = yA(v); if (y === v) return; var p = n.parentNode;
+    if (p && p.tagName === "OPTION" && !p.hasAttribute("value")) p.setAttribute("value", p.textContent);
+    n.data = y; }
   function skipped(n) {
     for (var e = n.nodeType === 1 ? n : n.parentNode; e && e.nodeType === 1; e = e.parentNode)
       if (SKIPTAG[e.tagName] || e.isContentEditable || e.hasAttribute("data-noalif")) return true;
@@ -1755,6 +1759,11 @@ window.LESSONS = [
     // Supabase bir so'rovda ko'pi bilan 1000 qator qaytaradi — qolganlari jimgina tushib qolardi. Sahifalab hammasini olamiz.
     const PG = 1000;
     async function pageAll(mk) { const out = []; for (let i = 0; i < 200000; i += PG) { const rows = chk(await mk().range(i, i + PG - 1)) || []; out.push(...rows); if (rows.length < PG) break; } return out; }
+    // Yangi alifbo harflari (ğ, ç, ş, ö) bilan saqlanib qolgan filial/holat qiymatlarini eski shaklga keltiramiz
+    const E = v => typeof v === "string" && window.alifEski ? window.alifEski(v) : v;
+    const normIss = l => Array.isArray(l) ? l.map(h => h && typeof h === "object" ? { ...h, filial: E(h.filial), type: E(h.type), place: E(h.place), who: E(h.who) } : h) : l;
+    const normRep = r => { if (r && r.data && typeof r.data === "object") { const d = { ...r.data }; if (d.issues) d.issues = normIss(d.issues); if (d.own_issues) d.own_issues = normIss(d.own_issues); if (Array.isArray(d.filials)) d.filials = d.filials.map(E);
+        if (Array.isArray(d.rows)) d.rows = d.rows.map(x => x && typeof x === "object" ? { ...x, filial: E(x.filial), subject: E(x.subject) } : x); r.data = d; } return r; };
     async function pageSoft(mk) { try { return await pageAll(mk); } catch (e) { return []; } }
     function trErr(m) {
       if (/Invalid login/i.test(m)) return "Login yoki parol noto'g'ri";
@@ -1822,10 +1831,10 @@ window.LESSONS = [
       async updateTask(id, patch) { return chk(await sb.from("tasks").update(patch).eq("id", id).select().single()); },
       async deleteTask(id) { chk(await sb.from("tasks").delete().eq("id", id)); return true; },
       async listReports({ from, to } = {}) {
-        return pageAll(() => { let q = sb.from("daily_reports").select("*").order("report_date", { ascending: false }).order("id");
+        return (await pageAll(() => { let q = sb.from("daily_reports").select("*").order("report_date", { ascending: false }).order("id");
           if (from) q = q.gte("report_date", from);
           if (to) q = q.lte("report_date", to);
-          return q; });
+          return q; })).map(normRep);
       },
       async saveMyReport(r) {
         const ex = chk(await sb.from("daily_reports").select("id,status,grade").eq("author_id", meCache.id).eq("report_date", r.report_date).maybeSingle());
@@ -1871,13 +1880,13 @@ window.LESSONS = [
       },
       async listSelfLogs(from, to, uid) { let q = sb.from("self_logs").select("*").gte("log_date", from).lte("log_date", to).order("log_date", { ascending: false }); if (uid) q = q.eq("user_id", uid); return chk(await q); },
       async saveSelfLog(date, body) { chk(await sb.from("self_logs").upsert({ user_id: meCache.id, log_date: date, body }, { onConflict: "user_id,log_date" })); return true; },
-      async listCeoReports(from, to) { return pageAll(() => sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date").order("ceo_id")); },
+      async listCeoReports(from, to) { return (await pageAll(() => sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date").order("ceo_id"))).map(normRep); },
       async saveCeoReport(date, kind, data, summary) {
         chk(await sb.from("ceo_reports").upsert({ report_date: date, ceo_id: meCache.id, kind, data, summary }, { onConflict: "report_date,ceo_id" })); return true;
       },
       // ---- O'qituvchilar bazasi va kuzatuvlar
-      async listTeachers(subs) { return pageAll(() => { let q = sb.from("teachers").select("*").order("full_name").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; }); },
-      async listTeacherObs(from, subs) { return pageAll(() => { let q = sb.from("teacher_obs").select("*").gte("day", from).order("day").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; }); },
+      async listTeachers(subs) { return (await pageAll(() => { let q = sb.from("teachers").select("*").order("full_name").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; })).map(t => ({ ...t, filial: E(t.filial) })); },
+      async listTeacherObs(from, subs) { return (await pageAll(() => { let q = sb.from("teacher_obs").select("*").gte("day", from).order("day").order("id"); if (subs && subs.length) q = q.in("subject", subs); return q; })).map(o => ({ ...o, filial: E(o.filial) })); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
       async listTeacherPlans() { const r = await sb.from("teacher_plan").select("*").gte("month", new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)); return r.error ? [] : r.data; },
       async setTeacherPlan(teacher_id, month, plan, note) { if (plan === null || plan === undefined) { chk(await sb.from("teacher_plan").delete().eq("teacher_id", teacher_id).eq("month", month)); return true; }
