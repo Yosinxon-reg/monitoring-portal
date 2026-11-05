@@ -7499,40 +7499,55 @@ window.METODISTLAR = [
       ${ms6.slice().reverse().map(ms => `<tr><td>${esc(mLabel(ms))}</td>${ceos.map(c => { const d = data.find(x => x.ms === ms && x.c.id === c.id); return `<td><b>${d && d.final !== null ? d.final : "—"}</b>${d && d.nat && d.nat.why ? `<div class="small muted">${esc(d.nat.why)}</div>` : ""}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
-  // ---- Takrorlanuvchi topshiriqlar
+  // ---- Takrorlanuvchi topshiriqlar (36: tahrirlash, yuborilish vaqti, bir nechta hafta kuni)
   const RULE_L = { kunlik: "Har kuni (dush–shan)", haftalik: "Har hafta", oylik: "Har oy" };
+  const recDows = r => (r.dows && r.dows.length ? r.dows : [r.dow || 1]).slice().sort();
+  const recWhen = r => `${RULE_L[r.rule]}${r.rule === "haftalik" ? ": " + recDows(r).map(d => (KUN[d] || d).toLowerCase()).join(", ") : r.rule === "oylik" ? `, ${r.dom}-sana` : ""} · soat ${esc(r.send_time || "08:00")} da boradi`;
   async function recurringView() {
     let list = []; try { list = await db.listRecurring(); } catch (e) { return toast(e.message, true); }
-    const m = openModal("🔁 Takrorlanuvchi topshiriqlar", `<p class="small muted" style="margin-top:0">Belgilangan kuni avtomatik yaratiladi va ijrochiga (Telegram ulangan bo'lsa) xabar boradi.</p>
+    const m = openModal("🔁 Takrorlanuvchi topshiriqlar", `<p class="small muted" style="margin-top:0">Belgilangan kuni va soatda avtomatik yaratiladi, ijrochiga (Telegram ulangan bo'lsa) xabar boradi. Matni, kunlari, soati va ijrochilarini istalgan payt «✏️ Tahrirlash» orqali o'zgartirasiz.</p>
       ${list.map(r => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(r.title)} ${r.active ? "" : pill("missing", "To'xtatilgan")}</div>
-        <div class="small muted">${RULE_L[r.rule]}${r.rule === "haftalik" ? ", " + (KUN[r.dow] || "dushanba") : r.rule === "oylik" ? `, ${r.dom}-sana` : ""} · muddat: +${r.due_days} kun ${esc(r.due_time)} · ${r.assignees.map(nameOf).map(esc).join(", ")}${r.last_run ? ` · oxirgi: ${fmtDate(r.last_run)}` : ""}</div></div>
-        <button class="btn sm" data-rtog="${r.id}">${r.active ? "To'xtatish" : "Yoqish"}</button><button class="btn sm bad" data-rdel="${r.id}">×</button></div>`).join("") || `<div class="empty">Hali takrorlanuvchi topshiriq yo'q</div>`}`,
+        <div class="small muted">${recWhen(r)} · muddat: +${r.due_days} kun ${esc(r.due_time)} · ${r.assignees.map(nameOf).map(esc).join(", ")}${r.last_run ? ` · oxirgi: ${fmtDate(r.last_run)}` : ""}</div></div>
+        <button class="btn sm" data-redit="${r.id}">✏️ Tahrirlash</button><button class="btn sm" data-rtog="${r.id}">${r.active ? "To'xtatish" : "Yoqish"}</button><button class="btn sm bad" data-rdel="${r.id}">×</button></div>`).join("") || `<div class="empty">Hali takrorlanuvchi topshiriq yo'q</div>`}`,
       `<button class="btn" data-close>Yopish</button><button class="btn primary" id="rc-new">+ Yangi</button>`);
     $("#rc-new", m).onclick = () => recurringForm();
+    $$("[data-redit]", m).forEach(b => b.onclick = () => recurringForm(list.find(x => x.id === +b.dataset.redit)));
     $$("[data-rtog]", m).forEach(b => b.onclick = async () => { const r = list.find(x => x.id === +b.dataset.rtog); await act(() => db.saveRecurring({ id: r.id, active: !r.active }), "Saqlandi"); recurringView(); });
     $$("[data-rdel]", m).forEach(b => b.onclick = async () => { if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "O'chirilsinmi?"; return; } await act(() => db.deleteRecurring(+b.dataset.rdel), "O'chirildi"); recurringView(); });
   }
-  function recurringForm() {
-    const people = assignable();
-    const m = openModal("Yangi takrorlanuvchi topshiriq", `<form id="rcf">
-      <div class="field"><label>Sarlavha *</label><input name="title" required maxlength="200"></div>
-      <div class="field"><label>Tavsif</label><textarea name="description" rows="3"></textarea></div>
-      <div class="grid2"><div class="field"><label>Qachon *</label><select name="rule">${Object.entries(RULE_L).map(([k, l]) => `<option value="${k}" ${k === "haftalik" ? "selected" : ""}>${l}</option>`).join("")}</select></div>
-        <div class="field" id="rc-when"></div></div>
-      <div class="grid2"><div class="field"><label>Muddat (necha kundan keyin)</label><input name="due_days" type="number" min="0" max="30" value="0"></div>
-        <div class="field"><label>Muddat vaqti</label><input name="due_time" type="time" value="18:00"></div></div>
-      <div class="grid2"><div class="field"><label>Turi</label><select name="category">${Object.entries(CATS).map(([k, v]) => `<option value="${k}">${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("")}</select></div>
-        <div class="field"><label>Muhimligi</label><select name="priority">${Object.entries(PRIO).map(([k, v]) => `<option value="${k}" ${k === "oddiy" ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("")}</select></div></div>
-      <div class="field"><label>Kimga *</label><div id="rc-rp"></div></div><div class="err" id="rc-err"></div></form>`,
-      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="rc-ok">Saqlash</button>`);
-    const getRp = recipientPicker($("#rc-rp", m), people);
-    const when = () => { const r = $("[name=rule]", m).value; $("#rc-when", m).innerHTML = r === "haftalik" ? `<label>Hafta kuni</label><select name="dow">${[1, 2, 3, 4, 5, 6].map(d => `<option value="${d}">${esc(KUN[d] || d)}</option>`).join("")}</select>` : r === "oylik" ? `<label>Oyning kuni</label><input name="dom" type="number" min="1" max="28" value="1">` : `<label>&nbsp;</label><div class="small muted">Yakshanbadan tashqari har kuni</div>`; };
+  function recurringForm(r0) {
+    const ed = !!r0; const r = r0 || { rule: "haftalik", dows: [1], dom: 1, due_days: 0, due_time: "18:00", send_time: "08:00", category: "", priority: "oddiy", assignees: [], title: "", description: "" };
+    const people = assignable(); const pre = r.assignees || [];
+    // ijrochi tahrirlovchiga «tayinlanadigan» ro'yxatda bo'lmasa ham yo'qolib qolmasin
+    pre.forEach(id => { if (!people.some(p => p.id === id)) { const p = person(id); if (p) people.push(p); } });
+    const dw = recDows(r);
+    const m = openModal(ed ? "✏️ Takrorlanuvchi topshiriqni tahrirlash" : "Yangi takrorlanuvchi topshiriq", `<form id="rcf">
+      <div class="field"><label>Sarlavha (matni) *</label><input name="title" required maxlength="200" value="${esc(r.title)}"></div>
+      <div class="field"><label>Tavsif</label><textarea name="description" rows="3">${esc(r.description || "")}</textarea></div>
+      <div class="grid2"><div class="field"><label>Qachon *</label><select name="rule">${Object.entries(RULE_L).map(([k, l]) => `<option value="${k}" ${k === r.rule ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label>Soat nechada borsin *</label><input name="send_time" type="time" value="${esc(r.send_time || "08:00")}" required></div></div>
+      <div class="field" id="rc-when"></div>
+      <div class="grid2"><div class="field"><label>Muddat (necha kundan keyin)</label><input name="due_days" type="number" min="0" max="30" value="${+r.due_days || 0}"></div>
+        <div class="field"><label>Muddat vaqti</label><input name="due_time" type="time" value="${esc(r.due_time || "18:00")}"></div></div>
+      <div class="grid2"><div class="field"><label>Turi</label><select name="category">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${k === r.category ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("")}</select></div>
+        <div class="field"><label>Muhimligi</label><select name="priority">${Object.entries(PRIO).map(([k, v]) => `<option value="${k}" ${k === (r.priority || "oddiy") ? "selected" : ""}>${esc(Array.isArray(v) ? v[0] : v)}</option>`).join("")}</select></div></div>
+      <div class="field"><label>Kimga *</label><div id="rc-rp"></div></div>
+      ${ed && r.last_run === today() ? `<div class="small muted">Bu topshiriq bugun allaqachon yuborilgan — o'zgarishlar keyingi safardan kuchga kiradi.</div>` : ""}<div class="err" id="rc-err"></div></form>`,
+      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="rc-ok">${ed ? "O'zgarishlarni saqlash" : "Saqlash"}</button>`);
+    const getRp = recipientPicker($("#rc-rp", m), people, pre);
+    const when = () => { const rl = $("[name=rule]", m).value; $("#rc-when", m).innerHTML = rl === "haftalik"
+      ? `<label>Hafta kunlari * <span class="muted">(bir nechtasini tanlash mumkin)</span></label><div class="chips">${[1, 2, 3, 4, 5, 6].map(d => `<label class="rp-chk" style="margin-right:10px"><input type="checkbox" name="dw" value="${d}" ${dw.includes(d) ? "checked" : ""}> ${esc(KUN[d] || d)}</label>`).join("")}</div>`
+      : rl === "oylik" ? `<label>Oyning kuni</label><input name="dom" type="number" min="1" max="28" value="${+r.dom || 1}" style="width:auto">` : `<div class="small muted">Yakshanbadan tashqari har kuni</div>`; };
     when(); $("[name=rule]", m).onchange = when;
     $("#rc-ok", m).onclick = async e => {
-      const f = $("#rcf", m); if (!f.reportValidity()) return; const d = Object.fromEntries(new FormData(f)); const ids = getRp();
-      if (!ids.length) return ($("#rc-err", m).textContent = "Kamida bitta ijrochini tanlang");
+      const f = $("#rcf", m); if (!f.reportValidity()) return; const d = Object.fromEntries(new FormData(f)); const ids = getRp(); const err = $("#rc-err", m);
+      if (!ids.length) return (err.textContent = "Kamida bitta ijrochini tanlang");
+      const dows = $$("[name=dw]", m).filter(x => x.checked).map(x => +x.value);
+      if (d.rule === "haftalik" && !dows.length) return (err.textContent = "Kamida bitta hafta kunini belgilang");
+      const row = { title: d.title.trim(), description: (d.description || "").trim(), rule: d.rule, dows: d.rule === "haftalik" ? dows : [], dow: d.rule === "haftalik" ? dows[0] : null, dom: d.rule === "oylik" ? (+d.dom || 1) : null,
+        send_time: d.send_time || "08:00", due_days: +d.due_days || 0, due_time: d.due_time || "18:00", category: d.category, priority: d.priority, assignees: ids };
       e.target.disabled = true;
-      try { await act(() => db.saveRecurring({ title: d.title.trim(), description: (d.description || "").trim(), rule: d.rule, dow: d.dow ? +d.dow : null, dom: d.dom ? +d.dom : null, due_days: +d.due_days || 0, due_time: d.due_time || "18:00", category: d.category, priority: d.priority, assignees: ids, active: true }), "Takrorlanuvchi topshiriq saqlandi"); recurringView(); }
+      try { await act(() => db.saveRecurring(ed ? { id: r.id, ...row } : { ...row, active: true }), ed ? "O'zgarishlar saqlandi" : "Takrorlanuvchi topshiriq saqlandi"); recurringView(); }
       catch (x) { e.target.disabled = false; }
     };
   }
