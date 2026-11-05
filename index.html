@@ -1721,7 +1721,7 @@ window.LESSONS = [
       async sendHelpReq(to_id, teacher_ids, due, note) { const d = load(); d.helpreq = d.helpreq || []; const id = Date.now(); d.helpreq.unshift({ id, from_id: me().id, to_id, teacher_ids, due, note: note || "", status: "kutilmoqda", reply: "", created_at: new Date().toISOString() }); save(); return ok(id); },
       async answerHelpReq(rid, okk, msg) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) { h.status = okk ? "qabul" : "rad"; h.reply = msg || ""; h.answered_at = new Date().toISOString(); } save(); return ok(true); },
       async cancelHelpReq(rid) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) h.status = "bekor"; save(); return ok(true); },
-      async listTeacherObs(from, subs) { return ok((load().tobs || []).filter(o => o.day >= from && (!subs || !subs.length || subs.includes(o.subject)))); },
+      async listTeacherObs(from, subs, ids, to) { return ok((load().tobs || []).filter(o => o.day >= from && (!to || o.day <= to) && (!subs || !subs.length || subs.includes(o.subject)))); },
       async setStaffSubjects(uid, subs) { const d = load(); const m = me(); if (!m || !(m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"))) return fail("Ruxsat yo'q");
         const p = d.profiles.find(x => x.id === uid); if (p) p.subjects = subs || []; save(); return ok(true); },
       async listTeacherPlans() { return ok(load().tplan || []); },
@@ -1965,8 +1965,9 @@ window.LESSONS = [
         const m = new Map(); [...a, ...b, ...c].forEach(t => m.set(t.id, t));
         return [...m.values()].sort((x, y) => x.full_name.localeCompare(y.full_name)).map(t => ({ ...t, filial: E(t.filial) }));
       },
-      async listTeacherObs(from, subs, ids) {
-        const base = () => sb.from("teacher_obs").select("*").gte("day", from).order("day").order("id");
+      // to — ixtiyoriy yuqori chegara (yillik tarixni keyinroq, alohida yuklash uchun)
+      async listTeacherObs(from, subs, ids, to) {
+        const base = () => { let q = sb.from("teacher_obs").select("*").gte("day", from); if (to) q = q.lte("day", to); return q.order("day").order("id"); };
         if (!subs || !subs.length) return (await pageAll(base)).map(o => ({ ...o, filial: E(o.filial) }));
         const [a, c] = await Promise.all([pageAll(() => base().in("subject", subs)), ids && ids.length ? pageAll(() => base().in("teacher_id", ids)) : Promise.resolve([])]);
         const m = new Map(); [...a, ...c].forEach(o => m.set(o.id, o));
@@ -1975,6 +1976,14 @@ window.LESSONS = [
       onChange(tables, cb, st) { try { const ch = sb.channel("mp-live-" + Math.random().toString(36).slice(2, 8)); tables.forEach(t => ch.on("postgres_changes", { event: "*", schema: "public", table: t }, cb)); ch.subscribe(x => st && st(x)); return () => sb.removeChannel(ch); } catch (e) { return () => {}; } },
       async zaxiraExport(fresh) { return chk(await sb.rpc("zaxira_export", { fresh: !!fresh })); },
       async zaxiraInfo() { return chk(await sb.rpc("zaxira_info")); },
+      // Kesh uchun: faqat o'zgargan ustozlar va mavjud ustozlar id ro'yxati (o'chirilganlarni aniqlash)
+      async listTeachersSince(subs, ids, since) {
+        const base = () => sb.from("teachers").select("*").gt("updated_at", since).order("id");
+        const lists = await Promise.all(!subs || !subs.length ? [pageAll(base)] : [pageAll(() => base().in("subject", subs)), pageAll(() => base().eq("subject", "")), ids && ids.length ? pageAll(() => base().in("id", ids)) : Promise.resolve([])]);
+        const m = new Map(); lists.flat().forEach(t => m.set(t.id, t)); return [...m.values()].map(t => ({ ...t, filial: E(t.filial) }));
+      },
+      async listTeacherIds() { return (await pageAll(() => sb.from("teachers").select("id").order("id"))).map(x => x.id); },
+      async listObsOfTeachers(ids, from) { if (!ids.length) return []; return (await pageAll(() => sb.from("teacher_obs").select("*").in("teacher_id", ids).gte("day", from).order("day").order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
       async listTeacherReqs() { const r = await sb.from("teacher_requests").select("*").gte("created_at", new Date(Date.now() - 120 * 864e5).toISOString()).order("created_at", { ascending: false }); if (r.error) throw new Error(trErr(r.error.message)); return r.data; },
       async sendTeacherReq(k, tid, left_day, nm, fil, subj, kl, msg) { return chk(await sb.rpc("send_teacher_request", { k, tid, left_day: left_day || null, nm: nm || "", fil: fil || "", subj: subj || "", kl: kl || "", msg: msg || "" })); },
       async decideTeacherReq(rid, okk, msg, nm, fil, subj) { chk(await sb.rpc("decide_teacher_request", { rid, ok: okk, msg: msg || "", nm: nm || "", fil: fil || "", subj: subj || "" })); return true; },
@@ -2614,7 +2623,8 @@ window.METODISTLAR = [
         isManager() ? db.listCeoReports(today(), today()).catch(() => []) : Promise.resolve(S.creps || []),
         db.listHelpReqs ? db.listHelpReqs().catch(() => S.help || []) : Promise.resolve([]), tqLoad()]);
       S.plans = pl || []; if (isManager()) S.creps = cr || []; S.help = hp || [];
-      if (S.me.role === "asoschi" || ["akademik", "intizomiy"].includes(deptOf(S.me))) await teachReload();
+      // Intizomiy bo'lim rahbariga akademik kuzatuvlar kerak emas (Filiallar sahifasida — kerak bo'lganda yuklanadi)
+      if (S.me.role === "asoschi" || deptOf(S.me) === "akademik" || (deptOf(S.me) === "intizomiy" && S.me.role === "xodim")) await teachReload();
       { const need = [...new Set((S.help || []).flatMap(h => h.teacher_ids || []))].filter(id => !hrTeacher(id));
         if (need.length && db.teachersByIds) { try { (await db.teachersByIds(need)).forEach(t => S.helpT[t.id] = t); } catch (e) {} } }
       if (db.listAbsences) { try { S.abs = new Set((await db.listAbsences(addD(today(), -75), today())).map(a => a.user_id + "|" + String(a.day).slice(0, 10))); } catch (e) { S.abs = S.abs || new Set(); } }
@@ -4425,21 +4435,72 @@ window.METODISTLAR = [
       return { t, sc }; }).filter(x => x.sc).sort((a, b) => b.sc - a.sc || a.t.full_name.localeCompare(b.t.full_name)).slice(0, limit).map(x => x.t);
   }
   const TS = { t: 0, o: 0 };
-  // Kuzatuvlar qancha davrga yuklanadi: rahbarlarga yillik statistika uchun 400 kun, xodimga — o'tgan oy boshidan (oylik reja va reyting uchun yetarli)
-  const obsFrom = () => (S.me && (S.me.role === "asoschi" || S.me.role === "ceo")) ? addD(today(), -400) : mStart(addD(mStart(today()), -1));
-  async function teachReload(force) {
+  // ---- Ustozlar va kuzatuvlar keshi (2026-11-05): birinchi ochilganda yuklanadi va brauzerda (IndexedDB) saqlanadi.
+  // Keyingi ochilishlarda bazadan faqat so'nggi OBS_WIN kunlik kuzatuvlar va o'zgargan ustozlar keladi — trafik 10–20 baravar kam.
+  // Har 7 kunda bir marta hammasi qaytadan yuklanadi (eski yozuvlardagi tuzatishlar ham shu bilan yangilanadi).
+  const OBS_WIN = 10, FULL_EVERY = 7 * 864e5, HIST_DAYS = 400;
+  const IDB = {
+    db: null,
+    open() { return new Promise(res => { try { const r = indexedDB.open("mp-cache", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch (e) { res(null); } }); },
+    async get(k) { const d = this.db || (this.db = await this.open()); if (!d) return null; return new Promise(res => { try { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); },
+    async set(k, v) { const d = this.db || (this.db = await this.open()); if (!d) return; try { d.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch (e) {} },
+  };
+  const tcKey = () => `tc2:${S.me.id}:${mySubs().join(",")}`;
+  // Kuzatuvlar odatda joriy va o'tgan oy uchun; yillik tarix — faqat kerak bo'lganda (ensureHistory)
+  const obsFrom = () => mStart(addD(mStart(today()), -1));
+  const tVisible = t => { const subs = mySubs(); return !subs.length || subs.includes(canonSubj(t.subject)) || !String(t.subject || "").trim() || grantedIds().has(t.id); };
+  const sortObs = a => a.sort((x, y) => x.day < y.day ? -1 : x.day > y.day ? 1 : (x.id > y.id ? 1 : -1));
+  let TC = null; // { v, full, from, tAt, teachers, tobs, gids }
+  async function teachReload(force, histFrom) {
     if (!db.listTeachers) return;
     try {
-      const now = Date.now(), cut = addD(today(), -10);
-      const fullT = force || !S.teachers || now - TS.t > SYNC_FULL, fullO = force || !S.tobs || now - TS.o > SYNC_FULL;
-      const [t, o, e, tp] = await Promise.all([fullT ? db.listTeachers(mySubs(), [...grantedIds()]) : S.teachers, db.listTeacherObs(fullO ? obsFrom() : cut, mySubs(), [...grantedIds()]),
-        fullT && db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || []),
-        fullT && db.listTeacherPlans ? db.listTeacherPlans().catch(() => S.tplan || []) : Promise.resolve(S.tplan || [])]);
-      if (fullT) TS.t = now; if (fullO) TS.o = now;
-      S.teachers = t; S.teditors = e; S.tplan = tp || [];
-      S.tobs = fullO ? o : (S.tobs || []).filter(x => x.day < cut).concat(o).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+      const now = Date.now(), cut = addD(today(), -OBS_WIN), base = obsFrom(), subs = mySubs(), gids = [...grantedIds()];
+      if (!TC) { const c = db.listTeachersSince ? await IDB.get(tcKey()) : null; if (c && c.v === 2) TC = c; }
+      let full = !TC || now - TC.full >= FULL_EVERY || !db.listTeachersSince;
+      const tAtNew = new Date(now - 60e3).toISOString();
+      // 1) Ustozlar
+      let teachers;
+      if (full) teachers = await db.listTeachers(subs, gids);
+      else {
+        const [ch, idl] = await Promise.all([force || now - TS.t > 120e3 ? db.listTeachersSince([], [], TC.tAt) : Promise.resolve([]), force || now - TS.t > SYNC_FULL ? db.listTeacherIds() : Promise.resolve(null)]);
+        const m = new Map(TC.teachers.map(t => [t.id, t]));
+        ch.forEach(t => { if (tVisible(t)) m.set(t.id, t); else m.delete(t.id); });
+        if (idl) { const live = new Set(idl); let gone = false; [...m.keys()].forEach(id => { if (!live.has(id)) { m.delete(id); gone = true; } }); if (gone) full = true; } // birlashtirilgan ustoz — kuzatuvlar ham qayta
+        if (gids.some(id => !m.has(id))) (await db.listTeachers(subs, gids)).forEach(t => m.set(t.id, t));
+        teachers = full ? await db.listTeachers(subs, gids) : [...m.values()].sort((a, b) => a.full_name.localeCompare(b.full_name));
+      }
+      // 2) Kuzatuvlar
+      let from = TC && !full ? TC.from : base; if (TC && full && TC.from < base) from = TC.from; // to'liq yangilashda yuklangan tarix saqlanadi
+      if (histFrom && histFrom < from && !full) {
+        const older = await db.listTeacherObs(histFrom, subs, gids, addD(from, -1));
+        TC.tobs = sortObs(older.concat(TC.tobs)); TC.from = from = histFrom;
+      } else if (histFrom && histFrom < from) from = histFrom;
+      let tobs;
+      if (full) tobs = await db.listTeacherObs(from, subs, gids);
+      else {
+        const [fresh, extra] = await Promise.all([db.listTeacherObs(cut, subs, gids), (() => { const newG = gids.filter(id => !(TC.gids || []).includes(id)); return newG.length ? db.listObsOfTeachers(newG, from) : Promise.resolve([]); })()]);
+        const m = new Map(TC.tobs.filter(x => x.day < cut).map(x => [x.id, x])); extra.forEach(x => { if (x.day < cut) m.set(x.id, x); });
+        tobs = sortObs([...m.values()].concat(fresh));
+      }
+      // 3) Kichik ro'yxatlar (har 6 soatda)
+      if (force || full || now - TS.t > SYNC_FULL || !S.teditors) {
+        const [e, tp] = await Promise.all([db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || []), db.listTeacherPlans ? db.listTeacherPlans().catch(() => S.tplan || []) : Promise.resolve(S.tplan || [])]);
+        S.teditors = e; S.tplan = tp || []; TS.t = now;
+      }
+      S.teachers = teachers; S.tobs = tobs; TS.o = now;
+      TC = { v: 2, full: full ? now : TC.full, from, tAt: tAtNew, teachers, tobs, gids };
+      IDB.set(tcKey(), TC);
     }
-    catch (e) { S.teachers = S.teachers || []; S.tobs = S.tobs || []; }
+    catch (e) { console.warn("teachReload", e); S.teachers = S.teachers || (TC && TC.teachers) || []; S.tobs = S.tobs || (TC && TC.tobs) || []; }
+  }
+  // Yillik statistika / ustoz tarixi kerak bo'lganda — 400 kunlik kuzatuvlar bir marta yuklanadi va keshda qoladi
+  async function ensureHistory(rerun) {
+    const need = addD(today(), -HIST_DAYS);
+    if (!TC || TC.from <= need || !db.listTeacherObs || ensureHistory.busy || ensureHistory.tried === today()) return false;
+    ensureHistory.busy = true; ensureHistory.tried = today(); // bir kunda bir marta urinadi — xato bo'lsa ham aylanib qolmaydi
+    toast("Yillik ma'lumotlar yuklanmoqda…");
+    try { await teachReload(false, need); } finally { ensureHistory.busy = false; }
+    if (rerun && TC && TC.from <= need) rerun(); return true;
   }
 
 
@@ -4990,6 +5051,8 @@ window.METODISTLAR = [
   // ---- O'qituvchilar sahifasi (Monitoring bo'limi rahbari va Akademik bo'lim rahbari)
   PAGES.oqituvchilar = async page => {
     if (!canMetAdmin()) return PAGES.bosh(page);
+    // yillik statistika uchun tarix — bir marta yuklanadi, keyin keshda
+    if (TC && TC.from > addD(today(), -HIST_DAYS)) ensureHistory(() => { if (curRoute() === "oqituvchilar") PAGES.oqituvchilar(page); });
     const tab = S.ui.ttab || "rk";
     page.innerHTML = head("Ustozlar", "Akademik bo'lim xodimlari kuzatgan darslar asosida: statistika, uzoq kuzatilmagan ustozlar va ustozlar bazasi.",
       `<div class="row" style="gap:8px"><button class="btn" id="tx-xlsx">⬇ Excel</button><button class="btn" id="tx-pdf">⬇ PDF</button></div>`) +
@@ -5117,8 +5180,9 @@ window.METODISTLAR = [
     };
     draw();
   }
-  function teacherModal(id) {
+  function teacherModal(id, again) {
     const t = teacherById(id); if (!t) return;
+    if (!again && TC && TC.from > addD(today(), -HIST_DAYS)) ensureHistory(() => { if ($("#modal-root").innerHTML !== "") { closeModal(); teacherModal(id, true); } });
     const ob = obsOf(id); const f = teacherFacts(t);
     openModal(esc(t.full_name), `<p class="small muted" style="margin-top:0">${esc([canonSubj(t.subject), t.filial].filter(Boolean).join(" · ") || "—")}${t.lead_class ? " · sinf rahbari " + esc(t.lead_class) : ""}${(t.classes || []).length ? " · Sinflari: " + esc(t.classes.join(", ")) : ""}</p>
       <div class="stats" style="grid-template-columns:repeat(4,1fr)">${stat("Kuzatuvlar", f.n)}${stat("O'rt. intizomiy", f.ib ?? "—")}${stat("O'rt. akademik", f.ab ?? "—")}${stat("Oxirgi kuzatuv", f.days === null ? "—" : f.days === 0 ? "bugun" : f.days + " kun", f.long ? "warn" : "ok")}</div>
@@ -8167,6 +8231,7 @@ window.METODISTLAR = [
   PAGES.bogcha = page => {
     if (!canSeeBog()) return PAGES.bosh(page);
     const fil = S.ui.bgF || "", t = today(), ms = mStart(S.ui.bgM || t);
+    if (TC && TC.from > ms) ensureHistory(() => { if (curRoute() === "bogcha") PAGES.bogcha(page); });
     const P = planCalc(ms, { bog: true, subs: [], fil });
     const R = buildRating(ms, mEndOf(ms) < t ? mEndOf(ms) : t, fil, true).out[BOG] || [];
     const rk = Object.fromEntries(R.map(x => [x.t.id, x]));
