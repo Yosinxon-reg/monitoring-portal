@@ -1145,6 +1145,8 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
     if (!el.getAttribute) return;
     for (var i = 0; i < ATTRS.length; i++) { var v = el.getAttribute(ATTRS[i]); if (v) { var y = yA(v); if (y !== v) el.setAttribute(ATTRS[i], y); } }
     if (el.tagName === "INPUT" && /^(button|submit|reset)$/i.test(el.type || "")) { var b = el.value, yb = yA(b); if (yb !== b) el.value = yb; }
+    // oldindan to'ldirilgan maydonlar ham yangi alifboda ko'rinsin (qidiruv maydonlari bundan mustasno — yozish paytida qayta chiziladi)
+    if ((el.tagName === "INPUT" || el.tagName === "TEXTAREA") && document.activeElement !== el && !/qidir/i.test(el.getAttribute("placeholder") || "") && el.type !== "search") show(el);
   }
   // <option> ning qiymati (value) ko'rsatilmagan bo'lsa — matni qiymat bo'ladi. Matn o'girilganda qiymat o'zgarib, bazaga yangi harflar
   // bilan tushmasligi uchun asl matnni value'ga yozib qo'yamiz (2026-11-04 tuzatish: filial va holat turlari «Fağona», «Çilonzor» bo'lib qolardi)
@@ -1198,16 +1200,28 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
     try { if (w && w.document) { var d = w.document, ow = d.write; d.write = function () { return ow.apply(d, [].map.call(arguments, alifHtml)); }; } } catch (e) {}
     return w;
   };
-  // ---- Kiritish: ş, ç, ğ, ö yozilsa — bazaga eski shaklda tushadi (qidiruv va o'qituvchilar bazasi bir xil ishlaydi)
-  document.addEventListener("input", function (e) {
-    var el = e.target; if (!el) return;
-    var ok = el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && /^(text|search|)$/i.test(el.getAttribute("type") || ""));
-    if (!ok) return;
-    var v = el.value; if (!/[ŞşÇçĞğÖö]/.test(v)) return;
-    var s = el.selectionStart, pre = s == null ? null : eski(v.slice(0, s)).length;
-    el.value = eski(v);
-    if (pre !== null) try { el.setSelectionRange(pre, pre); } catch (_) {}
-  }, true);
+  // ---- Kiritish (2026-11-05): yozish paytida matnga tegilmaydi. Maydondan chiqqanda eski yozuv (sh, ch, o', g') yangi
+  // harflarga o'tadi, yangi harflar o'z holicha qoladi. Dastur esa qiymatni har doim eski shaklda o'qiydi — bazaga eski
+  // yozuvda tushadi (qidiruv, ustozlar bazasi, reyting avvalgidek ishlaydi).
+  function okEl(el) {
+    if (!el || el.hasAttribute && el.hasAttribute("data-noalif")) return false;
+    if (el.tagName === "TEXTAREA") return true;
+    return el.tagName === "INPUT" && /^(text|search|)$/i.test(el.getAttribute("type") || "");
+  }
+  var RAW = {};
+  [["INPUT", HTMLInputElement.prototype], ["TEXTAREA", HTMLTextAreaElement.prototype]].forEach(function (x) {
+    var d = Object.getOwnPropertyDescriptor(x[1], "value"); if (!d || !d.get) return;
+    RAW[x[0]] = d;
+    Object.defineProperty(x[1], "value", { configurable: true, enumerable: d.enumerable,
+      get: function () { var v = d.get.call(this); return typeof v === "string" && /[ŞşÇçĞğÖö]/.test(v) && okEl(this) ? eski(v) : v; },
+      set: function (v) { d.set.call(this, typeof v === "string" && okEl(this) && document.activeElement !== this ? yA(v) : v); } });
+  });
+  function show(el) {
+    if (!RAW || !okEl(el) || !RAW[el.tagName]) return;
+    var d = RAW[el.tagName], v = d.get.call(el), y = yA(v);
+    if (y !== v) d.set.call(el, y);
+  }
+  document.addEventListener("focusout", function (e) { show(e.target); }, true);
 })();
 
 </script>
@@ -5055,10 +5069,11 @@ window.METODISTLAR = [
     if (TC && TC.from > addD(today(), -HIST_DAYS)) ensureHistory(() => { if (curRoute() === "oqituvchilar") PAGES.oqituvchilar(page); });
     const tab = S.ui.ttab || "rk";
     page.innerHTML = head("Ustozlar", "Akademik bo'lim xodimlari kuzatgan darslar asosida: statistika, uzoq kuzatilmagan ustozlar va ustozlar bazasi.",
-      `<div class="row" style="gap:8px"><button class="btn" id="tx-xlsx">⬇ Excel</button><button class="btn" id="tx-pdf">⬇ PDF</button></div>`) +
+      `<div class="row" style="gap:8px"><button class="btn" id="tx-word">⬇ Ro'yxat (Word)</button><button class="btn" id="tx-xlsx">⬇ Excel</button><button class="btn" id="tx-pdf">⬇ PDF</button></div>`) +
       `<div class="tabs">${[["rk", "Reyting"], ["reja", "Oylik reja"], ["stat", "Statistika"], ["long", `Uzoq kuzatilmagan${longUnseen().length ? ` <span class="badge">${longUnseen().length}</span>` : ""}`], ["base", `Ustozlar bazasi <span class="small muted">${(S.teachers || []).length}</span>`]]
         .map(([k, l]) => `<button data-tt="${k}" class="${k === tab ? "active" : ""}">${l}</button>`).join("")}</div><div id="tx-body"><div class="card empty">Yuklanmoqda…</div></div>`;
     $$("[data-tt]", page).forEach(b => b.onclick = () => { S.ui.ttab = b.dataset.tt; PAGES.oqituvchilar(page); });
+    $("#tx-word", page).onclick = () => tlModal();
     await teachReload();
     const body = $("#tx-body", page);
     $("#tx-xlsx", page).onclick = () => teachExport("xlsx");
@@ -7835,7 +7850,7 @@ window.METODISTLAR = [
       <div class="card" style="margin-bottom:12px"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
         <div style="flex:1;min-width:220px"><b>${all.length} ta ustoz</b> <span class="small muted">· ${esc(subsTxt)}</span>
           <div class="small muted">Ustoz ishdan ketgan bo'lsa — qatoridagi «🚪 Ketdi» tugmasi. Ro'yxatda yo'q yangi ustoz bo'lsa — «➕ Yangi ustoz». Ikkalasini ham CEO tasdiqlaydi.</div></div>
-        <button class="btn primary" id="mt-new">➕ Yangi ustoz</button></div></div>
+        <button class="btn" id="mt-word">⬇ Ro'yxat (Word)</button><button class="btn primary" id="mt-new">➕ Yangi ustoz</button></div></div>
       <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><select id="mt-f" style="width:auto"><option value="">Barcha filiallar (${all.length})</option>${FILIALLAR.map(f => `<option value="${esc(f)}" ${f === fil ? "selected" : ""}>${esc(f)} (${cntF[f] || 0})</option>`).join("")}</select>
         <input id="mt-q" value="${esc(q)}" placeholder="Ism bo'yicha qidirish…" style="flex:1;min-width:160px"></div>
       ${Object.keys(byF).sort().map(f => `<div class="card" style="margin-bottom:12px;padding:0"><div class="card-head" style="padding:12px 16px 4px"><h2 style="font-size:16px">${esc(f)}</h2><span class="spacer"></span><span class="small muted">${byF[f].length} ta</span></div>
@@ -7848,7 +7863,92 @@ window.METODISTLAR = [
     const ff = $("#mt-f", root); ff.onchange = () => { S.ui.mtF = ff.value; myTeachersView(root, rerun); };
     const fq = $("#mt-q", root); let tm; fq.oninput = () => { clearTimeout(tm); tm = setTimeout(() => { S.ui.mtQ = fq.value; myTeachersView(root, rerun); const n = $("#mt-q", root); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); };
     $("#mt-new", root).onclick = () => tqNewModal(rerun);
+    $("#mt-word", root).onclick = () => tlModal();
     $$("[data-mtk]", root).forEach(b => b.onclick = () => tqLeftModal(teacherById(b.dataset.mtk), rerun));
+  }
+
+
+  // =====================================================================
+  // 41: Ustozlar ro'yxati — Word (tanlangan ustunlar bilan). Har kim o'z fani doirasida, fan kesimida filiallararo ham.
+  // =====================================================================
+  function tlPool() {
+    const base = canMetAdmin() ? (S.teachers || []).filter(t => !tArch(t) && !tPool(t) && !isBogT(t)) : myTeachers();
+    const bog = canSeeBog() ? (S.teachers || []).filter(t => isBogT(t) && !tArch(t)) : [];
+    return [...base, ...bog];
+  }
+  function tlModal(preSubj) {
+    const pool = tlPool();
+    if (!pool.length) return toast("Sizga biriktirilgan ustozlar yo'q", true);
+    const subs = [...new Set(pool.map(t => canonSubj(t.subject)).filter(Boolean))].sort((a, b) => (a === BOG) - (b === BOG) || a.localeCompare(b));
+    const fils = FILIALLAR.filter(f => pool.some(t => t.filial === f));
+    const U = S.ui.tl || {}; const sub0 = preSubj && subs.includes(preSubj) ? preSubj : (subs.includes(U.sub) ? U.sub : "");
+    const cb = (id, l, on) => `<label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="${id}" ${on ? "checked" : ""} style="width:auto">${l}</label>`;
+    const AN = [["", "Tahlilsiz (faqat ro'yxat)"], ["all-d", "Barcha tahlillar — har bir tahlili va umumiy ball bilan"], ["all-t", "Barcha tahlillar — faqat umumiy ball"],
+      ["oy-d", "Shu oydagi tahlillar — har bir tahlili va umumiy ball bilan"], ["oy-t", "Shu oydagi tahlillar — faqat umumiy ball"]];
+    const m = openModal("⬇ Ustozlar ro'yxati — Word", `
+      <div class="field"><label>Fan</label><select id="tl-s"><option value="">${subs.length > 1 ? "Barcha fanlarim" : esc(subs[0] || "")}</option>${subs.length > 1 ? subs.map(x => `<option ${x === sub0 ? "selected" : ""}>${esc(x)}</option>`).join("") : ""}</select></div>
+      <div class="field"><label>Filiallar</label><div class="row" style="gap:6px 14px;flex-wrap:wrap">${fils.map((f, i) => cb("tl-f" + i, esc(f), !U.fil || U.fil.includes(f))).join("")}</div>
+        <div class="seg" id="tl-lay" style="margin-top:8px"><button type="button" data-ly="fil" class="${U.lay !== "one" ? "active" : ""}">Har filial alohida jadval</button><button type="button" data-ly="one" class="${U.lay === "one" ? "active" : ""}">Bitta jadval (filiallararo)</button></div></div>
+      <div class="field"><label>Ustunlar</label><div class="row" style="gap:6px 14px;flex-wrap:wrap">
+        ${cb("tl-cf", "Filial", U.cf !== false)}${cb("tl-cn", "Ism familiya", U.cn !== false)}${cb("tl-cs", "Fan", U.cs !== false)}</div></div>
+      <div class="field"><label>Tahlillar</label>${AN.map(([k, l]) => `<label class="row" style="gap:6px;align-items:center;font-weight:400;margin:3px 0"><input type="radio" name="tl-an" value="${k}" ${(U.an || "") === k ? "checked" : ""} style="width:auto">${l}</label>`).join("")}</div>
+      <div class="small muted">Umumiy ball — reyting balli (%), o'rin — shu fan bo'yicha barcha filiallar orasida (kamida ${MIN_OBS} marta kuzatilganlar).</div>
+      <div class="err-text" id="tl-err"></div>`,
+      `<button class="btn" data-close>Yopish</button><button class="btn primary" id="tl-go">⬇ Word saqlash</button>`);
+    let lay = U.lay === "one" ? "one" : "fil";
+    $$("[data-ly]", m).forEach(b => b.onclick = () => { lay = b.dataset.ly; $$("[data-ly]", m).forEach(x => x.classList.toggle("active", x === b)); });
+    $("#tl-go", m).onclick = async e => {
+      const o = { sub: $("#tl-s", m).value, fil: fils.filter((f, i) => $("#tl-f" + i, m).checked), lay,
+        cf: $("#tl-cf", m).checked, cn: $("#tl-cn", m).checked, cs: $("#tl-cs", m).checked, an: ($("input[name=tl-an]:checked", m) || {}).value || "" };
+      const err = $("#tl-err", m);
+      if (!o.fil.length) return err.textContent = "Kamida bitta filialni belgilang";
+      if (!o.cf && !o.cn && !o.cs && !o.an) return err.textContent = "Kamida bitta ustun yoki tahlilni tanlang";
+      S.ui.tl = o; e.target.disabled = true; e.target.textContent = "Tayyorlanmoqda…";
+      try { await tlExport(o, pool); toast("Word fayli saqlandi"); closeModal(); }
+      catch (x) { err.textContent = x.message || "Xatolik"; e.target.disabled = false; e.target.textContent = "⬇ Word saqlash"; }
+    };
+  }
+  async function tlExport(o, pool) {
+    const D = DOCX, t = today(), ms = mStart(t);
+    const isAll = o.an.startsWith("all"), det = o.an.endsWith("-d");
+    if (isAll && TC && TC.from > addD(t, -HIST_DAYS)) await ensureHistory();
+    const from = !o.an ? null : isAll ? "2000-01-01" : ms;
+    const list = pool.filter(x => o.fil.includes(x.filial) && (!o.sub || canonSubj(x.subject) === o.sub));
+    if (!list.length) throw new Error("Tanlangan fan va filiallarda ustoz yo'q");
+    // reyting: fan guruhi bo'yicha, barcha filiallar orasida
+    const rk = {};
+    if (o.an) [false, true].forEach(bog => Object.values(buildRating(from, t, "", bog).out).forEach(arr => arr.forEach(x => { rk[x.t.id] = x; })));
+    const obsOf = id => (S.tobs || []).filter(z => z.teacher_id === id && (!from || z.day >= from) && z.day <= t).sort((a, b) => a.day < b.day ? -1 : 1);
+    const one = (z, grp) => { const s = tScore([z], grp); const mx = abMax(z.subject);
+      return `${fmtDate(z.day)} — ${grp === BOG ? "" : `I ${z.ib ?? "—"}/${IB_MAX}, `}${grp === OTHER_GRP ? "" : `A ${z.ab ?? "—"}/${mx}, `}${s.total ?? "—"}%${z.author_id ? " · " + nameOf(z.author_id) : ""}`; };
+    const head = ["№"], W = [500];
+    if (o.cn) { head.push("Ism familiya"); W.push(3200); }
+    if (o.cf && !(o.lay === "fil")) { head.push("Filial"); W.push(1500); }
+    if (o.cf && o.lay === "fil" && !o.cn && !o.cs && !o.an) { head.push("Filial"); W.push(1500); }
+    if (o.cs) { head.push("Fan"); W.push(1900); }
+    if (o.an) { head.push("Tahlillar soni", "Umumiy ball", "O'rin"); W.push(1100, 1200, 800); if (det) { head.push(isAll ? "Barcha tahlillar" : "Shu oydagi tahlillar"); W.push(5200); } }
+    const sc = W.reduce((a, b) => a + b, 0), max = det ? 14900 : 9900; const Wn = W.map(w => Math.floor(w * Math.min(1, max / sc)));
+    const row = (x, i) => { const r = [String(i + 1)]; const g = subjGroup(x.subject); const R = rk[x.id];
+      if (o.cn) r.push({ v: x.full_name, b: 1 });
+      if (o.cf && o.lay !== "fil") r.push(x.filial || "—");
+      if (o.cf && o.lay === "fil" && !o.cn && !o.cs && !o.an) r.push(x.filial || "—");
+      if (o.cs) r.push(canonSubj(x.subject) || "—");
+      if (o.an) { const ob = obsOf(x.id); const tot = R ? R.total : (ob.length ? tScore(ob, g).total : null);
+        r.push(String(ob.length), tot === null || tot === undefined ? "—" : { v: tot + "%", b: 1 }, R && R.rank ? String(R.rank) : "—");
+        if (det) r.push(ob.length ? ob.map(z => one(z, g)).join("\n") : "—"); }
+      return r; };
+    const tot = x => { const R = rk[x.id]; return R && R.total !== null && R.total !== undefined ? R.total : -1; };
+    const sorter = (a, b) => o.an ? tot(b) - tot(a) || a.full_name.localeCompare(b.full_name) : a.full_name.localeCompare(b.full_name);
+    const anL = { "all-d": "barcha tahlillar (har biri bilan)", "all-t": "barcha tahlillar (umumiy ball)", "oy-d": `${monthLabel(monthOf(t))} tahlillari (har biri bilan)`, "oy-t": `${monthLabel(monthOf(t))} tahlillari (umumiy ball)` }[o.an];
+    let body = D.h1("Ustozlar ro'yxati") + D.p([o.sub || "Barcha fanlar", o.fil.length === FILIALLAR.length ? "barcha filiallar" : o.fil.join(", "), anL].filter(Boolean).join(" · "), { c: "3B5B86" })
+      + D.p(`Tuzildi: ${fmtDate(t)} · ${S.me.full_name} · jami ${list.length} ta ustoz`, { sz: 18, c: "6B7A90" });
+    if (o.lay === "fil") o.fil.forEach(f => { const a = list.filter(x => x.filial === f).sort(sorter); if (!a.length) return;
+      body += D.h3(f, `${a.length} ta ustoz`) + D.table(head, a.map(row), Wn, { center: [0] }); });
+    else body += D.table(head, list.slice().sort(sorter).map(row), Wn, { center: [0] });
+    const blob = D.build(body, det);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `ustozlar_${(o.sub || "barcha-fanlar").replace(/[^A-Za-z0-9ʻ'-]+/g, "-")}_${t}.docx`; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   }
 
   // «Ishdan ketdi» so'rovi
@@ -8243,7 +8343,7 @@ window.METODISTLAR = [
     const byF = {}; all.forEach(x => (byF[x.filial || "—"] = byF[x.filial || "—"] || []).push(x));
     const fOrder = [...BOG_FIL, ...Object.keys(byF).filter(f => !BOG_FIL.includes(f)).sort()];
     page.innerHTML = head("Bog'chalar", `Bog'cha ustozlari alohida: reja — oyiga ${PLAN_BOG} marta, faqat akademik ball (/${BOG_AB}). Maktab ustozlari reytingi va statistikasiga qo'shilmaydi.`,
-      `<button class="btn primary" id="bg-new">➕ Bog'cha ustozi</button>`) + `
+      `<div class="row" style="gap:8px"><button class="btn" id="bg-word">⬇ Ro'yxat (Word)</button><button class="btn primary" id="bg-new">➕ Bog'cha ustozi</button></div>`) + `
       <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <select id="bg-m" style="width:auto">${months.map(m => `<option value="${m}" ${m === ms ? "selected" : ""}>${esc(mLabel(m))}</option>`).join("")}</select>
         <select id="bg-f" style="width:auto"><option value="">Barcha bog'chalar</option>${fOrder.filter(f => f !== "—").map(f => `<option value="${esc(f)}" ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></div>
@@ -8264,6 +8364,7 @@ window.METODISTLAR = [
     $("#bg-m", page).onchange = e => { S.ui.bgM = e.target.value; PAGES.bogcha(page); };
     $("#bg-f", page).onchange = e => { S.ui.bgF = e.target.value; PAGES.bogcha(page); };
     $("#bg-new", page).onclick = () => tqNewModal(() => PAGES.bogcha(page), BOG);
+    $("#bg-word", page).onclick = () => tlModal(BOG);
     $$("[data-tid]", page).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
     $$("[data-bgk]", page).forEach(b => b.onclick = ev => { ev.stopPropagation(); tqLeftModal(teacherById(b.dataset.bgk), () => PAGES.bogcha(page)); });
   };
