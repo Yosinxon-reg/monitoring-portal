@@ -4669,6 +4669,11 @@ window.METODISTLAR = [
   const noLessonDays = tid => (S.nolesson || []).filter(z => z.teacher_id === tid).map(z => +z.dow).sort();
   const recSeen = (o) => (S.tobs || []).some(x => x.teacher_id === o.teacher_id && x.author_id === o.user_id && x.day === o.day);
   const recNextDay = () => nextWorkday(S.me, today());
+  // Kunlik reja (haftalik rejadagi shu kun) — akademik xodimlarda kuniga necha dars ko'rishi: «7», «8 ta dars» va h.k.
+  const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
+  const recFromPlan = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); return !!m && +m[0] >= 1 && +m[0] <= 30; };
+  // Yana qancha «taklif» kerak: reja − tanlanganlar
+  const recWant = day => Math.max(0, recTarget(day) - recMine(day, ["tanlandi"]).length);
   // Intizomiy (va boshqa) xodimga CEO yo'naltirgan ustozlar — tavsiyada birinchi
   function recDirected(day) {
     const mine = (S.help || []).filter(h => h.to_id === S.me?.id && h.status === "qabul" && h.due >= day);
@@ -4705,11 +4710,11 @@ window.METODISTLAR = [
   }
   async function recFill(day, force) {
     if (!db.recTake || REC.busy) return false;
-    const pend = recMine(day, ["taklif"]).length;
-    if (pend >= REC_N && !force) return false;
+    const pend = recMine(day, ["taklif"]).length, want = recWant(day);
+    if (pend >= want) return false;
     if (!force && REC.at[day] && Date.now() - REC.at[day] < 60e3) return false;
     REC.busy = true;
-    try { const rows = await db.recTake(day, recCands(day), REC_N);
+    try { const rows = await db.recTake(day, recCands(day), want);
       S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); REC.at[day] = Date.now(); return true; }
     catch (e) { console.warn("recFill", e); return false; }
     finally { REC.busy = false; }
@@ -4729,10 +4734,10 @@ window.METODISTLAR = [
           <div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}${r ? (r.last ? ` · oxirgi: ${fmtDate(r.last.day)} (${esc(r.last.author_id === S.me.id ? "o'zingiz" : shortName(r.last.author_id))})` : " · bu oy hali ko'rilmagan") : ""}</div></div>${r ? plCount(r) : ""}`; };
       box.innerHTML = `<div class="card pl-rec rec-w" style="margin:0 0 16px"><div class="card-head"><h2>📌 Tavsiyalar</h2>
           <div class="seg" style="margin-left:8px"><button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button><button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
-          <span class="spacer"></span><span class="small muted">${ch.length ? `tanlangan: <b>${ch.length}</b>` : ""}</span></div>
-        <p class="small muted" style="margin:0 0 8px">Avval bu oy ko'rilmagan va kam ko'rilgan, oxirgi marta boshqa xodim ko'rgan ustozlar; filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
+          <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b></span></div>
+        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng. Avval bu oy ko'rilmagan va kam ko'rilgan, oxirgi marta boshqa xodim ko'rgan ustozlar; filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
-          : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
+          : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
         ${ch.length ? `<div class="small muted" style="margin:12px 0 4px"><b>Tanlanganlar — ${day === t ? "bugungi" : fmtDate(day)} rejangizda</b></div>
           ${ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Tanlovni bekor qilish — navbatga qaytadi">Bekor</button>`}</div>`; }).join("")}` : ""}
         <div class="row" style="margin-top:8px"><span class="spacer"></span><button type="button" class="btn sm ghost" id="rec-more">+ Yana tavsiya</button></div></div>`;
@@ -4740,14 +4745,16 @@ window.METODISTLAR = [
       $$("[data-rok]", box).forEach(b => b.onclick = async () => { b.disabled = true; const o = (S.recs || []).find(x => String(x.id) === b.dataset.rok);
         try { await db.recDecide(o.id, true); o.status = "tanlandi"; const tt = hrTeacher(o.teacher_id);
           if (opts.onPick && day === t && tt) opts.onPick(tt); toast(`${tt ? tt.full_name : "Ustoz"} rejangizga qo'shildi`);
-          await recFill(day, true); draw(); } catch (e) { toast(e.message, true); b.disabled = false; } });
+          // kunlik reja to'lsa — qolgan takliflar boshqalarga bo'shatiladi
+          if (!recWant(day)) { for (const x of recMine(day, ["taklif"])) { try { await db.recCancel(x.id); x.status = "bekor"; } catch (e) {} } toast("Kunlik rejangiz to'ldi"); }
+          else await recFill(day, true); draw(); } catch (e) { toast(e.message, true); b.disabled = false; } });
       $$("[data-rno]", box).forEach(b => b.onclick = () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rno); recRejectModal(o, async () => { await recFill(day, true); draw(); }); });
       $$("[data-rcx]", box).forEach(b => b.onclick = async () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rcx);
         try { await db.recCancel(o.id); o.status = "bekor"; draw(); } catch (e) { toast(e.message, true); } });
       $("#rec-more", box).onclick = async () => { const before = recMine(day, ["taklif"]).length; await recFillMore(day); draw(); if (recMine(day, ["taklif"]).length === before) toast("Boshqa mos ustoz qolmadi"); };
     };
     draw();
-    if (recMine(day, ["taklif"]).length < REC_N) recFill(day).then(ch => { if (ch && box.isConnected) draw(); });
+    if (recMine(day, ["taklif"]).length < recWant(day)) recFill(day).then(ch => { if (ch && box.isConnected) draw(); });
   }
   async function recFillMore(day) { if (!db.recTake) return; try { const rows = await db.recTake(day, recCands(day), recMine(day, ["taklif"]).length + REC_N);
     S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); } catch (e) { toast(e.message, true); } }
