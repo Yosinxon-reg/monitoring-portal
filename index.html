@@ -1741,6 +1741,19 @@ window.LESSONS = [
       async sendHelpReq(to_id, teacher_ids, due, note) { const d = load(); d.helpreq = d.helpreq || []; const id = Date.now(); d.helpreq.unshift({ id, from_id: me().id, to_id, teacher_ids, due, note: note || "", status: "kutilmoqda", reply: "", created_at: new Date().toISOString() }); save(); return ok(id); },
       async answerHelpReq(rid, okk, msg) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) { h.status = okk ? "qabul" : "rad"; h.reply = msg || ""; h.answered_at = new Date().toISOString(); } save(); return ok(true); },
       async cancelHelpReq(rid) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) h.status = "bekor"; save(); return ok(true); },
+      // ---- 43: amaliyot fanlari (demo) — umumiy jadval amallari
+      async amalLoad() { const d = load(); const T = k => d["amal_" + k] || [];
+        if (!d.amal_access) { d.amal_access = [{ user_id: "u-x1", can_eval: true }]; save(); }
+        return ok({ acc: T("access"), teachers: T("teachers"), videos: T("videos"), months: T("months"), notes: T("notes"), awards: T("awards"), groups: T("groups"), tg: T("tg") }); },
+      async amalAccess() { const d = load(); if (!d.amal_access) { d.amal_access = [{ user_id: "u-x1", can_eval: true }]; save(); } return ok(d.amal_access); },
+      async amalIns(tb, row) { const d = load(); const a = d["amal_" + tb] = d["amal_" + tb] || [];
+        const r = { id: tb === "teachers" ? "a" + Date.now() + Math.floor(Math.random() * 1e3) : Date.now() + Math.random(), created_at: new Date().toISOString(), ...row };
+        if (tb === "notes" && !r.author_id) r.author_id = me().id; if (tb === "videos" && !r.created_by) r.created_by = me().id; a.push(r); save(); return ok(r); },
+      async amalUpd(tb, match, patch) { const d = load(); (d["amal_" + tb] || []).filter(x => Object.entries(match).every(([k, v]) => x[k] === v)).forEach(x => Object.assign(x, patch)); save(); return ok(true); },
+      async amalUps(tb, row, keys) { const d = load(); const a = d["amal_" + tb] = d["amal_" + tb] || []; const x = a.find(z => keys.every(k => z[k] === row[k]));
+        if (x) Object.assign(x, row); else a.push({ ...row }); save(); return ok(true); },
+      async amalAssign(iid, tid) { const d = load(); (d.amal_tg || []).filter(x => x.id === iid).forEach(x => { x.teacher_id = tid; x.status = tid ? "biriktirildi" : "ahamiyatsiz"; }); save(); return ok(true); },
+      async amalDel(tb, match) { const d = load(); d["amal_" + tb] = (d["amal_" + tb] || []).filter(x => !Object.entries(match).every(([k, v]) => x[k] === v)); save(); return ok(true); },
       // ---- 42: tavsiyalar navbati (demo)
       async listRecs(from, to) { return ok((load().recs || []).filter(o => o.day >= from && o.day <= to)); },
       async listNoLesson() { return ok(load().nolesson || []); },
@@ -2033,6 +2046,21 @@ window.LESSONS = [
       async sendHelpReq(to_user, tids, due_date, msg) { return chk(await sb.rpc("send_help_request", { to_user, tids, due_date, msg: msg || "" })); },
       async answerHelpReq(rid, ok, msg) { chk(await sb.rpc("answer_help_request", { rid, ok, msg: msg || "" })); return true; },
       async cancelHelpReq(rid) { chk(await sb.rpc("cancel_help_request", { rid })); return true; },
+      // ---- 43: amaliyot fanlari
+      async amalLoad() {
+        const since = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
+        const q = (t, f) => pageSoft(() => f ? f(sb.from(t).select("*")) : sb.from(t).select("*"));
+        const [acc, teachers, videos, months, notes, awards, groups, tg] = await Promise.all([q("amal_access"), q("amal_teachers"),
+          q("amal_videos", x => x.gte("month", since).order("id")), q("amal_months", x => x.gte("month", since)), q("amal_notes", x => x.order("id")),
+          q("amal_awards"), q("amal_groups"), q("amal_tg", x => x.gte("sent_at", since).order("id"))]);
+        return { acc, teachers, videos, months, notes, awards, groups, tg };
+      },
+      async amalAccess() { const r = await sb.from("amal_access").select("*"); return r.error ? [] : r.data; },
+      async amalIns(tb, row) { return chk(await sb.from("amal_" + tb).insert(row).select().single()); },
+      async amalUpd(tb, match, patch) { chk(await sb.from("amal_" + tb).update(patch).match(match)); return true; },
+      async amalUps(tb, row, keys) { chk(await sb.from("amal_" + tb).upsert(row, { onConflict: keys.join(",") })); return true; },
+      async amalDel(tb, match) { chk(await sb.from("amal_" + tb).delete().match(match)); return true; },
+      async amalAssign(iid, tid) { chk(await sb.rpc("amal_assign", { iid, tid })); return true; },
       // ---- 42: tavsiyalar navbati
       async listRecs(from, to) { return pageSoft(() => sb.from("rec_offers").select("*").gte("day", from).lte("day", to).order("id")); },
       async listNoLesson() { return pageSoft(() => sb.from("teacher_nolesson").select("*").order("teacher_id")); },
@@ -2670,6 +2698,7 @@ window.METODISTLAR = [
         isManager() ? db.listCeoReports(today(), today()).catch(() => []) : Promise.resolve(S.creps || []),
         db.listHelpReqs ? db.listHelpReqs().catch(() => S.help || []) : Promise.resolve([]), tqLoad()]);
       S.plans = pl || []; if (isManager()) S.creps = cr || []; S.help = hp || [];
+      if (db.amalAccess) { try { S.amalAcc = await db.amalAccess(); } catch (e) {} }
       if (db.listRecs) { try { const [rc, nl] = await Promise.all([db.listRecs(addD(w0, -7), addD(w0, 13)), db.listNoLesson()]);
         const keep = (S.recs || []).filter(o => o.day < addD(w0, -7) || o.day > addD(w0, 13)); S.recs = keep.concat(rc || []); S.nolesson = nl || []; } catch (e) {} }
       // Intizomiy bo'lim rahbariga akademik kuzatuvlar kerak emas (Filiallar sahifasida — kerak bo'lganda yuklanadi)
@@ -2745,7 +2774,7 @@ window.METODISTLAR = [
     "hisob-reyting": { tabs: grpTabs },
     ustozlar: { tabs: () => { if (!S.me || !isStaff()) return []; const o = [{ id: "yordam", label: "Ustozlarim" }];
       if (canPlan()) o.push({ id: "oylik-reja", label: "Oylik reja" }); if (canMetAdmin()) o.push({ id: "oqituvchilar", label: "Barcha ustozlar va reyting" });
-      if (canSeeBog()) o.push({ id: "bogcha", label: "Bog'chalar" }); return o; } },
+      if (canSeeBog()) o.push({ id: "bogcha", label: "Bog'chalar" }); if (amalSee()) o.push({ id: "amaliyot", label: "Amaliyot fanlari" }); return o; } },
     tahlil: { tabs: () => { if (!S.me || !isStaff()) return []; const r = S.me.role, o = [{ id: "statistika", label: "Statistika" }];
       if (canIntzStat()) o.push({ id: "intizomiy-tahlil", label: "Intizomiy tahlil" }); if (r === "asoschi" || r === "ceo") o.push({ id: "filiallar", label: "Filiallar" }); return o; } },
     shaxsiy: { tabs: () => { const o = [{ id: "profil", label: "Profilim" }]; if (S.me && isStaff()) o.push({ id: "organish", label: "O'rganish" }); o.push({ id: "portal-haqida", label: "Portal haqida" }); return o; } },
@@ -7180,10 +7209,11 @@ window.METODISTLAR = [
   function usersAdmin(page) {
     const tab = S.ui.utab || "faol";
     const archN = S.profiles.filter(p => p.archived).length;
-    const tabsHtml = `<div class="tabs" style="margin-top:0">${[["faol", "Faol xodimlar"], ["arxiv", `Arxiv${archN ? ` <span class="small muted">${archN}</span>` : ""}`], ["tatil", "Ta'til kunlari"]]
+    const tabsHtml = `<div class="tabs" style="margin-top:0">${[["faol", "Faol xodimlar"], ["arxiv", `Arxiv${archN ? ` <span class="small muted">${archN}</span>` : ""}`], ["tatil", "Ta'til kunlari"], ["amaliyot", "Amaliyot fanlari"]]
       .map(([k, l]) => `<button data-ut="${k}" class="${k === tab ? "active" : ""}">${l}</button>`).join("")}</div>`;
     const bindTabsU = () => $$("[data-ut]", page).forEach(b => b.onclick = () => { S.ui.utab = b.dataset.ut; usersAdmin(page); });
     if (tab === "arxiv") { page.innerHTML = head("Foydalanuvchilar", "Ishdan bo'shatilgan xodimlar avtomatik shu yerga o'tadi. Ular portalga kira olmaydi, ma'lumotlari saqlanib qoladi.") + tabsHtml + `<div id="u-body"></div>`; bindTabsU(); return archiveView($("#u-body", page)); }
+    if (tab === "amaliyot") { page.innerHTML = head("Foydalanuvchilar", "Amaliyot fanlari bo'limiga kirish va baholash huquqi.") + tabsHtml + `<div id="u-body"></div>`; bindTabsU(); return amAccessView($("#u-body", page)); }
     if (tab === "tatil") { page.innerHTML = head("Foydalanuvchilar", "Navbatdan tashqari ta'til kunlarini belgilang. Yakshanba — hamma uchun dam olish kuni, 5 kunlik ish jadvalidagilar uchun shanba ham.") + tabsHtml + `<div id="u-body"></div>`; bindTabsU(); return leavesView($("#u-body", page)); }
     const rf = S.ui.urole || "";
     const list = S.profiles.filter(p => !p.archived && (!rf || p.role === rf)).sort((a, b) =>
@@ -8265,8 +8295,11 @@ window.METODISTLAR = [
     const tabs = [["mening", "Mening ustozlarim", ""], ["tq", "Ustoz so'rovlari", (canMetAdmin() ? tqPending().length : tqAnswered().length) || ""],
       ["sorov", "Yordam so'rovlari", hrIncoming().length || ""], ...(canPool() && poolList().length ? [["baza", "Yangi bazadan tanlash", poolList().length]] : [])];
     const tab = tabs.some(x => x[0] === S.ui.yTab) ? S.ui.yTab : "mening";
+    if (amalSee() && !S.amal && !S._amalLoading) { S._amalLoading = true; amalReload().then(() => { S._amalLoading = false; if (curRoute() === "yordam") PAGES.yordam(page); }); }
+    const schoolN = (S.teachers || []).filter(x => !tArch(x)).length, amN = S.amal ? amLive().length : null;
     page.innerHTML = head("Ustozlarim", "O'z ustozlaringiz ro'yxati. Ustoz ishdan ketsa yoki yangi ustoz kelsa — shu yerdan CEOga so'rov yuborasiz; boshqa xodimdan yordam so'rashingiz ham mumkin.",
       `<button class="btn" id="hr-new">🤝 Yordam so'rash</button>`) +
+      (amalSee() && amN !== null ? `<div class="note" style="margin:0 0 12px">👥 Jami ustozlar: <b>${schoolN + amN}</b> — maktab: ${schoolN}, <a href="#/amaliyot">amaliyot fanlari: ${amN}</a></div>` : "") +
       `<div class="tabs">${tabs.map(([k, l, b]) => `<button data-yt="${k}" class="${tab === k ? "active" : ""}">${l}${b ? ` <span class="badge">${b}</span>` : ""}</button>`).join("")}</div><div id="ybody"></div>`;
     $$("[data-yt]", page).forEach(b => b.onclick = () => { S.ui.yTab = b.dataset.yt; PAGES.yordam(page); });
     $("#hr-new", page).onclick = () => hrNewModal(() => PAGES.yordam(page));
@@ -8541,6 +8574,417 @@ window.METODISTLAR = [
   // Reja oyiga 4 marta, faqat akademik ball (/30); umumiy ustozlar reytingi va statistikasiga qo'shilmaydi.
   // =====================================================================
   const BOG_FIL = ["Farg'ona", "Samarqand", "Chilonzor"];
+  // =====================================================================
+  // 43: AMALIYOT FANLARI — alohida bo'lim (faqat Monitoring bo'limi rahbari, Akademik CEO va baholovchi ko'radi)
+  // Ball: 3 video × 5 (faollik 0–3, tartib 0/1, sifat 0/1) + to'liq dars 10 (5 yo'nalish × 2 talab) = 25; bonus video 1 ball, oyiga 10 gacha
+  // =====================================================================
+  const AMAL_SUBJ = ["Futbol va jismoniy tarbiya", "Gimnastika", "Kamondan o'q otish", "Muhandislik", "Musiqa", "Ot sporti", "Pazandachilik", "Robototexnika", "Shaxmat", "Suzish", "Taekvondo", "Tasviriy san'at", "Tikuvchilik"];
+  const AMAL_DEADLINE = 20, AMAL_BONUS_MAX = 10;
+  const AMAL_DIRS = [["etika", "Pedagogik muomala va etika", ["O'quvchilar bilan hurmatli va tushunarli muloqot qilish", "Haqorat, kamsitish, qo'rqitish va asossiz tanbehga yo'l qo'ymaslik"]],
+    ["vaqt", "Darsni tashkil etish va vaqt", ["Darsni o'z vaqtida boshlash va yakunlash", "Mashg'ulot bosqichlarini mantiqiy ketma-ketlikda olib borish, vaqtni mazmunli taqsimlash"]],
+    ["yordam", "Yo'l-yo'riq va individual yordam", ["Topshiriq yoki mashqni tushunarli tushuntirish, zarur bo'lsa namoyish qilish", "O'quvchilar ishini kuzatish, qiynalayotganlarga yordam berish, xatolarni tuzatish"]],
+    ["natija", "Amaliy ko'nikma va natija", ["Fan va dars maqsadiga mos amaliy topshiriq yoki mashq bajartirish", "Bajarilgan ish natijasini tekshirish va o'quvchiga aniq fikr bildirish"]],
+    ["xavfsizlik", "Maxsus kiyim va xavfsizlik", ["Fan talab qiladigan maxsus kiyim va himoya vositalaridan foydalanish", "Asbob-uskunadan to'g'ri foydalanish, xavfsizlik, o'quvchilarni nazoratsiz qoldirmaslik"]]];
+  S.amal = null;
+  const amalAcc = () => (S.amal && S.amal.acc) || S.amalAcc || [];
+  const amalSee = () => !!S.me && (S.me.role === "asoschi" || canMetAdmin() || amalAcc().some(a => a.user_id === S.me.id));
+  const amalEval = () => !!S.me && amalAcc().some(a => a.user_id === S.me.id && a.can_eval);
+  const amalAdmin = () => !!S.me && (S.me.role === "asoschi" || canMetAdmin());
+  async function amalReload() { if (!db.amalLoad) return; try { S.amal = await db.amalLoad(); S.amalAcc = S.amal.acc; } catch (e) { console.warn("amal", e); S.amal = S.amal || { acc: [], teachers: [], videos: [], months: [], notes: [], awards: [], groups: [], tg: [] }; } }
+  const amT = () => (S.amal ? S.amal.teachers : []);
+  const amLive = () => amT().filter(x => x.status !== "arxiv");
+  const amTeacher = id => amT().find(x => x.id === id);
+  const amMonthRow = (tid, ms) => (S.amal.months || []).find(x => x.teacher_id === tid && x.month === ms) || null;
+  const vDay = v => String(v.sent_at || v.created_at || "").slice(0, 10) || v.lesson_day || "";
+  const actPts = (st, en) => { if (!st || en === null || en === undefined || en === "") return null; const p = en / st * 100; return p >= 90 ? 3 : p >= 70 ? 2 : p >= 50 ? 1 : 0; };
+  // Ustozning shu oydagi holati
+  function amCalc(t, ms) {
+    const V = (S.amal.videos || []).filter(v => v.teacher_id === t.id && v.month === ms);
+    const main = V.filter(v => v.kind === "asosiy").sort((a, b) => (a.n || 0) - (b.n || 0)).slice(0, 3);
+    const bonus = V.filter(v => v.kind === "bonus");
+    const M = amMonthRow(t.id, ms) || {};
+    const dl = addD(ms, AMAL_DEADLINE - 1), past = today() > dl;
+    const inTime = main.length >= 3 && main.every(v => vDay(v) <= dl);
+    const elig = inTime || !!M.force_eval;
+    const scored = main.filter(v => v.score !== null && v.score !== undefined);
+    const vSum = scored.reduce((a, v) => a + v.score, 0);
+    const full = M.full_score ?? null;
+    const done = elig && main.length >= 3 && scored.length >= 3 && full !== null;
+    const base = done ? vSum + full : null;
+    const bon = Math.min(AMAL_BONUS_MAX, bonus.length);
+    const total = (base ?? 0) + bon;
+    const third = main.length >= 3 ? vDay(main[2]) : null;
+    let st, cls;
+    if (done) { st = base === 25 ? "25/25 ✓" : `${base}/25`; cls = base === 25 ? "bajarildi" : "jarayonda"; }
+    else if (!elig && past) { st = "baholanmaydi"; cls = "qaytarildi"; }
+    else if (main.length < 3) { st = `video ${main.length}/3`; cls = "yangi"; }
+    else if (scored.length < 3) { st = "video baholash kutilmoqda"; cls = "jarayonda"; }
+    else { st = "to'liq dars kutilmoqda"; cls = "jarayonda"; }
+    return { t, ms, main, bonus, M, elig, inTime, past, vSum, scoredN: scored.length, full, done, base, bon, total, third, st, cls };
+  }
+  const amSubjCount = subj => amLive().filter(x => x.subject === subj).length;
+  // Oy ustozi nomzodlari: ko'p ustozli fanda — 25 olganlar ichida eng yuqori jami; yagona ustozli fanda — oxirgi unvondan beri jami 10 bonus
+  function amCandidates(ms) {
+    const out = [];
+    [...new Set(amLive().map(x => x.subject).filter(Boolean))].sort().forEach(subj => {
+      const T = amLive().filter(x => x.subject === subj); const award = (S.amal.awards || []).find(a => a.subject === subj && a.month === ms);
+      if (T.length >= 2) {
+        const C = T.map(x => amCalc(x, ms)).filter(c => c.base === 25)
+          .sort((a, b) => b.total - a.total || (b.full ?? 0) - (a.full ?? 0) || b.bonus.length - a.bonus.length || String(a.third || "9").localeCompare(String(b.third || "9")));
+        out.push({ subj, single: false, list: C, award });
+      } else if (T.length === 1) {
+        const x = T[0]; const lastAw = (S.amal.awards || []).filter(a => a.subject === subj && a.month < ms).map(a => a.month).sort().pop() || "0000";
+        const cum = (S.amal.videos || []).filter(v => v.teacher_id === x.id && v.kind === "bonus" && v.month > lastAw && v.month <= ms).length;
+        const c = amCalc(x, ms); c.cum = cum;
+        out.push({ subj, single: true, list: cum >= AMAL_BONUS_MAX && c.base === 25 ? [c] : [], one: c, award });
+      }
+    });
+    return out;
+  }
+  // Yillik (o'quv yili: sentabrdan) reyting
+  function amYear(ms) {
+    const y = +ms.slice(0, 4), m = +ms.slice(5, 7); const from = `${m >= 9 ? y : y - 1}-09-01`;
+    const months = [...new Set((S.amal.videos || []).map(v => v.month).concat((S.amal.months || []).map(x => x.month)))].filter(x => x >= from && x <= ms).sort();
+    return amLive().map(t => { const C = months.map(mm => amCalc(t, mm)); const sum = C.reduce((a, c) => a + c.total, 0);
+      return { t, sum, n25: C.filter(c => c.base === 25).length, bon: C.reduce((a, c) => a + c.bonus.length, 0), aw: (S.amal.awards || []).filter(a => a.teacher_id === t.id).length }; })
+      .filter(r => r.sum > 0).sort((a, b) => b.sum - a.sum || b.n25 - a.n25);
+  }
+  const amMonths = () => { const t = today(); return Array.from({ length: 8 }, (_, i) => mStart(addD(mStart(t), -i * 28 - (i ? 3 : 0)))).filter((v, i, a) => a.indexOf(v) === i); };
+
+  PAGES.amaliyot = async page => {
+    if (!amalSee()) return PAGES.bosh(page);
+    if (!S.amal) { page.innerHTML = `<div class="empty" style="padding:40px">Yuklanmoqda…</div>`; await amalReload(); if (curRoute() !== "amaliyot") return; }
+    const tab = S.ui.amTab || "ustozlar", ms = S.ui.amM || mStart(today()), fil = S.ui.amF || "", subj = S.ui.amS || "";
+    const subs = [...new Set(amLive().map(x => x.subject).concat(AMAL_SUBJ))].filter(Boolean).sort();
+    const fils = FILIALLAR.filter(f => amLive().some(x => x.filial === f));
+    page.innerHTML = head("Amaliyot fanlari", "Ustozlar oyiga 3 ta video (20-sanagacha) yuboradi, Monitoring bo'limi bitta darsni kamera orqali to'liq ko'radi. 3 × 5 + 10 = 25 ball, bonus videolar — +1 dan (oyiga 10 gacha).",
+      `<div class="row" style="gap:8px"><button class="btn" id="am-word">⬇ Word</button>${amalSee() ? `<button class="btn primary" id="am-new">➕ Ustoz qo'shish</button>` : ""}</div>`) + `
+      <div class="seg" style="margin-bottom:12px">${[["ustozlar", "Ustozlar"], ["baholash", `Baholash${amalEval() ? "" : " (ko'rish)"}`], ["dashboard", "Dashboard"], ["oy", "Oy ustozi"], ["tg", "Telegram guruhlar"]]
+        .map(([k, l]) => `<button type="button" data-amt="${k}" class="${k === tab ? "active" : ""}">${l}</button>`).join("")}</div>
+      <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <select id="am-m" style="width:auto">${amMonths().map(m => `<option value="${m}" ${m === ms ? "selected" : ""}>${esc(mLabel(m))}</option>`).join("")}</select>
+        <select id="am-f" style="width:auto"><option value="">Barcha filiallar</option>${fils.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
+        <select id="am-s" style="width:auto"><option value="">Barcha fanlar</option>${subs.map(f => `<option ${f === subj ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></div>
+      <div id="am-body"></div>`;
+    const rerun = () => PAGES.amaliyot(page);
+    $$("[data-amt]", page).forEach(b => b.onclick = () => { S.ui.amTab = b.dataset.amt; rerun(); });
+    $("#am-m", page).onchange = e => { S.ui.amM = e.target.value; rerun(); };
+    $("#am-f", page).onchange = e => { S.ui.amF = e.target.value; rerun(); };
+    $("#am-s", page).onchange = e => { S.ui.amS = e.target.value; rerun(); };
+    const nb = $("#am-new", page); if (nb) nb.onclick = () => amTeacherForm(null, rerun);
+    $("#am-word", page).onclick = () => amWordModal(ms, fil, subj);
+    const body = $("#am-body", page);
+    const T = amLive().filter(x => (!fil || x.filial === fil) && (!subj || x.subject === subj));
+    if (tab === "baholash") return amEvalView(body, T, ms, rerun);
+    if (tab === "dashboard") return amDash(body, T, ms);
+    if (tab === "oy") return amAwardView(body, ms, rerun);
+    if (tab === "tg") return amTgView(body, rerun);
+    // Ustozlar
+    const C = T.map(x => amCalc(x, ms)).sort((a, b) => (a.t.subject || "").localeCompare(b.t.subject || "") || (a.t.filial || "").localeCompare(b.t.filial || "") || a.t.full_name.localeCompare(b.t.full_name));
+    const full = C.filter(c => c.main.length >= 3).length, s25 = C.filter(c => c.base === 25).length;
+    const bases = C.filter(c => c.base !== null).map(c => c.base); const avg = bases.length ? Math.round(bases.reduce((a, b) => a + b, 0) / bases.length * 10) / 10 : null;
+    body.innerHTML = `<div class="stats">${stat("Amaliyot ustozlari", T.length)}${stat("3/3 video yuborgan", `${full} / ${T.length}`, full === T.length && T.length ? "ok" : "warn")}
+        ${stat("25 ball olgan", s25, s25 ? "ok" : "")}${stat("O'rtacha ball", avg === null ? "—" : `${avg}/25`)}</div>
+      <div class="card" style="margin-top:16px;padding:0"><div class="table-wrap"><table class="mt-tbl"><thead><tr><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Videolar</th><th>Video ball</th><th>To'liq dars</th><th>Bonus</th><th>Jami</th><th>Holat</th></tr></thead><tbody>
+      ${C.map(c => `<tr class="click" data-amp="${c.t.id}"><td><div class="row" style="gap:8px;align-items:center">${avatar(c.t.full_name, c.t.photo_url, "sm")}<b>${esc(c.t.full_name)}</b></div></td><td>${esc(c.t.subject || "—")}</td><td>${esc(c.t.filial || "—")}</td>
+        <td>${c.main.length}/3</td><td>${c.scoredN ? `${c.vSum}/15` : "—"}</td><td>${c.full !== null ? `${c.full}/10` : "—"}</td><td>${c.bon ? "+" + c.bon : "—"}</td>
+        <td><b>${c.base !== null ? c.base + (c.bon ? " + " + c.bon : "") : c.bon ? "+" + c.bon : "—"}</b></td><td>${pill(c.cls, c.st)}</td></tr>`).join("") || `<tr><td colspan="9" class="empty">Ustoz topilmadi</td></tr>`}
+      </tbody></table></div></div>`;
+    $$("[data-amp]", body).forEach(r => r.onclick = () => amProfile(r.dataset.amp, rerun));
+  };
+
+  function amTeacherForm(t, done) {
+    const subs = [...new Set(AMAL_SUBJ.concat(amT().map(x => x.subject)))].filter(Boolean).sort();
+    const m = openModal(t ? "Ustozni tahrirlash" : "➕ Amaliyot ustozi", `
+      <div class="field"><label>Familiya Ism *</label><input id="at-n" value="${esc(t ? t.full_name : "")}"></div>
+      <div class="field"><label>Fan *</label><select id="at-s"><option value=""></option>${subs.map(x => `<option ${t && t.subject === x ? "selected" : ""}>${esc(x)}</option>`).join("")}<option value="__">Boshqa fan…</option></select>
+        <input id="at-s2" placeholder="Fan nomi" style="display:none;margin-top:6px"></div>
+      <div class="field"><label>Filial *</label><select id="at-f"><option value=""></option>${FILIALLAR.map(f => `<option ${t && t.filial === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></div>
+      <div class="field"><label>Rasm havolasi (ixtiyoriy)</label><input id="at-p" value="${esc(t ? t.photo_url || "" : "")}" placeholder="https://…"></div>
+      <div class="err-text" id="at-e"></div>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="at-go">Saqlash</button>`);
+    $("#at-s", m).onchange = e => { $("#at-s2", m).style.display = e.target.value === "__" ? "" : "none"; };
+    $("#at-go", m).onclick = async e => {
+      const n = $("#at-n", m).value.trim().replace(/\s+/g, " "), s = $("#at-s", m).value === "__" ? $("#at-s2", m).value.trim() : $("#at-s", m).value, f = $("#at-f", m).value;
+      if (n.split(" ").length < 2 || !s || !f) return $("#at-e", m).textContent = "Familiya, ism, fan va filialni to'ldiring";
+      e.target.disabled = true;
+      try { const row = { full_name: n, subject: s, filial: f, photo_url: $("#at-p", m).value.trim() };
+        if (t) await db.amalUpd("teachers", { id: t.id }, row); else await db.amalIns("teachers", { ...row, created_by: S.me.id });
+        await amalReload(); closeModal(); toast("Saqlandi"); done && done(); }
+      catch (x) { $("#at-e", m).textContent = /duplicate|unique/i.test(x.message) ? "Bu ustoz shu fan va filialda allaqachon bor" : x.message; e.target.disabled = false; }
+    };
+  }
+
+  // Bot guruhdan yig'gan videolar (bir kundagi bir nechta video = 1 dars)
+  function amTgBlock(t, ms, c) {
+    const me = mEndOf(ms); const used = new Set((S.amal.videos || []).filter(v => v.teacher_id === t.id).flatMap(v => [String(v.tg_id || ""), v.link]));
+    const L = (S.amal.tg || []).filter(x => x.teacher_id === t.id && x.day >= ms && x.day <= me && x.status !== "ahamiyatsiz").sort((a, b) => a.day < b.day ? -1 : 1);
+    if (!L.length) return "";
+    const byDay = {}; L.forEach(x => (byDay[x.day] = byDay[x.day] || []).push(x));
+    const days = Object.keys(byDay).sort();
+    return `<div class="small muted" style="margin:10px 0 4px"><b>📥 Telegram guruhdan kelgan darslar: ${days.length}</b> (bir kundagi videolar — 1 dars)</div>
+      ${days.map(d => { const xs = byDay[d]; const u = xs.some(x => used.has(String(x.id)) || used.has(x.link)); const x = xs[0];
+        return `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${fmtDate(d)} · ${xs.map((z, i) => `<a href="${esc(z.link)}" target="_blank" rel="noopener">video${xs.length > 1 ? " " + (i + 1) : ""} ↗</a>`).join(" ")}</div>
+          <div class="small muted">${esc((x.caption || "").slice(0, 120)) || "izohsiz"}</div></div>
+          ${u ? pill("bajarildi", "kiritilgan") : amalEval() ? (c.main.length < 3 ? `<button class="btn sm primary" data-tgv="${x.id}" data-k="asosiy">→ ${c.main.length + 1}-video</button>` : `<button class="btn sm" data-tgv="${x.id}" data-k="bonus">→ Bonus (+1)</button>`) : ""}</div>`; }).join("")}`;
+  }
+  function amProfile(id, done) {
+    const t = amTeacher(id); if (!t) return;
+    const ms = S.ui.amM || mStart(today()); const c = amCalc(t, ms);
+    const hist = [...new Set((S.amal.videos || []).filter(v => v.teacher_id === id).map(v => v.month).concat((S.amal.months || []).filter(x => x.teacher_id === id).map(x => x.month)))].sort().reverse();
+    const notes = (S.amal.notes || []).filter(x => x.teacher_id === id).sort((a, b) => (b.day + b.created_at).localeCompare(a.day + a.created_at));
+    const aw = (S.amal.awards || []).filter(a => a.teacher_id === id);
+    const vRow = v => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${v.kind === "bonus" ? "⭐ Bonus video" : `${v.n}-video`} · ${fmtDate(v.lesson_day || vDay(v))}${v.link ? ` · <a href="${esc(v.link)}" target="_blank" rel="noopener">havola ↗</a>` : ""}</div>
+      <div class="small muted">${v.kind === "bonus" ? "+1 ball" : v.score !== null && v.score !== undefined ? `faollik ${v.s_act}/3 (${v.engaged ?? "?"}/${v.students ?? "?"}), tartib ${v.s_order}, sifat ${v.s_quality} — <b>${v.score}/5</b>` : "baholanmagan"}${v.note ? " · " + esc(v.note) : ""}</div></div>
+      ${amalEval() ? `<button class="btn sm ghost" data-ve="${v.id}">${v.kind === "bonus" ? "Tahrirlash" : "Baholash"}</button>` : ""}</div>`;
+    const m = openModal(`${esc(t.full_name)}`, `
+      <div class="row" style="gap:12px;align-items:center;margin-bottom:12px">${avatar(t.full_name, t.photo_url)}<div><div><b>${esc(t.subject)}</b> · ${esc(t.filial)}</div>
+        <div class="small muted">${aw.length ? `🏆 Oy ustozi: ${aw.length} marta (${aw.map(a => esc(mLabel(a.month))).join(", ")})` : "Oy ustozi unvoni hali yo'q"}</div></div><span class="spacer"></span>
+        ${amalSee() ? `<button class="btn sm ghost" id="ap-ed">✏️</button><button class="btn sm ghost" id="ap-left">🚪 Ishdan ketdi</button>` : ""}</div>
+      <div class="card" style="margin:0 0 12px"><div class="card-head"><h2>${esc(mLabel(ms))}</h2><span class="spacer"></span>${pill(c.cls, c.st)}</div>
+        <div class="small" style="margin-bottom:8px">Videolar: <b>${c.vSum}/15</b> · To'liq dars: <b>${c.full ?? "—"}/10</b> · Bonus: <b>+${c.bon}</b> · Jami: <b>${c.base !== null ? c.base + c.bon : "—"}</b>${!c.inTime && c.past ? ` · <span class="bad-t">20-sanagacha 3 ta video bo'lmagan</span>` : ""}</div>
+        ${c.main.map(vRow).join("")}${c.bonus.map(vRow).join("")}
+        ${c.M.full_score !== undefined && c.M.full_score !== null ? `<div class="list-item"><div style="flex:1"><div class="t">🎥 To'liq dars · ${fmtDate(c.M.full_day)}${c.M.klass ? ` · ${esc(c.M.klass)} sinf` : ""}${c.M.lesson_no ? ` · ${c.M.lesson_no}-soat` : ""}${c.M.lesson_time ? ` · ${esc(c.M.lesson_time)}` : ""}</div><div class="small muted">${c.M.full_score}/10${c.M.no_watch ? " · <b>dars ko'rilmay ball berildi</b>" : ""}${c.M.advice ? " · tavsiya: " + esc(c.M.advice) : ""}</div></div></div>` : c.M.camera_ok === false ? `<div class="note" style="margin-top:8px">📷 Kamera ishlamadi — qaror: ${esc(c.M.full_note || "kutilmoqda")}</div>` : ""}
+        ${amTgBlock(t, ms, c)}
+        <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">
+          ${amalEval() ? `${c.main.length < 3 ? `<button class="btn sm primary" id="ap-v">+ ${c.main.length + 1}-video</button>` : ""}<button class="btn sm" id="ap-b">⭐ Bonus video (+1)</button>
+            <button class="btn sm" id="ap-full" ${c.main.length < 3 && !c.M.force_eval ? "disabled title='Avval 3 ta video'" : ""}>🎥 To'liq dars (10 ball)</button>` : ""}
+          ${(amalEval() || amalAdmin()) && !c.inTime ? `<label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="ap-force" ${c.M.force_eval ? "checked" : ""} style="width:auto"> Muddat o'tsa ham baholansin</label>` : ""}
+          <span class="spacer"></span>${c.done ? `<button class="btn sm ghost" id="ap-izoh">📋 Baholash izohi</button>` : ""}</div></div>
+      <div class="card" style="margin:0 0 12px"><div class="card-head"><h2>📝 Kunlik izohlar</h2></div>
+        ${amalSee() ? `<div class="row" style="gap:6px;margin-bottom:8px"><textarea id="ap-note" rows="2" placeholder="Bugungi izoh…" style="flex:1"></textarea><button class="btn sm primary" id="ap-ns">Qo'shish</button></div>` : ""}
+        ${notes.map(x => `<div class="list-item"><div style="flex:1"><div class="small muted">${fmtDate(x.day)} · ${esc(nameOf(x.author_id))}</div><div style="white-space:pre-wrap">${esc(x.body)}</div></div></div>`).join("") || `<div class="small muted">Izoh hali yo'q</div>`}</div>
+      ${hist.length ? `<div class="card" style="margin:0"><div class="card-head"><h2>📈 Oylar bo'yicha</h2></div><div class="table-wrap"><table><thead><tr><th>Oy</th><th>Video</th><th>To'liq dars</th><th>Bonus</th><th>Jami</th><th>Holat</th></tr></thead><tbody>
+        ${hist.map(mm => { const h = amCalc(t, mm); return `<tr><td>${esc(mLabel(mm))}</td><td>${h.scoredN ? h.vSum + "/15" : "—"}</td><td>${h.full ?? "—"}</td><td>${h.bon ? "+" + h.bon : "—"}</td><td><b>${h.base !== null ? h.base + h.bon : "—"}</b></td><td>${pill(h.cls, h.st)}</td></tr>`; }).join("")}</tbody></table></div></div>` : ""}`,
+      `<button class="btn" data-close>Yopish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "760px";
+    const again = () => { done && done(); amProfile(id, done); };
+    const on = (sel, fn) => { const b = $(sel, m); if (b) b.onclick = fn; };
+    on("#ap-ed", () => amTeacherForm(t, again));
+    on("#ap-left", async () => { const why = prompt("Ishdan ketish sababi (ixtiyoriy):", ""); if (why === null) return;
+      try { await db.amalUpd("teachers", { id }, { status: "arxiv", left_at: today(), left_note: why }); await amalReload(); closeModal(); toast("Arxivga o'tkazildi — ballari saqlanadi"); done && done(); } catch (e) { toast(e.message, true); } });
+    on("#ap-v", () => amVideoForm(t, ms, null, "asosiy", again));
+    on("#ap-b", () => amVideoForm(t, ms, null, "bonus", again));
+    on("#ap-full", () => amFullForm(t, ms, again));
+    on("#ap-izoh", () => amIzoh(t, ms));
+    $$("[data-tgv]", m).forEach(b => b.onclick = () => { const x = (S.amal.tg || []).find(z => String(z.id) === b.dataset.tgv); if (!x) return;
+      amVideoForm(t, ms, null, b.dataset.k, again, { link: x.link, lesson_day: x.day, sent_at: x.sent_at, tg_id: x.id }); });
+    $$("[data-ve]", m).forEach(b => b.onclick = () => { const v = (S.amal.videos || []).find(x => String(x.id) === b.dataset.ve); amVideoForm(t, ms, v, v.kind, again); });
+    const fc = $("#ap-force", m); if (fc) fc.onchange = async () => { try { await db.amalUps("months", { teacher_id: id, month: ms, force_eval: fc.checked }, ["teacher_id", "month"]); await amalReload(); again(); } catch (e) { toast(e.message, true); } };
+    on("#ap-ns", async () => { const b = $("#ap-note", m).value.trim(); if (!b) return;
+      try { await db.amalIns("notes", { teacher_id: id, body: b, day: today(), author_id: S.me.id }); await amalReload(); again(); } catch (e) { toast(e.message, true); } });
+  }
+
+  function amVideoForm(t, ms, v, kind, done, pre) {
+    pre = pre || {};
+    const bonus = kind === "bonus"; const n = v ? v.n : (S.amal.videos || []).filter(x => x.teacher_id === t.id && x.month === ms && x.kind === "asosiy").length + 1;
+    const m = openModal(bonus ? "⭐ Bonus video (+1 ball)" : `${n}-video — baholash`, `<p class="small muted" style="margin-top:0"><b>${esc(t.full_name)}</b> · ${esc(t.subject)} · ${esc(t.filial)} · ${esc(mLabel(ms))}</p>
+      <div class="field"><label>Telegram havolasi *</label><input id="av-l" value="${esc(v ? v.link : pre.link || "")}" placeholder="https://t.me/c/…"></div>
+      <div class="row" style="gap:10px"><div class="field" style="flex:1"><label>Dars sanasi</label><input type="date" id="av-d" value="${esc(v ? v.lesson_day || "" : pre.lesson_day || today())}"></div>
+        <div class="field" style="flex:1"><label>Yuborilgan sana</label><input type="date" id="av-s" value="${esc(v ? vDay(v) : String(pre.sent_at || today()).slice(0, 10))}"></div></div>
+      ${bonus ? "" : `<div class="row" style="gap:10px"><div class="field" style="flex:1"><label>Qatnashgan o'quvchilar *</label><input type="number" min="1" id="av-st" value="${v && v.students != null ? v.students : ""}"></div>
+        <div class="field" style="flex:1"><label>Jalb qilinganlar *</label><input type="number" min="0" id="av-en" value="${v && v.engaged != null ? v.engaged : ""}"></div></div>
+        <div class="small muted" id="av-act" style="margin:-4px 0 8px"></div>
+        <label class="row" style="gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="av-o" style="width:auto" ${!v || v.s_order ? "checked" : ""}> Darsdagi tartib (1 ball)</label>
+        <label class="row" style="gap:8px;align-items:center;font-weight:400;margin:4px 0 8px"><input type="checkbox" id="av-q" style="width:auto" ${!v || v.s_quality ? "checked" : ""}> Video sifati — tasvir ravshan, ovoz tushunarli, jarayon ko'rinadi (1 ball)</label>`}
+      <div class="field"><label>Izoh</label><textarea id="av-n" rows="2">${esc(v ? v.note || "" : "")}</textarea></div><div class="err-text" id="av-e"></div>`,
+      `${v ? `<button class="btn ghost" id="av-del">O'chirish</button>` : ""}<span class="spacer"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="av-go">Saqlash</button>`);
+    const upd = () => { const a = $("#av-act", m); if (!a) return; const p = actPts(+$("#av-st", m).value, $("#av-en", m).value === "" ? null : +$("#av-en", m).value);
+      const tot = p === null ? null : p + ($("#av-o", m).checked ? 1 : 0) + ($("#av-q", m).checked ? 1 : 0);
+      a.innerHTML = p === null ? "Faollik balli foizdan avtomatik hisoblanadi: 90–100% — 3, 70–89% — 2, 50–69% — 1" : `Faollik: <b>${Math.round($("#av-en", m).value / $("#av-st", m).value * 100)}% → ${p}/3</b> · video bali: <b>${tot}/5</b>`; };
+    ["#av-st", "#av-en", "#av-o", "#av-q"].forEach(s => { const el = $(s, m); if (el) el.oninput = el.onchange = upd; }); upd();
+    $("#av-go", m).onclick = async e => {
+      const link = $("#av-l", m).value.trim(); if (!/^https?:\/\//.test(link)) return $("#av-e", m).textContent = "Telegram havolasini kiriting";
+      const row = { teacher_id: t.id, month: ms, kind, n: bonus ? 0 : n, link, lesson_day: $("#av-d", m).value || null, sent_at: ($("#av-s", m).value || today()) + "T12:00:00+05:00", note: $("#av-n", m).value.trim() };
+      if (pre.tg_id) row.tg_id = pre.tg_id;
+      if (!bonus) { const st = +$("#av-st", m).value, en = $("#av-en", m).value === "" ? null : +$("#av-en", m).value;
+        if (!st || en === null || en > st || en < 0) return $("#av-e", m).textContent = "O'quvchilar sonini to'g'ri kiriting (jalb qilinganlar qatnashganlardan ko'p emas)";
+        const a = actPts(st, en), o = $("#av-o", m).checked ? 1 : 0, q = $("#av-q", m).checked ? 1 : 0;
+        Object.assign(row, { students: st, engaged: en, s_act: a, s_order: o, s_quality: q, score: a + o + q, eval_by: S.me.id, eval_at: new Date().toISOString() }); }
+      else Object.assign(row, { score: 1, eval_by: S.me.id, eval_at: new Date().toISOString() });
+      e.target.disabled = true;
+      try { if (v) await db.amalUpd("videos", { id: v.id }, row); else await db.amalIns("videos", { ...row, created_by: S.me.id }); await amalReload(); closeModal(); toast("Saqlandi"); done && done(); }
+      catch (x) { $("#av-e", m).textContent = x.message; e.target.disabled = false; }
+    };
+    const dl = $("#av-del", m); if (dl) dl.onclick = async () => { if (!confirm("Video o'chirilsinmi?")) return; try { await db.amalDel("videos", { id: v.id }); await amalReload(); closeModal(); done && done(); } catch (e) { toast(e.message, true); } };
+  }
+
+  function amFullForm(t, ms, done) {
+    const M = amMonthRow(t.id, ms) || {}; const it = M.items || {};
+    const m = openModal("🎥 To'liq kuzatilgan dars — 10 ball", `<p class="small muted" style="margin-top:0"><b>${esc(t.full_name)}</b> · ${esc(t.subject)} · ${esc(t.filial)} · ${esc(mLabel(ms))}</p>
+      <div class="row" style="gap:10px;flex-wrap:wrap"><div class="field" style="flex:1;min-width:130px"><label>Dars sanasi *</label><input type="date" id="af-d" value="${esc(M.full_day || today())}"></div>
+        <div class="field" style="flex:1;min-width:90px"><label>Sinf *</label><input id="af-k" value="${esc(M.klass || "")}" placeholder="5-A"></div>
+        <div class="field" style="flex:1;min-width:90px"><label>Nechanchi soat *</label><input type="number" min="1" max="12" id="af-s" value="${M.lesson_no || ""}"></div>
+        <div class="field" style="flex:1;min-width:110px"><label>Vaqti</label><input id="af-t" value="${esc(M.lesson_time || "")}" placeholder="10:30–11:15"></div></div>
+      <label class="row" style="gap:8px;align-items:center;font-weight:400;margin-bottom:8px"><input type="checkbox" id="af-cam" style="width:auto" ${M.camera_ok === false ? "checked" : ""}> 📷 Kamera ishlamadi / darsni to'liq ko'rib bo'lmadi</label>
+      <div id="af-items">${AMAL_DIRS.map(([k, l, reqs]) => `<div class="card" style="margin:0 0 8px;padding:10px 12px"><div class="t" style="margin-bottom:4px"><b>${esc(l)}</b> <span class="small muted" data-dsum="${k}"></span></div>
+        ${reqs.map((r, i) => `<label class="row" style="gap:8px;align-items:flex-start;font-weight:400;margin:3px 0"><input type="checkbox" data-it="${k}${i + 1}" style="width:auto;margin-top:3px" ${it[k + (i + 1)] ? "checked" : ""}> ${esc(r)}</label>`).join("")}
+        <input data-itn="${k}" placeholder="Asos / kuzatuv (ixtiyoriy)" value="${esc((it.notes || {})[k] || "")}" style="margin-top:4px"></div>`).join("")}</div>
+      <div class="field"><label id="af-nl">Tavsiyalar</label><textarea id="af-a" rows="3">${esc(M.advice || "")}</textarea></div>
+      <div class="small"><b>Jami: <span id="af-sum">0</span>/10</b></div><div class="err-text" id="af-e"></div>`,
+      `<button class="btn ghost" id="af-nw" title="Dars kuzatilmasdan to'liq 10 ball qo'yiladi">✅ Dars ko'rmay ball berildi (10)</button><span class="spacer"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="af-go">Saqlash</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "720px";
+    $("#af-nw", m).onclick = async e => { if (!confirm("Dars ko'rilmasdan 10 ball berilsinmi?")) return;
+      const items = { notes: {} }; AMAL_DIRS.forEach(([kk]) => { items[kk + 1] = true; items[kk + 2] = true; items.notes[kk] = ""; });
+      const sn = +$("#af-s", m).value;
+      const row = { teacher_id: t.id, month: ms, full_day: $("#af-d", m).value || null, klass: $("#af-k", m).value.trim(), lesson_no: sn || null, lesson_time: $("#af-t", m).value.trim(),
+        camera_ok: true, no_watch: true, items, full_score: 10, advice: $("#af-a", m).value.trim(), full_note: "Dars ko'rilmay ball berildi", eval_by: S.me.id, eval_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      e.target.disabled = true;
+      try { await db.amalUps("months", row, ["teacher_id", "month"]); await amalReload(); closeModal(); toast("10 ball berildi"); done && done(); }
+      catch (x) { $("#af-e", m).textContent = x.message; e.target.disabled = false; } };
+    const sum = () => { let s = 0; AMAL_DIRS.forEach(([k]) => { const d = [1, 2].filter(i => $(`[data-it="${k}${i}"]`, m).checked).length; s += d; $(`[data-dsum="${k}"]`, m).textContent = `${d}/2`; });
+      $("#af-sum", m).textContent = s; const cam = $("#af-cam", m).checked; $("#af-items", m).style.opacity = cam ? .4 : 1; $("#af-nl", m).textContent = cam ? "Qaror / izoh *" : "Tavsiyalar"; return s; };
+    $$("input[type=checkbox]", m).forEach(x => x.onchange = sum); sum();
+    $("#af-go", m).onclick = async e => {
+      const cam = $("#af-cam", m).checked, d = $("#af-d", m).value, k = $("#af-k", m).value.trim(), sn = +$("#af-s", m).value;
+      if (!cam && (!d || !k || !sn)) return $("#af-e", m).textContent = "Sana, sinf va nechanchi soatni kiriting";
+      if (cam && !$("#af-a", m).value.trim()) return $("#af-e", m).textContent = "Kamera ishlamagan holat bo'yicha qaror/izohni yozing";
+      const items = { notes: {} }; AMAL_DIRS.forEach(([kk]) => { [1, 2].forEach(i => { items[kk + i] = $(`[data-it="${kk}${i}"]`, m).checked; }); items.notes[kk] = $(`[data-itn="${kk}"]`, m).value.trim(); });
+      const row = { teacher_id: t.id, month: ms, full_day: d || null, klass: k, lesson_no: sn || null, lesson_time: $("#af-t", m).value.trim(), camera_ok: !cam, no_watch: false, items,
+        full_score: cam ? null : sum(), advice: cam ? "" : $("#af-a", m).value.trim(), full_note: cam ? $("#af-a", m).value.trim() : "", eval_by: S.me.id, eval_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      e.target.disabled = true;
+      try { await db.amalUps("months", row, ["teacher_id", "month"]); await amalReload(); closeModal(); toast("Saqlandi"); done && done(); }
+      catch (x) { $("#af-e", m).textContent = x.message; e.target.disabled = false; }
+    };
+  }
+
+  // Hujjatdagi shakldagi baholash izohi (nusxa olish uchun)
+  function amIzohText(t, ms) {
+    const c = amCalc(t, ms), M = c.M, it = M.items || {};
+    const L = [`📋 Amaliyot fanlari — baholash natijasi`, `Filial: ${t.filial}`, `Ustoz: ${t.full_name}`, `Fan: ${t.subject}`, `Oy: ${mLabel(ms)}`, `To'liq kuzatilgan dars: ${M.full_day ? fmtDate(M.full_day) : "—"}${M.klass ? `, ${M.klass} sinf` : ""}${M.lesson_no ? `, ${M.lesson_no}-soat` : ""}`, ""];
+    c.main.forEach(v => L.push(`${v.n}-video: ${v.score ?? "—"}/5 (faollik ${v.s_act}/3, tartib ${v.s_order}/1, sifat ${v.s_quality}/1)${v.note ? " — " + v.note : ""}`));
+    L.push(`To'liq dars: ${c.full ?? "—"}/10`);
+    AMAL_DIRS.forEach(([k, l]) => L.push(`  • ${l}: ${[1, 2].filter(i => it[k + i]).length}/2${(it.notes || {})[k] ? " — " + it.notes[k] : ""}`));
+    L.push(`Umumiy ball: ${c.base ?? "—"}/25${c.bon ? ` + ${c.bon} bonus` : ""}`, "");
+    if (M.advice) L.push(`Tavsiyalar: ${M.advice}`);
+    if (c.base === 25) { L.push("", "🏅 «Kun o'qituvchisi» nominatsiyasi"); c.main.forEach(v => v.link && L.push(`${v.n}-video: ${v.link}`)); }
+    else L.push("", "Ustoz natija yetkazilganidan keyin 3 ish kuni ichida Monitoring bo'limiga qayta ko'rib chiqish yuzasidan murojaat qilishi mumkin.");
+    return L.join("\n");
+  }
+  function amIzoh(t, ms) {
+    const tx = window.yA ? window.yA(amIzohText(t, ms)) : amIzohText(t, ms), c = amCalc(t, ms);
+    const m = openModal("📋 Baholash izohi", `<p class="small muted" style="margin-top:0">${c.base === 25 ? "25 ball — «Kun o'qituvchisi» Telegram guruhiga" : "25 dan kam — «Rahbariyat monitoring» guruhiga"} yuboriladi.</p><textarea id="iz-t" rows="16" style="width:100%;font-family:inherit">${esc(tx)}</textarea>`,
+      `<button class="btn" data-close>Yopish</button><button class="btn primary" id="iz-c">📋 Nusxa olish</button>`);
+    $("#iz-c", m).onclick = async () => { try { await navigator.clipboard.writeText($("#iz-t", m).value); toast("Nusxa olindi"); } catch (e) { $("#iz-t", m).select(); document.execCommand("copy"); toast("Nusxa olindi"); } };
+  }
+
+  function amEvalView(body, T, ms, rerun) {
+    const C = T.map(x => amCalc(x, ms));
+    const grp = [["Video baholash kutilmoqda", C.filter(c => c.main.some(v => v.score === null || v.score === undefined))],
+      ["To'liq dars kutilmoqda (3 ta video bor)", C.filter(c => c.elig && c.main.length >= 3 && c.scoredN >= 3 && c.full === null && c.M.camera_ok !== false)],
+      ["📷 Kamera ishlamagan — qaror kerak", C.filter(c => c.M.camera_ok === false)],
+      [`Video yetishmaydi (20-sanagacha ${Math.max(0, AMAL_DEADLINE - +today().slice(8, 10) + (today().slice(0, 7) === ms.slice(0, 7) ? 0 : 99))} kun)`, C.filter(c => c.main.length < 3 && !c.past)],
+      ["Muddat o'tdi — baholanmaydi", C.filter(c => !c.elig && c.past)],
+      ["Baholandi", C.filter(c => c.done)]];
+    body.innerHTML = (amalEval() ? "" : `<div class="note" style="margin-bottom:12px">Baholashni faqat biriktirilgan baholovchi kiritadi (Foydalanuvchilar → Amaliyot fanlari). Siz ko'rib turasiz.</div>`) +
+      grp.map(([l, L]) => L.length ? `<div class="card" style="margin-top:12px"><div class="card-head"><h2>${esc(l)}</h2><span class="spacer"></span><span class="small muted">${L.length} ta</span></div>
+        ${L.map(c => `<div class="list-item click" data-amp="${c.t.id}"><div style="flex:1;min-width:0"><div class="t">${esc(c.t.full_name)}</div><div class="small muted">${esc(c.t.subject)} · ${esc(c.t.filial)} · video ${c.main.length}/3${c.bon ? ` · bonus +${c.bon}` : ""}</div></div>${pill(c.cls, c.st)}</div>`).join("")}</div>` : "").join("")
+      || `<div class="card empty" style="margin-top:12px">Ustozlar yo'q</div>`;
+    $$("[data-amp]", body).forEach(r => r.onclick = () => amProfile(r.dataset.amp, rerun));
+  }
+
+  function amDash(body, T, ms) {
+    const prev = mStart(addD(ms, -1));
+    const C = T.map(x => amCalc(x, ms)), P = T.map(x => amCalc(x, prev));
+    const agg = (L, key) => { const g = {}; L.forEach(c => { const k = c.t[key] || "—"; const a = g[k] = g[k] || { n: 0, v3: 0, s: 0, b: 0, k25: 0, bon: 0 }; a.n++; if (c.main.length >= 3) a.v3++; if (c.base !== null) { a.s += c.base; a.b++; } if (c.base === 25) a.k25++; a.bon += c.bon; }); return g; };
+    const gf = agg(C, "filial"), gs = agg(C, "subject"), pf = agg(P, "filial"), ps = agg(P, "subject");
+    const avg = a => a && a.b ? Math.round(a.s / a.b * 10) / 10 : null;
+    const dlt = (a, b) => { const x = avg(a), y = avg(b); if (x === null || y === null) return ""; const d = Math.round((x - y) * 10) / 10; return d ? ` <span class="small ${d > 0 ? "ok-t" : "bad-t"}">${d > 0 ? "▲" : "▼"}${Math.abs(d)}</span>` : ""; };
+    const tbl = (g, pg, lbl) => `<div class="table-wrap"><table><thead><tr><th>${lbl}</th><th>Ustoz</th><th>3/3 video</th><th>O'rtacha ball</th><th>25 ball</th><th>Bonus</th></tr></thead><tbody>
+      ${Object.entries(g).sort((a, b) => (avg(b[1]) ?? -1) - (avg(a[1]) ?? -1)).map(([k, a]) => `<tr><td><b>${esc(k)}</b></td><td>${a.n}</td><td>${a.v3}/${a.n} <span class="small muted">${Math.round(a.v3 / a.n * 100)}%</span></td><td><b>${avg(a) ?? "—"}</b>${avg(a) !== null ? "/25" : ""}${dlt(a, pg[k])}</td><td>${a.k25}</td><td>${a.bon ? "+" + a.bon : "—"}</td></tr>`).join("")}</tbody></table></div>`;
+    const Fs = FILIALLAR.filter(f => T.some(x => x.filial === f)), Ss = [...new Set(T.map(x => x.subject))].sort();
+    const cell = (f, s) => { const L = C.filter(c => c.t.filial === f && c.t.subject === s); if (!L.length) return `<td class="muted" style="text-align:center">·</td>`;
+      const b = L.filter(c => c.base !== null); if (!b.length) return `<td style="text-align:center" class="small muted">${L.length} ust.</td>`;
+      const v = Math.round(b.reduce((a, c) => a + c.base, 0) / b.length * 10) / 10, p = v / 25;
+      return `<td style="text-align:center;background:${p >= .9 ? "#d7f2e1" : p >= .75 ? "#eef7d9" : p >= .6 ? "#fff3d6" : "#fde0dc"}"><b>${v}</b></td>`; };
+    const Y = amYear(ms);
+    const won = (S.amal.awards || []).filter(a => a.month === ms);
+    body.innerHTML = `<div class="stats">${stat("Ustozlar", T.length)}${stat("3/3 video", `${C.filter(c => c.main.length >= 3).length}/${T.length}`)}${stat("25 ball", C.filter(c => c.base === 25).length, "ok")}
+        ${stat("O'rtacha ball", (() => { const b = C.filter(c => c.base !== null); return b.length ? `${Math.round(b.reduce((a, c) => a + c.base, 0) / b.length * 10) / 10}/25` : "—"; })())}${stat("Bonus videolar", C.reduce((a, c) => a + c.bonus.length, 0))}</div>
+      ${won.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>🏆 ${esc(mLabel(ms))} — Oy ustozlari</h2></div><div class="row" style="gap:10px;flex-wrap:wrap">
+        ${won.map(a => { const t = amTeacher(a.teacher_id) || {}; return `<div class="card" style="margin:0;padding:12px;min-width:200px;flex:1"><div class="row" style="gap:10px;align-items:center">${avatar(t.full_name, t.photo_url)}<div><b>${esc(t.full_name || "—")}</b><div class="small muted">${esc(a.subject)} · ${esc(t.filial || "")}</div><div class="small">${a.total ?? ""}${a.single ? " · yagona ustoz (10 bonus)" : " ball"}</div></div></div></div>`; }).join("")}</div></div>` : ""}
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>🗺️ Filial × fan — o'rtacha ball (/25)</h2><span class="spacer"></span><span class="small muted">yashil — kuchli, qizil — zaif</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Fan \\ Filial</th>${Fs.map(f => `<th>${esc(f)}</th>`).join("")}</tr></thead><tbody>${Ss.map(s => `<tr><td><b>${esc(s)}</b></td>${Fs.map(f => cell(f, s)).join("")}</tr>`).join("")}</tbody></table></div></div>
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>🏢 Filiallar</h2><span class="spacer"></span><span class="small muted">▲▼ — o'tgan oyga nisbatan</span></div>${tbl(gf, pf, "Filial")}</div>
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>📚 Fanlar</h2></div>${tbl(gs, ps, "Fan")}</div>
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>📅 Yillik reyting (o'quv yili)</h2><span class="spacer"></span><span class="small muted">25 + bonus ballar yig'indisi</span></div>
+        ${Y.length ? `<div class="table-wrap"><table><thead><tr><th>O'rin</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Jami ball</th><th>25 ball (oy)</th><th>Bonus video</th><th>Oy ustozi</th></tr></thead><tbody>
+          ${Y.slice(0, 50).map((r, i) => `<tr><td>${i + 1}${i < 3 ? " " + ["🥇", "🥈", "🥉"][i] : ""}</td><td><b>${esc(r.t.full_name)}</b></td><td>${esc(r.t.subject)}</td><td>${esc(r.t.filial)}</td><td><b>${r.sum}</b></td><td>${r.n25}</td><td>${r.bon}</td><td>${r.aw || "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Hali baholangan ustoz yo'q</div>`}</div>`;
+  }
+
+  function amAwardView(body, ms, rerun) {
+    const K = amCandidates(ms);
+    body.innerHTML = `<p class="small muted" style="margin-top:0">Har fan bo'yicha barcha filiallar orasida bitta «Oy ustozi»: faqat 25 ball olganlar ichidan eng yuqori jami (25 + bonus). Teng bo'lsa — bonus videolar soni, keyin 3-videoni ertaroq topshirgani.
+      Yagona ustozli fanda — oxirgi unvondan beri jami ${AMAL_BONUS_MAX} bonus yig'ilgan va shu oy 25 ball olganda. Portal nomzodni tayyorlaydi, Monitoring bo'limi rahbari yoki Akademik CEO tasdiqlaydi.</p>
+      ${K.map(k => { const top = k.list[0];
+        return `<div class="card" style="margin-top:12px"><div class="card-head"><h2>${esc(k.subj)}</h2>${k.single ? `<span class="small muted" style="margin-left:8px">yagona ustoz</span>` : ""}<span class="spacer"></span>
+          ${k.award ? `${pill("bajarildi", "🏆 " + ((amTeacher(k.award.teacher_id) || {}).full_name || "—"))}${amalAdmin() ? ` <button class="btn sm ghost" data-awx="${k.award.id}">Bekor</button>` : ""}` : top && amalAdmin() ? `<button class="btn sm primary" data-awok="${esc(k.subj)}|${top.t.id}|${top.total}|${k.single ? 1 : 0}">🏆 Tasdiqlash</button>` : ""}</div>
+          ${k.single ? `<div class="small">${esc(k.one.t.full_name)} (${esc(k.one.t.filial)}) — oxirgi unvondan beri bonus: <b>${k.one.cum}/${AMAL_BONUS_MAX}</b> · shu oy: ${k.one.base ?? "—"}/25</div>`
+            : k.list.length ? k.list.slice(0, 5).map((c, i) => `<div class="list-item"><div style="flex:1"><div class="t">${i + 1}. ${esc(c.t.full_name)}</div><div class="small muted">${esc(c.t.filial)} · 25 + ${c.bon} bonus</div></div><b>${c.total}</b></div>`).join("")
+            : `<div class="small muted">Shu oy 25 ball olgan ustoz yo'q</div>`}</div>`; }).join("") || `<div class="card empty">Ustozlar yo'q</div>`}`;
+    $$("[data-awok]", body).forEach(b => b.onclick = async () => { const [subj, tid, tot, sg] = b.dataset.awok.split("|");
+      try { await db.amalIns("awards", { subject: subj, month: ms, teacher_id: tid, total: +tot, single: sg === "1", approved_by: S.me.id }); await amalReload(); toast("Oy ustozi tasdiqlandi"); rerun(); } catch (e) { toast(e.message, true); } });
+    $$("[data-awx]", body).forEach(b => b.onclick = async () => { try { await db.amalDel("awards", { id: +b.dataset.awx || b.dataset.awx }); await amalReload(); rerun(); } catch (e) { toast(e.message, true); } });
+  }
+
+  function amTgView(body, rerun) {
+    const G = (S.amal.groups || []).slice().sort((a, b) => (a.title + a.topic).localeCompare(b.title + b.topic));
+    const subs = [...new Set(AMAL_SUBJ.concat(amT().map(x => x.subject)))].filter(Boolean).sort();
+    body.innerHTML = `<p class="small muted" style="margin-top:0">Bot filiallarning amaliyot fanlari guruhlariga admin qilinganda, har guruh va fan sahifasi shu yerda paydo bo'ladi. Har biriga filial va fanni biriktiring — bot shu sahifadagi videolarni ustozlarga bog'laydi, har kuni 08:00 da kunlik xulosa va 10:00 da shu fanga mos qoidalarni yuboradi.</p>
+      <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr><th>Guruh</th><th>Sahifa (mavzu)</th><th>Filial</th><th>Fan</th><th>Faol</th></tr></thead><tbody>
+      ${G.map(g => `<tr><td>${esc(g.title || g.chat_id)}</td><td>${esc(g.topic || "Umumiy")}</td>
+        <td><select data-gf="${g.chat_id}|${g.thread_id}" style="width:auto"><option value=""></option>${FILIALLAR.map(f => `<option ${g.filial === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></td>
+        <td><select data-gs="${g.chat_id}|${g.thread_id}" style="width:auto"><option value=""></option>${subs.map(f => `<option ${g.subject === f ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></td>
+        <td><input type="checkbox" data-ga="${g.chat_id}|${g.thread_id}" ${g.active ? "checked" : ""} style="width:auto"></td></tr>`).join("") || `<tr><td colspan="5" class="empty">Bot hali hech bir guruhga qo'shilmagan</td></tr>`}</tbody></table></div></div>`;
+    const un = (S.amal.tg || []).filter(x => !x.teacher_id && x.status === "yangi").sort((a, b) => a.sent_at < b.sent_at ? 1 : -1);
+    if (un.length) body.insertAdjacentHTML("beforeend", `<div class="card" style="margin-top:16px"><div class="card-head"><h2>❓ Tanilmagan videolar (${un.length})</h2></div>
+      <p class="small muted" style="margin-top:0">Bot izohdagi familiya-ismdan ustozni aniqlay olmadi. Ustozni tanlang — shu Telegram akkauntning keyingi videolari avtomatik taniladi.</p>
+      ${un.slice(0, 60).map(x => { const g = G.find(z => z.chat_id === x.chat_id && z.thread_id === x.thread_id) || {};
+        const opts = amLive().filter(a => (!g.filial || a.filial === g.filial) && (!g.subject || a.subject === g.subject)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+        return `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${fmtDate(x.day)} · ${esc(x.from_name || "—")} · <a href="${esc(x.link)}" target="_blank" rel="noopener">video ↗</a></div>
+          <div class="small muted">${esc([g.title, g.topic].filter(Boolean).join(" · "))}${x.caption ? " — " + esc(x.caption.slice(0, 120)) : ""}</div></div>
+          <select data-tga="${x.id}" style="width:auto;max-width:220px"><option value="">Ustozni tanlang…</option>${opts.map(a => `<option value="${a.id}">${esc(a.full_name)} (${esc(a.filial)})</option>`).join("")}</select>
+          <button class="btn sm ghost" data-tgx="${x.id}" title="Dars videosi emas">✕</button></div>`; }).join("")}</div>`);
+    $$("[data-tga]", body).forEach(s => s.onchange = async () => { if (!s.value) return; try { await db.amalAssign(+s.dataset.tga, s.value); await amalReload(); toast("Biriktirildi"); rerun(); } catch (e) { toast(e.message, true); } });
+    $$("[data-tgx]", body).forEach(b => b.onclick = async () => { try { await db.amalAssign(+b.dataset.tgx, null); await amalReload(); rerun(); } catch (e) { toast(e.message, true); } });
+    const save = async (k, patch) => { const [c, th] = k.split("|"); try { await db.amalUpd("groups", { chat_id: +c, thread_id: +th }, patch); await amalReload(); toast("Saqlandi"); } catch (e) { toast(e.message, true); } };
+    $$("[data-gf]", body).forEach(s => s.onchange = () => save(s.dataset.gf, { filial: s.value }));
+    $$("[data-gs]", body).forEach(s => s.onchange = () => save(s.dataset.gs, { subject: s.value }));
+    $$("[data-ga]", body).forEach(s => s.onchange = () => save(s.dataset.ga, { active: s.checked }));
+  }
+
+  function amWordModal(ms, fil, subj) {
+    const cb = (id, l, on) => `<label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="${id}" ${on ? "checked" : ""} style="width:auto">${l}</label>`;
+    const m = openModal("⬇ Amaliyot fanlari — Word", `<p class="small muted" style="margin-top:0">${esc(mLabel(ms))} · ${esc(fil || "barcha filiallar")} · ${esc(subj || "barcha fanlar")} (yuqoridagi tanlov bo'yicha)</p>
+      <div class="seg" id="aw-lay" style="margin-bottom:10px"><button type="button" data-ly="fil" class="active">Filiallar bo'yicha</button><button type="button" data-ly="fan">Fanlar bo'yicha</button><button type="button" data-ly="one">Bitta jadval</button></div>
+      <div class="row" style="gap:6px 14px;flex-wrap:wrap">${cb("aw-f", "Filial", 1)}${cb("aw-s", "Fan", 1)}${cb("aw-v", "Video ballari", 1)}${cb("aw-full", "To'liq dars", 1)}${cb("aw-b", "Bonus", 1)}${cb("aw-t", "Jami", 1)}${cb("aw-st", "Holat", 1)}</div>`,
+      `<button class="btn" data-close>Yopish</button><button class="btn primary" id="aw-go">⬇ Word saqlash</button>`);
+    let lay = "fil"; $$("[data-ly]", m).forEach(b => b.onclick = () => { lay = b.dataset.ly; $$("[data-ly]", m).forEach(x => x.classList.toggle("active", x === b)); });
+    $("#aw-go", m).onclick = () => { const o = k => $("#aw-" + k, m).checked; const D = DOCX;
+      const T = amLive().filter(x => (!fil || x.filial === fil) && (!subj || x.subject === subj)); const C = T.map(x => amCalc(x, ms)).sort((a, b) => b.total - a.total || a.t.full_name.localeCompare(b.t.full_name));
+      const hd = ["№", "Ustoz"], W = [500, 3000];
+      if (o("f") && lay !== "fil") { hd.push("Filial"); W.push(1500); } if (o("s") && lay !== "fan") { hd.push("Fan"); W.push(1800); }
+      if (o("v")) { hd.push("1-v", "2-v", "3-v"); W.push(600, 600, 600); } if (o("full")) { hd.push("To'liq dars"); W.push(1000); } if (o("b")) { hd.push("Bonus"); W.push(800); }
+      if (o("t")) { hd.push("Jami"); W.push(900); } if (o("st")) { hd.push("Holat"); W.push(1700); }
+      const sc = W.reduce((a, b) => a + b, 0); const Wn = W.map(w => Math.floor(w * Math.min(1, 14800 / sc)));
+      const row = (c, i) => { const r = [String(i + 1), { v: c.t.full_name, b: 1 }]; if (o("f") && lay !== "fil") r.push(c.t.filial); if (o("s") && lay !== "fan") r.push(c.t.subject);
+        if (o("v")) [0, 1, 2].forEach(k => r.push(c.main[k] && c.main[k].score != null ? String(c.main[k].score) : "—")); if (o("full")) r.push(c.full != null ? String(c.full) : "—");
+        if (o("b")) r.push(c.bon ? "+" + c.bon : "—"); if (o("t")) r.push(c.base != null ? { v: String(c.base + c.bon), b: 1 } : "—"); if (o("st")) r.push(c.st); return r; };
+      let bd = D.h1("Amaliyot fanlari — natijalar") + D.p(`${mLabel(ms)} · ${fil || "barcha filiallar"} · ${subj || "barcha fanlar"}`, { c: "3B5B86" }) + D.p(`Tuzildi: ${fmtDate(today())} · ${S.me.full_name}`, { sz: 18, c: "6B7A90" });
+      if (lay === "one") bd += D.table(hd, C.map(row), Wn, { center: [0] });
+      else { const key = lay === "fil" ? "filial" : "subject"; [...new Set(C.map(c => c.t[key]))].sort().forEach(g => { const L = C.filter(c => c.t[key] === g); bd += D.h3(g, `${L.length} ta ustoz`) + D.table(hd, L.map(row), Wn, { center: [0] }); }); }
+      const blob = D.build(bd, true); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `amaliyot_${ms.slice(0, 7)}.docx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); closeModal(); };
+  }
+
+  // Foydalanuvchilar → «Amaliyot fanlari» — baholovchini biriktirish (faqat Monitoring bo'limi rahbari)
+  async function amAccessView(box) {
+    if (!S.amal) await amalReload();
+    const acc = amalAcc(); const list = S.profiles.filter(p => p.active && !p.archived && ["xodim", "ceo"].includes(p.role)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    box.innerHTML = `<div class="card"><div class="card-head"><h2>🎯 Amaliyot fanlari</h2></div><p class="small muted" style="margin-top:0">Belgilangan xodim «Ustozlar → Amaliyot fanlari» bo'limini ko'radi, ustoz qo'sha oladi va videolarni baholaydi. Siz va Akademik CEO doim ko'rasiz. Boshqa xodimlarga bu bo'lim ko'rinmaydi.</p>
+      ${list.map(p => `<label class="list-item" style="cursor:pointer"><input type="checkbox" data-aac="${p.id}" ${acc.some(a => a.user_id === p.id) ? "checked" : ""} style="width:auto;margin-right:10px"><div style="flex:1"><b>${esc(p.full_name)}</b><div class="small muted">${esc(ROLES[p.role] || p.role)}</div></div></label>`).join("")}</div>`;
+    $$("[data-aac]", box).forEach(x => x.onchange = async () => { try { if (x.checked) await db.amalUps("access", { user_id: x.dataset.aac, can_eval: true, set_by: S.me.id }, ["user_id"]); else await db.amalDel("access", { user_id: x.dataset.aac });
+      await amalReload(); toast("Saqlandi"); } catch (e) { toast(e.message, true); x.checked = !x.checked; } });
+  }
+
   PAGES.bogcha = page => {
     if (!canSeeBog()) return PAGES.bosh(page);
     const fil = S.ui.bgF || "", t = today(), ms = mStart(S.ui.bgM || t);
