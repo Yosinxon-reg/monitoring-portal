@@ -8774,7 +8774,7 @@ window.METODISTLAR = [
     const aw = (S.amal.awards || []).filter(a => a.teacher_id === id);
     const vRow = v => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${v.kind === "bonus" ? "⭐ Bonus video" : `${v.n}-video`} · ${fmtDate(v.lesson_day || vDay(v))}${v.link ? ` · <a href="${esc(v.link)}" target="_blank" rel="noopener">havola ↗</a>` : ""}</div>
       <div class="small muted">${v.kind === "bonus" ? "+1 ball" : v.score !== null && v.score !== undefined ? `faollik ${v.s_act}/3 (${v.engaged ?? "?"}/${v.students ?? "?"}), tartib ${v.s_order}, sifat ${v.s_quality} — <b>${v.score}/5</b>` : "baholanmagan"}${v.note ? " · " + esc(v.note) : ""}</div></div>
-      ${amalEval() ? `<button class="btn sm ghost" data-ve="${v.id}">${v.kind === "bonus" ? "Tahrirlash" : "Baholash"}</button>` : ""}</div>`;
+      ${amalEval() ? `<button class="btn sm ghost" data-ve="${v.id}" title="Bahoni o'zgartirish yoki videoni o'chirish">✏️ Tahrirlash / o'chirish</button>` : ""}</div>`;
     const m = openModal(`${esc(t.full_name)}`, `
       <div class="row" style="gap:12px;align-items:center;margin-bottom:12px">${avatar(t.full_name, t.photo_url)}<div><div><b>${esc(t.subject)}</b> · ${esc(t.filial)}</div>
         <div class="small muted">${aw.length ? `🏆 Oy ustozi: ${aw.length} marta (${aw.map(a => esc(mLabel(a.month))).join(", ")})` : "Oy ustozi unvoni hali yo'q"}</div></div><span class="spacer"></span>
@@ -8788,7 +8788,8 @@ window.METODISTLAR = [
           ${amalEval() ? `${c.main.length < 3 ? `<button class="btn sm primary" id="ap-v">+ ${c.main.length + 1}-video</button>` : ""}<button class="btn sm" id="ap-b">⭐ Bonus video (+1)</button>
             <button class="btn sm" id="ap-full" ${c.main.length < 3 && !c.M.force_eval ? "disabled title='Avval 3 ta video'" : ""}>🎥 To'liq dars (10 ball)</button>` : ""}
           ${(amalEval() || amalAdmin()) && !c.inTime ? `<label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="ap-force" ${c.M.force_eval ? "checked" : ""} style="width:auto"> Muddat o'tsa ham baholansin</label>` : ""}
-          <span class="spacer"></span>${c.done ? `<button class="btn sm ghost" id="ap-izoh">📋 Baholash izohi</button>` : ""}</div></div>
+          <span class="spacer"></span>${c.done ? `<button class="btn sm ghost" id="ap-izoh">📋 Baholash izohi</button>` : ""}
+          ${amalEval() && (c.main.length || (S.amal.videos || []).some(v => v.teacher_id === t.id && v.month === ms) || c.M.full_score != null) ? `<button class="btn sm ghost" id="ap-reset" title="Shu oydagi barcha video va to'liq dars baholarini o'chirish">🗑 Oyni nollashtirish</button>` : ""}</div></div>
       <div class="card" style="margin:0 0 12px"><div class="card-head"><h2>📝 Kunlik izohlar</h2></div>
         ${amalSee() ? `<div class="row" style="gap:6px;margin-bottom:8px"><textarea id="ap-note" rows="2" placeholder="Bugungi izoh…" style="flex:1"></textarea><button class="btn sm primary" id="ap-ns">Qo'shish</button></div>` : ""}
         ${notes.map(x => `<div class="list-item"><div style="flex:1"><div class="small muted">${fmtDate(x.day)} · ${esc(nameOf(x.author_id))}</div><div style="white-space:pre-wrap">${esc(x.body)}</div></div></div>`).join("") || `<div class="small muted">Izoh hali yo'q</div>`}</div>
@@ -8805,6 +8806,10 @@ window.METODISTLAR = [
     on("#ap-b", () => amVideoForm(t, ms, null, "bonus", again));
     on("#ap-full", () => amFullForm(t, ms, again));
     on("#ap-izoh", () => amIzoh(t, ms));
+    on("#ap-reset", async () => { if (!confirm(`${t.full_name} — ${mLabel(ms)} oyidagi barcha baholar (videolar va to'liq dars) o'chirilsinmi? Qaytarib bo'lmaydi.`)) return;
+      try { await db.amalDel("videos", { teacher_id: t.id, month: ms });
+        await db.amalUps("months", { teacher_id: t.id, month: ms, force_eval: false, full_day: null, klass: "", lesson_no: null, lesson_time: "", camera_ok: null, no_watch: false, items: {}, full_score: null, advice: "", full_note: "", eval_by: null, eval_at: null, updated_at: new Date().toISOString() }, ["teacher_id", "month"]);
+        await amalReload(); toast("Oy baholari nollashtirildi"); again(); } catch (e) { toast(e.message, true); } });
     $$("[data-tgv]", m).forEach(b => b.onclick = () => { const x = (S.amal.tg || []).find(z => String(z.id) === b.dataset.tgv); if (!x) return;
       amVideoForm(t, ms, null, b.dataset.k, again, { link: x.link, lesson_day: x.day, sent_at: x.sent_at, tg_id: x.id }); });
     $$("[data-ve]", m).forEach(b => b.onclick = () => { const v = (S.amal.videos || []).find(x => String(x.id) === b.dataset.ve); amVideoForm(t, ms, v, v.kind, again); });
@@ -8860,8 +8865,11 @@ window.METODISTLAR = [
         <input data-itn="${k}" placeholder="Asos / kuzatuv (ixtiyoriy)" value="${esc((it.notes || {})[k] || "")}" style="margin-top:4px"></div>`).join("")}</div>
       <div class="field"><label id="af-nl">Tavsiyalar</label><textarea id="af-a" rows="3">${esc(M.advice || "")}</textarea></div>
       <div class="small"><b>Jami: <span id="af-sum">0</span>/10</b></div><div class="err-text" id="af-e"></div>`,
-      `<button class="btn ghost" id="af-nw" title="Dars kuzatilmasdan to'liq 10 ball qo'yiladi">✅ Dars ko'rmay ball berildi (10)</button><span class="spacer"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="af-go">Saqlash</button>`);
+      `${M.full_score != null ? `<button class="btn ghost" id="af-del" title="To'liq dars bahosini o'chirish">🗑 O'chirish</button>` : ""}<button class="btn ghost" id="af-nw" title="Dars kuzatilmasdan to'liq 10 ball qo'yiladi">✅ Dars ko'rmay ball berildi (10)</button><span class="spacer"></span><button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="af-go">Saqlash</button>`);
     $(".modal", $("#modal-root")).style.maxWidth = "720px";
+    const afd = $("#af-del", m); if (afd) afd.onclick = async () => { if (!confirm("To'liq dars bahosi o'chirilsinmi?")) return;
+      try { await db.amalUps("months", { teacher_id: t.id, month: ms, full_day: null, klass: "", lesson_no: null, lesson_time: "", camera_ok: null, no_watch: false, items: {}, full_score: null, advice: "", full_note: "", eval_by: null, eval_at: null, updated_at: new Date().toISOString() }, ["teacher_id", "month"]);
+        await amalReload(); closeModal(); toast("O'chirildi"); done && done(); } catch (x) { toast(x.message, true); } };
     $("#af-nw", m).onclick = async e => { if (!confirm("Dars ko'rilmasdan 10 ball berilsinmi?")) return;
       const items = { notes: {} }; AMAL_DIRS.forEach(([kk]) => { items[kk + 1] = true; items[kk + 2] = true; items.notes[kk] = ""; });
       const sn = +$("#af-s", m).value;
