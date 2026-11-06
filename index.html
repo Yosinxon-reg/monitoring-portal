@@ -2323,7 +2323,7 @@ window.METODISTLAR = [
   const dowOf = iso => ((new Date(iso + "T12:00:00").getDay() + 6) % 7) + 1;
   const planOf = (uid, ws) => S.plans.find(x => x.user_id === uid && x.week_start === ws);
   const dayPlan = (p, iso) => { const pl = planOf(p.id, weekOf(iso)); return ((pl && pl.days) || {})[dowOf(iso)] || ""; };
-  function nextWorkday(p, iso) { const sc = sched(p); let d = addD(iso, 1); for (let i = 0; i < 8 && !sc.days.includes(dowOf(d)); i++) d = addD(d, 1); return d; }
+  function nextWorkday(p, iso) { const sc = sched(p); let d = addD(iso, 1); for (let i = 0; i < 40 && !(sc.days.includes(dowOf(d)) && !onLeave(p, d)); i++) d = addD(d, 1); return d; }
   async function ensurePlans(ws) {
     if (S.plans.some(x => x.week_start === ws) || S.ui["pl_" + ws]) return;
     S.ui["pl_" + ws] = 1;
@@ -2941,10 +2941,14 @@ window.METODISTLAR = [
           </div>
         </section>
       </div>`;
+    let logBusy = false;
     const doLogin = async (email, pw) => {
+      if (logBusy) return; logBusy = true;
+      const sbtn = $("#login-form [type=submit]"); if (sbtn) sbtn.disabled = true;
       $("#login-err").textContent = "";
       try { S.me = await db.signIn(email, pw); await refresh(); location.hash = "#/bosh"; render(); }
-      catch (e) { $("#login-err").textContent = e.message; }
+      catch (e) { const el = $("#login-err"); if (el) el.textContent = /invalid login/i.test(e.message || "") ? "Login yoki parol noto'g'ri." : e.message; }
+      finally { logBusy = false; if (sbtn && sbtn.isConnected) sbtn.disabled = false; }
     };
     $("#login-form").onsubmit = e => { e.preventDefault(); doLogin($("#email").value, $("#pw").value); };
     $$("[data-lt]").forEach(b => b.onclick = () => {
@@ -3791,16 +3795,16 @@ window.METODISTLAR = [
         ${bl.map(x => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(x.full_name)}</div><div class="small muted">${esc(x.filial || "—")}</div></div>
           <input data-ld="${x.id}" value="${esc(x.lead_class || "")}" placeholder="3-B" style="max-width:110px"><button type="button" class="btn sm" data-lds="${x.id}">Saqlash</button></div>`).join("") || `<div class="empty">Bazada boshlang'ich ustoz yo'q</div>`}</details>`; };
     const draw = () => { if (ptrHold(draw)) return;
-      let body;
+      let body; const offN = !isWorkdayOn(S.me, date) ? `<div class="note" style="margin:0 0 12px">🌴 ${fmtDate(date)} — siz uchun dam olish kuni${onLeave(S.me, date) && onLeave(S.me, date).reason ? ` (${esc(onLeave(S.me, date).reason)})` : ""}. Hisobot yozish majburiy emas va KPI'da hisobga olinmaydi.</div>` : "";
       if (kind === "akademik") {
-        body = `${kindBlock()}${grantBlock(new Set(F.rows.map(x => x.teacher_id).filter(Boolean)))}${date === t ? `<div id="rec-w"></div>` : ""}${draftOn ? `<div class="note" style="margin:0 0 12px">💾 Oldin yozib qo'ygan qoralamangiz tiklandi. <button type="button" class="btn sm ghost" id="mr-drx">Tozalash</button></div>` : ""}
+        body = `${offN}${kindBlock()}${grantBlock(new Set(F.rows.map(x => x.teacher_id).filter(Boolean)))}${date === t ? `<div id="rec-w"></div>` : ""}${draftOn ? `<div class="note" style="margin:0 0 12px">💾 Oldin yozib qo'ygan qoralamangiz tiklandi. <button type="button" class="btn sm ghost" id="mr-drx">Tozalash</button></div>` : ""}
           <div class="card"><div class="card-head"><h2>Akademik baholash</h2><span class="spacer"></span><span class="small muted">Har bir kuzatilgan dars — alohida qator. Intizomiy ball ${IB_MAX} gacha, akademik ball ${AB_MAX} gacha</span></div>
           ${rowsBlock()}</div>${longBlock()}${leadBlock()}
           <div class="card" style="margin-top:16px"><div class="card-head"><h2>Kunlik ishlar bo'yicha izoh</h2><span class="spacer"></span><span class="small muted">ixtiyoriy</span></div>
             <textarea id="mr-note" rows="4" placeholder="Bugun yana nimalar qildingiz, qanday muammolar bo'ldi…">${esc(F.note)}</textarea></div>`;
       } else {
         const tot = F.topics.reduce((a, x) => a + (+x.posts || 0), 0);
-        body = `${draftOn ? `<div class="note" style="margin:0 0 12px">💾 Qoralamangiz tiklandi — u faqat sizda saqlanadi, «Hisobotni yuborish»ni bosmaguningizcha rahbarga ko'rinmaydi. <button type="button" class="btn sm ghost" id="mr-drx">Tozalash</button></div>` : `<div class="small muted" style="margin:0 0 10px">💾 Yozganlaringiz qoralama sifatida shu qurilmada saqlanib boradi va faqat «Hisobotni yuborish»ni bosganingizda rahbarga yetib boradi.</div>`}<div class="card"><div class="card-head"><h2>Qaysi filialni kuzatdingiz? *</h2></div>
+        body = `${offN}${draftOn ? `<div class="note" style="margin:0 0 12px">💾 Qoralamangiz tiklandi — u faqat sizda saqlanadi, «Hisobotni yuborish»ni bosmaguningizcha rahbarga ko'rinmaydi. <button type="button" class="btn sm ghost" id="mr-drx">Tozalash</button></div>` : `<div class="small muted" style="margin:0 0 10px">💾 Yozganlaringiz qoralama sifatida shu qurilmada saqlanib boradi va faqat «Hisobotni yuborish»ni bosganingizda rahbarga yetib boradi.</div>`}<div class="card"><div class="card-head"><h2>Qaysi filialni kuzatdingiz? *</h2></div>
             <div class="chips">${FILIALLAR.map(f => `<button type="button" class="chip-btn ${F.filials.includes(f) ? "on" : ""}" data-fil="${esc(f)}">${esc(f)}</button>`).join("")}</div></div>
           <div class="card" style="margin-top:16px"><div class="card-head"><h2>Aniqlangan holatlar</h2><span class="spacer"></span><b id="mr-tot">${(() => { const v = F.issues.filter(h => h.type); return `${v.length} ta holat · ${v.reduce((a, h) => a + (+h.posts || 0), 0)} ta post · ${v.filter(h => h.res === "hal").length} tasi hal qilindi`; })()}</b></div>
             <p class="small muted" style="margin:0 0 10px">Har bir holat — alohida qator: turi, qayerda, kim bilan bog'liqligi, og'irligi va natijasi. Jiddiy holat yuborilgach bo'lim rahbariga darhol xabar boradi.</p>
@@ -4739,7 +4743,7 @@ window.METODISTLAR = [
   const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
   const recFromPlan = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); return !!m && +m[0] >= 1 && +m[0] <= 30; };
   // Yana qancha «taklif» kerak: reja − tanlanganlar
-  const recWant = day => Math.max(0, recTarget(day) - recMine(day, ["tanlandi"]).length);
+  const recWant = day => !isWorkdayOn(S.me, day) ? 0 : Math.max(0, recTarget(day) - recMine(day, ["tanlandi"]).length);
   // Intizomiy (va boshqa) xodimga CEO yo'naltirgan ustozlar — tavsiyada birinchi
   function recDirected(day) {
     const mine = (S.help || []).filter(h => h.to_id === S.me?.id && h.status === "qabul" && h.due >= day);
@@ -4789,8 +4793,8 @@ window.METODISTLAR = [
   // Vidjet: hisobot formasida (va bosh sahifada). onPick(teacher) — bugungi tanlov hisobot qatoriga qo'shiladi
   function recWidget(box, opts = {}) {
     if (!box || !recShow()) { if (box) box.innerHTML = ""; return; }
-    const t = today(), nd = recNextDay();
-    const day = S.ui.recDay === nd ? nd : t;
+    const t = today(), nd = recNextDay(), tOff = !isWorkdayOn(S.me, t);
+    const day = S.ui.recDay === nd || tOff ? nd : t;
     const draw = () => { if (ptrHold(draw)) return;
       const pend = recMine(day, ["taklif"]), ch = recMine(day, ["tanlandi"]);
       const P = planCalc(mStart(day), { bog: "all" }); const pr = Object.fromEntries(P.rows.map(r => [r.t.id, r]));
@@ -4799,7 +4803,7 @@ window.METODISTLAR = [
         return `<div style="flex:1;min-width:0"><div class="t">${esc(tt.full_name)}${dir.has(id) ? ` <span class="pl-tag2">CEO yo'naltirgan</span>` : ""}${r && r.risk ? ` <span class="pl-tag">xavf</span>` : ""}</div>
           <div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}${r ? (r.last ? ` · oxirgi: ${fmtDate(r.last.day)} (${esc(r.last.author_id === S.me.id ? "o'zingiz" : shortName(r.last.author_id))})` : " · bu oy hali ko'rilmagan") : ""}</div></div>${r ? plCount(r) : ""}`; };
       box.innerHTML = `<div class="card pl-rec rec-w" style="margin:0 0 16px"><div class="card-head"><h2>📌 Tavsiyalar</h2>
-          <div class="seg" style="margin-left:8px"><button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button><button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
+          <div class="seg" style="margin-left:8px">${tOff ? "" : `<button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button>`}<button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
           <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b></span></div>
         <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng. Avval bu oy ko'rilmagan va kam ko'rilgan, oxirgi marta boshqa xodim ko'rgan ustozlar; filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
