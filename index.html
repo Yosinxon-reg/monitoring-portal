@@ -1887,7 +1887,16 @@ window.LESSONS = [
   function SupaDB() {
     const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
     let meCache = null;
-    const chk = ({ data, error }) => { if (error) throw new Error(trErr(error.message)); return data; };
+    // Sessiya holati: token yangilanmay qolsa (telefon uxlab qolgan, eski seans) so'rovlar «mehmon» sifatida ketadi va RLS rad etadi.
+    // Bunday holatda «ruxsat yo'q» emas, «qayta kiring» deymiz va ilovaga xabar beramiz.
+    let hasSes = true;
+    sb.auth.onAuthStateChange((ev, ses) => { const was = hasSes; hasSes = !!ses;
+      if (was && !ses && ev !== "INITIAL_SESSION") window.dispatchEvent(new CustomEvent("mp-session-lost")); });
+    const SES_MSG = "Sessiyangiz tugagan — qayta kiring. Yozganlaringiz qoralamada saqlangan, kirganingizdan keyin yuborasiz.";
+    const chk = ({ data, error, status }) => { if (error) {
+        const m = String(error.message || ""); const gone = !hasSes || status === 401 || /JWT expired|PGRST30[0-3]|invalid jwt/i.test(m + " " + (error.code || ""));
+        if (gone && /row-level security|JWT|PGRST30/i.test(m + " " + (error.code || ""))) { window.dispatchEvent(new CustomEvent("mp-session-lost")); throw new Error(SES_MSG); }
+        throw new Error(trErr(m)); } return data; };
     // Supabase bir so'rovda ko'pi bilan 1000 qator qaytaradi — qolganlari jimgina tushib qolardi. Sahifalab hammasini olamiz.
     const PG = 1000;
     async function pageAll(mk) { const out = []; for (let i = 0; i < 200000; i += PG) { const rows = chk(await mk().range(i, i + PG - 1)) || []; out.push(...rows); if (rows.length < PG) break; } return out; }
@@ -2886,6 +2895,11 @@ window.METODISTLAR = [
     dlObs = new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => dlMerge(page), 60); }); dlObs.observe(page, { childList: true, subtree: true }); }
   document.addEventListener("click", e => { if (!e.target.closest(".dl-wrap")) $$(".dl-wrap.open").forEach(x => x.classList.remove("open")); });
   window.addEventListener("hashchange", () => S.me && render());
+  // Sessiya tugasa (token yangilanmadi) — ochiq turgan sahifada «ruxsat yo'q» chiqavermasin: kirish oynasiga qaytaramiz (qoralamalar saqlanadi)
+  let sesLostT = 0;
+  window.addEventListener("mp-session-lost", () => { if (sesLostT) return; sesLostT = setTimeout(() => { sesLostT = 0;
+    if (!S.me || S.me.role === "oqituvchi") return;
+    toast("Sessiyangiz tugagan — qayta kiring. Yozganlaringiz qoralamada saqlangan.", true); S.me = null; render(); }, 400); });
 
   // ---------------------------------------------------------- login
   // Kirish sahifasidagi imkoniyatlar (shaxsiy ma'lumot ko'rsatilmaydi)
