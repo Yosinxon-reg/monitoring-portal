@@ -8175,14 +8175,18 @@ window.METODISTLAR = [
       <div class="field"><label>Fan</label><select id="tl-s"><option value="">${subs.length > 1 ? "Barcha fanlarim" : esc(subs[0] || "")}</option>${subs.length > 1 ? subs.map(x => `<option ${x === sub0 ? "selected" : ""}>${esc(x)}</option>`).join("") : ""}</select></div>
       <div class="field"><label>Filiallar</label><div class="row" style="gap:6px 14px;flex-wrap:wrap">${fils.map((f, i) => cb("tl-f" + i, esc(f), !U.fil || U.fil.includes(f))).join("")}</div>
         <div class="seg" id="tl-lay" style="margin-top:8px"><button type="button" data-ly="fil" class="${U.lay !== "one" ? "active" : ""}">Har filial alohida jadval</button><button type="button" data-ly="one" class="${U.lay === "one" ? "active" : ""}">Bitta jadval (filiallararo)</button></div></div>
-      <div class="field"><label>Ustunlar</label><div class="row" style="gap:6px 14px;flex-wrap:wrap">
+      <div class="field" id="tl-cols"><label>Ustunlar</label><div class="row" style="gap:6px 14px;flex-wrap:wrap">
         ${cb("tl-cf", "Filial", U.cf !== false)}${cb("tl-cn", "Ism familiya", U.cn !== false)}${cb("tl-cs", "Fan", U.cs !== false)}</div></div>
       <div class="field"><label>Tahlillar</label>${AN.map(([k, l]) => `<label class="row" style="gap:6px;align-items:center;font-weight:400;margin:3px 0"><input type="radio" name="tl-an" value="${k}" ${(U.an || "") === k ? "checked" : ""} style="width:auto">${l}</label>`).join("")}</div>
-      <div class="small muted">Umumiy ball — reyting balli (%), o'rin — shu fan bo'yicha barcha filiallar orasida (kamida ${MIN_OBS} marta kuzatilganlar).</div>
+      <div class="small muted" id="tl-hint"></div>
       <div class="err-text" id="tl-err"></div>`,
       `<button class="btn" data-close>Yopish</button><button class="btn primary" id="tl-go">⬇ Word saqlash</button>`);
     let lay = U.lay === "one" ? "one" : "fil";
-    $$("[data-ly]", m).forEach(b => b.onclick = () => { lay = b.dataset.ly; $$("[data-ly]", m).forEach(x => x.classList.toggle("active", x === b)); });
+    const hint = () => { const an = ($("input[name=tl-an]:checked", m) || {}).value || "";
+      $("#tl-cols", m).style.display = an ? "none" : "";
+      $("#tl-hint", m).textContent = !an ? "" : `Ballar: intizomiy ${IB_MAX} dan, akademik ${AB_MAX} dan, jami ${IB_MAX + AB_MAX} dan. ${an.endsWith("-d") ? "Har bir tahlil alohida qatorda, ostida o'rtachasi." : "Har ustoz uchun o'rtacha ball."} Fanlar bo'yicha alohida jadval, boshida umumiy xulosa, oxirida ko'rilmagan ustozlar. O'rin — ${lay === "fil" ? "shu filialdagi shu fan ichida" : "tanlangan filiallardagi shu fan ichida"}. Sahifa yotiq (albom).`; };
+    $$("[data-ly]", m).forEach(b => b.onclick = () => { lay = b.dataset.ly; $$("[data-ly]", m).forEach(x => x.classList.toggle("active", x === b)); hint(); });
+    $$("input[name=tl-an]", m).forEach(r => r.onchange = hint); hint();
     $("#tl-go", m).onclick = async e => {
       const o = { sub: $("#tl-s", m).value, fil: fils.filter((f, i) => $("#tl-f" + i, m).checked), lay,
         cf: $("#tl-cf", m).checked, cn: $("#tl-cn", m).checked, cs: $("#tl-cs", m).checked, an: ($("input[name=tl-an]:checked", m) || {}).value || "" };
@@ -8197,41 +8201,128 @@ window.METODISTLAR = [
   async function tlExport(o, pool) {
     const D = DOCX, t = today(), ms = mStart(t);
     const isAll = o.an.startsWith("all"), det = o.an.endsWith("-d");
-    if (isAll && TC && TC.from > addD(t, -HIST_DAYS)) await ensureHistory();
+    if (o.an && isAll && TC && TC.from > addD(t, -HIST_DAYS)) await ensureHistory();
     const from = !o.an ? null : isAll ? "2000-01-01" : ms;
     const list = pool.filter(x => o.fil.includes(x.filial) && (!o.sub || canonSubj(x.subject) === o.sub));
     if (!list.length) throw new Error("Tanlangan fan va filiallarda ustoz yo'q");
-    // reyting: fan guruhi bo'yicha, barcha filiallar orasida
-    const rk = {};
-    if (o.an) [false, true].forEach(bog => Object.values(buildRating(from, t, "", bog).out).forEach(arr => arr.forEach(x => { rk[x.t.id] = x; })));
-    const obsOf = id => (S.tobs || []).filter(z => z.teacher_id === id && (!from || z.day >= from) && z.day <= t).sort((a, b) => a.day < b.day ? -1 : 1);
-    const one = (z, grp) => { const s = tScore([z], grp); const mx = abMax(z.subject);
-      return `${fmtDate(z.day)} — ${grp === BOG ? "" : `I ${z.ib ?? "—"}/${IB_MAX}, `}${grp === OTHER_GRP ? "" : `A ${z.ab ?? "—"}/${mx}, `}${s.total ?? "—"}%${z.author_id ? " · " + nameOf(z.author_id) : ""}`; };
-    const head = ["№"], W = [500];
-    if (o.cn) { head.push("Ism familiya"); W.push(3200); }
-    if (o.cf && !(o.lay === "fil")) { head.push("Filial"); W.push(1500); }
-    if (o.cf && o.lay === "fil" && !o.cn && !o.cs && !o.an) { head.push("Filial"); W.push(1500); }
-    if (o.cs) { head.push("Fan"); W.push(1900); }
-    if (o.an) { head.push("Tahlillar soni", "Umumiy ball", "O'rin"); W.push(1100, 1200, 800); if (det) { head.push(isAll ? "Barcha tahlillar" : "Shu oydagi tahlillar"); W.push(5200); } }
-    const sc = W.reduce((a, b) => a + b, 0), max = det ? 14900 : 9900; const Wn = W.map(w => Math.floor(w * Math.min(1, max / sc)));
-    const row = (x, i) => { const r = [String(i + 1)]; const g = subjGroup(x.subject); const R = rk[x.id];
-      if (o.cn) r.push({ v: x.full_name, b: 1 });
-      if (o.cf && o.lay !== "fil") r.push(x.filial || "—");
-      if (o.cf && o.lay === "fil" && !o.cn && !o.cs && !o.an) r.push(x.filial || "—");
-      if (o.cs) r.push(canonSubj(x.subject) || "—");
-      if (o.an) { const ob = obsOf(x.id); const tot = R ? R.total : (ob.length ? tScore(ob, g).total : null);
-        r.push(String(ob.length), tot === null || tot === undefined ? "—" : { v: tot + "%", b: 1 }, R && R.rank ? String(R.rank) : "—");
-        if (det) r.push(ob.length ? ob.map(z => one(z, g)).join("\n") : "—"); }
-      return r; };
-    const tot = x => { const R = rk[x.id]; return R && R.total !== null && R.total !== undefined ? R.total : -1; };
-    const sorter = (a, b) => o.an ? tot(b) - tot(a) || a.full_name.localeCompare(b.full_name) : a.full_name.localeCompare(b.full_name);
-    const anL = { "all-d": "barcha tahlillar (har biri bilan)", "all-t": "barcha tahlillar (umumiy ball)", "oy-d": `${monthLabel(monthOf(t))} tahlillari (har biri bilan)`, "oy-t": `${monthLabel(monthOf(t))} tahlillari (umumiy ball)` }[o.an];
-    let body = D.h1("Ustozlar ro'yxati") + D.p([o.sub || "Barcha fanlar", o.fil.length === FILIALLAR.length ? "barcha filiallar" : o.fil.join(", "), anL].filter(Boolean).join(" · "), { c: "3B5B86" })
-      + D.p(`Tuzildi: ${fmtDate(t)} · ${S.me.full_name} · jami ${list.length} ta ustoz`, { sz: 18, c: "6B7A90" });
-    if (o.lay === "fil") o.fil.forEach(f => { const a = list.filter(x => x.filial === f).sort(sorter); if (!a.length) return;
-      body += D.h3(f, `${a.length} ta ustoz`) + D.table(head, a.map(row), Wn, { center: [0] }); });
-    else body += D.table(head, list.slice().sort(sorter).map(row), Wn, { center: [0] });
-    const blob = D.build(body, det);
+    const fils = o.fil.filter(f => list.some(x => x.filial === f));
+    const byFil = o.lay === "fil";
+    // --- yordamchilar
+    const r1 = v => v === null || v === undefined ? null : Math.round(v * 10) / 10;
+    const num = v => v === null || v === undefined ? "—" : String(r1(v)).replace(".", ",");
+    const mean = a => { const v = a.filter(x => x !== null && x !== undefined && x !== "" && !isNaN(+x)).map(Number); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+    const fanOf = x => canonSubj(x.subject) || "Fani ko'rsatilmagan";
+    const fanOrd = f => { const i = AKAD_SUBJ.indexOf(f); return f === BOG ? 900 : i >= 0 ? i : f === "Fani ko'rsatilmagan" ? 800 : 100; };
+    const fanSort = (a, b) => fanOrd(a) - fanOrd(b) || a.localeCompare(b);
+    const COL = p => p === null || p === undefined ? null : p >= 0.9 ? { shd: "D9F2E1", c: "1B6E36" } : p >= 0.7 ? { shd: "FFF1C9", c: "8A5A00" } : { shd: "FBDADA", c: "A62626" };
+    const KIND = g => g === BOG ? "bog" : g === OTHER_GRP ? "oth" : "ak";
+    // --- har bir ustoz bo'yicha hisob
+    const obsOf = id => (S.tobs || []).filter(z => z.teacher_id === id && z.day >= from && z.day <= t).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+    const stat = x => { const g = subjGroup(x.subject), k = KIND(g), ob = o.an ? obsOf(x.id) : [];
+      const I = k === "bog" ? null : r1(mean(ob.map(z => z.ib))), A = k === "oth" ? null : r1(mean(ob.map(z => z.ab)));
+      let J = null, jm = k === "bog" ? BOG_AB : k === "oth" ? IB_MAX : IB_MAX + AB_MAX, part = false;
+      if (k === "bog") J = A; else if (k === "oth") J = I;
+      else if (I !== null && A !== null) J = r1(I + A);
+      else if (I !== null) { J = I; jm = IB_MAX; part = true; } else if (A !== null) { J = A; jm = AB_MAX; part = true; }
+      return { x, g, k, ob, n: ob.length, I, A, J, jm, part, p: J === null ? null : J / jm }; };
+    const ST = new Map(list.map(x => [x.id, stat(x)]));
+    const cmp = (a, b) => (a.part - b.part) || (b.p ?? -1) - (a.p ?? -1) || b.n - a.n || a.x.full_name.localeCompare(b.x.full_name);
+    const rankOf = arr => { const r = new Map(); let last = null, rk = 0; arr.forEach((s, i) => { if (s.p === null) return; const key = Math.round(s.p * 10000); if (key !== last) { rk = i + 1; last = key; } r.set(s.x.id, rk); }); return r; };
+    const zScore = (z, k) => { const zi = k === "bog" ? null : (z.ib === null || z.ib === undefined || z.ib === "" ? null : +z.ib);
+      const za = k === "oth" ? null : (z.ab === null || z.ab === undefined || z.ab === "" ? null : +z.ab);
+      const zj = k === "bog" ? za : k === "oth" ? zi : zi !== null && za !== null ? zi + za : null;
+      const zm = k === "bog" ? BOG_AB : k === "oth" ? IB_MAX : IB_MAX + AB_MAX;
+      return { zi, za, zj, zp: zj === null ? null : zj / zm }; };
+    const zLabel = z => [fmtDate(z.day), [z.klass ? `${z.klass} sinf` : "", z.soat ? `${z.soat}-soat` : ""].filter(Boolean).join(", "), z.author_id ? nameOf(z.author_id) : ""].filter(Boolean).join(" · ");
+    // --- ustunlar
+    const LW = 15000, PW = 9900;
+    const scoreCols = k => k === "ak" ? [{ h: `Intizomiy\n(${IB_MAX} dan)`, w: 1350, al: "center", key: "I" }, { h: `Akademik\n(${AB_MAX} dan)`, w: 1350, al: "center", key: "A" }, { h: `Jami\n(${IB_MAX + AB_MAX} dan)`, w: 1350, al: "center", key: "J" }]
+      : k === "oth" ? [{ h: `Intizomiy ball\n(${IB_MAX} dan)`, w: 1700, al: "center", key: "J" }] : [{ h: `Akademik ball\n(${BOG_AB} dan)`, w: 1700, al: "center", key: "J" }];
+    const showFilCol = !byFil;
+    const colsFor = k => { const sc = scoreCols(k); const c = [{ h: "№", w: 500, al: "center" }, { h: "Ustoz", w: 3100 }];
+      if (showFilCol) c.push({ h: "Filial", w: 1600 });
+      if (det) c.push({ h: "Tahlil: sana · sinf, soat · kim ko'rgan", w: 0 }); else c.push({ h: "Tahlillar\nsoni", w: 1100, al: "center" });
+      c.push(...sc, { h: "O'rin", w: 900, al: "center" });
+      const used = c.reduce((a, x) => a + x.w, 0); if (det) c.find(x => x.w === 0).w = LW - used;
+      else { const extra = LW - used; c[1].w += Math.round(extra * 0.6); if (showFilCol) c[2].w += extra - Math.round(extra * 0.6); else c[1].w += extra - Math.round(extra * 0.6); }
+      return c; };
+    const scoreCells = (k, v, bold, colorP, star) => scoreCols(k).map(sc => { const val = sc.key === "I" ? v.I : sc.key === "A" ? v.A : v.J;
+      const cell = { v: num(val) + (sc.key === "J" && star ? ` / ${v.jm || IB_MAX} *` : ""), b: bold };
+      if (sc.key === "J" && val !== null && val !== undefined) Object.assign(cell, COL(colorP) || {}, { b: 1 });
+      return cell; });
+    // --- bitta fan jadvali
+    const fanTable = (arr, k) => { const cols = colsFor(k), rk = rankOf(arr), rows = [];
+      arr.forEach((s, i) => { const R = rk.get(s.x.id); const rv = { v: R ? String(R) : "—", b: 1 };
+        const base = (vm) => { const c = [{ v: String(i + 1), vm }, { v: s.x.full_name, b: 1, vm }]; if (showFilCol) c.push({ v: s.x.filial || "—", vm }); return c; };
+        if (!det) { rows.push({ cells: [...base(), { v: String(s.n) }, ...scoreCells(k, s, 0, s.p, s.part), rv] }); return; }
+        if (s.n === 1) { const z = s.ob[0], q = zScore(z, k);
+          rows.push({ cells: [...base(), { v: zLabel(z) }, ...scoreCells(k, { I: q.zi, A: q.za, J: s.J, jm: s.jm }, 0, s.p, s.part), rv] }); return; }
+        s.ob.forEach((z, j) => { const q = zScore(z, k);
+          rows.push({ keep: 1, cells: [...base(j ? "c" : "r"), { v: zLabel(z), c: "34495E" }, ...scoreCells(k, { I: q.zi, A: q.za, J: q.zj }, 0, null, false).map(c => ({ ...c, b: 0, shd: undefined, c: "34495E" })), { ...rv, vm: j ? "c" : "r" }] }); });
+        rows.push({ cells: [...base("c"), { v: `O'rtacha (${s.n} ta tahlil)`, b: 1, shd: "EAF0F8" }, ...scoreCells(k, s, 1, s.p, s.part).map(c => c.shd ? c : { ...c, shd: "EAF0F8" }), { ...rv, vm: "c" }] }); });
+      return D.tableX(cols, rows); };
+    const noteFor = k => k === "oth" ? D.p(`Bu fan faqat intizomiy bo'yicha baholanadi — ${IB_MAX} ball.`, { sz: 17, c: "6B7A90", i: 1, af: 60 })
+      : k === "bog" ? D.p(`Bog'cha faqat akademik bo'yicha baholanadi — ${BOG_AB} ball.`, { sz: 17, c: "6B7A90", i: 1, af: 60 }) : "";
+    const notSeen = arr => { if (!arr.length) return ""; const cols = [{ h: "№", w: 500, al: "center" }, { h: "Ustoz", w: 6000 }, { h: "Fan", w: 3400 }]; if (showFilCol) cols.push({ h: "Filial", w: 2400 });
+      const rows = arr.slice().sort((a, b) => fanSort(fanOf(a.x), fanOf(b.x)) || a.x.full_name.localeCompare(b.x.full_name))
+        .map((s, i) => ({ cells: [String(i + 1), s.x.full_name, fanOf(s.x), ...(showFilCol ? [s.x.filial || "—"] : [])] }));
+      return D.h3("Bu davrda ko'rilmagan ustozlar", `${arr.length} ta`) + D.tableX(cols, rows, { hshd: "F3E3E3" }); };
+    // bo'lim: berilgan ustozlar to'plami uchun fanlar bo'yicha jadvallar
+    const section = items => { let out = ""; const fans = [...new Set(items.map(s => fanOf(s.x)))].sort(fanSort);
+      fans.forEach(f => { const all = items.filter(s => fanOf(s.x) === f), seen = all.filter(s => s.n > 0).sort(cmp); if (!seen.length) return;
+        out += D.h3(f, `${all.length} ta ustoz · ${seen.length} tasi ko'rilgan`) + noteFor(seen[0].k) + fanTable(seen, seen[0].k); });
+      return out + notSeen(items.filter(s => s.n === 0)); };
+    // --- sarlavha
+    const allObs = o.an ? list.flatMap(x => ST.get(x.id).ob) : [];
+    const minDay = allObs.reduce((a, z) => !a || z.day < a ? z.day : a, null);
+    const perL = !o.an ? "" : isAll ? `barcha tahlillar${minDay ? ` (${fmtDate(minDay)} – ${fmtDate(t)})` : ""}` : `${monthLabel(monthOf(t))} tahlillari`;
+    const now = tashNow(); const hhmm = `${String(Math.floor(now.mins / 60)).padStart(2, "0")}:${String(now.mins % 60).padStart(2, "0")}`;
+    let body = D.h1(o.an ? "Ustozlar reytingi va tahlillari" : "Ustozlar ro'yxati")
+      + D.p([o.sub || "Barcha fanlar", o.fil.length === FILIALLAR.length ? "barcha filiallar" : o.fil.join(", "), perL].filter(Boolean).join(" · "), { c: "3B5B86", sz: 23 })
+      + D.p(`Tuzildi: ${fmtDate(t)} ${t.slice(0, 4)}, ${hhmm} · ${S.me.full_name} · jami ${list.length} ta ustoz`, { sz: 18, c: "6B7A90", af: 160 });
+    if (!o.an) { // tahlilsiz oddiy ro'yxat
+      if (!o.cn && !o.cs && !(o.cf && !byFil)) o = { ...o, cn: true };
+      const cols = [{ h: "№", w: 600, al: "center" }]; if (o.cn) cols.push({ h: "Ism familiya", w: 0 }); if (o.cs) cols.push({ h: "Fan", w: 2800 }); if (o.cf && !byFil) cols.push({ h: "Filial", w: 2200 });
+      const used = cols.reduce((a, x) => a + x.w, 0); const z = cols.find(c => c.w === 0); if (z) z.w = PW - used; else cols[cols.length - 1].w += PW - used;
+      const srt = (a, b) => fanSort(fanOf(a), fanOf(b)) || a.full_name.localeCompare(b.full_name);
+      const tbl = arr => D.tableX(cols, arr.slice().sort(srt).map((x, i) => ({ cells: [String(i + 1), ...(o.cn ? [{ v: x.full_name, b: 1 }] : []), ...(o.cs ? [fanOf(x)] : []), ...(o.cf && !byFil ? [x.filial || "—"] : [])] })));
+      if (byFil) fils.forEach(f => { const a = list.filter(x => x.filial === f); body += D.h2(`${f} — ${a.length} ta ustoz`) + tbl(a); }); else body += tbl(list);
+      return tlSave(D.build(body, false, "Registon maktabi · Monitoring bo'limi · Ustozlar ro'yxati"), o, t);
+    }
+    // --- umumiy xulosa
+    const agg = arr => { const seen = arr.filter(s => s.n > 0);
+      return { n: arr.length, seen: seen.length, obs: seen.reduce((a, s) => a + s.n, 0),
+        I: r1(mean(seen.filter(s => s.k !== "bog").map(s => s.I))), A: r1(mean(seen.filter(s => s.k === "ak").map(s => s.A))), J: r1(mean(seen.filter(s => s.k === "ak" && !s.part).map(s => s.J))) }; };
+    const sCols = [{ h: "Filial", w: 2600 }, { h: "Ustozlar", w: 1300, al: "center" }, { h: "Ko'rilgan", w: 1300, al: "center" }, { h: "Ko'rilmagan", w: 1400, al: "center" }, { h: "Tahlillar", w: 1300, al: "center" },
+      { h: `O'rtacha intizomiy\n(${IB_MAX} dan)`, w: 2350, al: "center" }, { h: `O'rtacha akademik\n(${AB_MAX} dan)`, w: 2350, al: "center" }, { h: `O'rtacha jami\n(${IB_MAX + AB_MAX} dan)`, w: 2400, al: "center" }];
+    const sRow = (label, a, bold) => ({ b: bold, shd: bold ? "EAF0F8" : undefined, cells: [{ v: label, b: 1 }, String(a.n), String(a.seen), { v: String(a.n - a.seen), c: a.n - a.seen ? "A62626" : undefined }, String(a.obs), num(a.I), num(a.A),
+      { v: num(a.J), b: 1, ...(a.J !== null ? COL(a.J / (IB_MAX + AB_MAX)) : {}) }] });
+    const all = list.map(x => ST.get(x.id));
+    body += D.h2("Umumiy xulosa") + D.tableX(sCols, [...fils.map(f => sRow(f, agg(all.filter(s => s.x.filial === f)))), ...(fils.length > 1 ? [sRow("Jami", agg(all), 1)] : [])]);
+    const ev = all.filter(s => s.n > 0 && s.p !== null && !s.part).sort(cmp);
+    const topCols = [{ h: "№", w: 500, al: "center" }, { h: "Ustoz", w: 3900 }, { h: "Fan · filial", w: 3500 }, { h: "Tahlil", w: 1400, al: "center" }, { h: "Ball", w: 1700, al: "center" }];
+    const topRows = arr => arr.map((s, i) => ({ cells: [String(i + 1), { v: s.x.full_name, b: 1 }, `${fanOf(s.x)} · ${s.x.filial || "—"}`, String(s.n), { v: `${num(s.J)} / ${s.jm}`, b: 1, ...COL(s.p) }] }));
+    if (ev.length) { const top = ev.slice(0, 3), low = ev.length >= 6 ? ev.slice(-3).reverse() : [];
+      body += `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="${low.length ? 7500 : 11000}"/>${low.length ? `<w:gridCol w:w="7500"/>` : ""}</w:tblGrid><w:tr>`
+        + `<w:tc><w:tcPr><w:tcW w:w="${low.length ? 7500 : 11000}" w:type="dxa"/></w:tcPr>${D.p("🏆 Eng yuqori natijalar", { b: 1, sz: 21, c: "1B6E36" })}${D.tableX(topCols.map(c => ({ ...c, w: Math.round(c.w * (low.length ? 7300 : 10900) / 10900) })), topRows(top), { af: 0 })}</w:tc>`
+        + (low.length ? `<w:tc><w:tcPr><w:tcW w:w="7500" w:type="dxa"/></w:tcPr>${D.p("⚠ E'tibor talab qiladi (eng past natijalar)", { b: 1, sz: 21, c: "A62626" })}${D.tableX(topCols.map(c => ({ ...c, w: Math.round(c.w * 7300 / 10900) })), topRows(low), { af: 0 })}</w:tc>` : "")
+        + `</w:tr></w:tbl>${D.para("", { af: 120 })}`; }
+    // izoh (qanday o'qiladi) + rang shkalasi
+    body += D.p("Qanday o'qiladi", { b: 1, sz: 20, c: "1F3A5F", af: 40 })
+      + D.p(`• Intizomiy — ${IB_MAX} ballgacha, akademik — ${AB_MAX} ballgacha, jami — ${IB_MAX + AB_MAX} ballgacha. «Boshqa fanlar» faqat intizomiy (${IB_MAX} ball), bog'cha faqat akademik (${BOG_AB} ball) bo'yicha baholanadi.`, { sz: 18, af: 20 })
+      + D.p(det ? "• Har bir tahlil alohida qatorda; bir nechta tahlil bo'lsa, ostida «O'rtacha» qatori — intizomiy va akademik alohida o'rtacha, jami esa ularning yig'indisi." : "• Ballar — davr ichidagi barcha tahlillarning o'rtachasi; jami — o'rtacha intizomiy va o'rtacha akademik yig'indisi.", { sz: 18, af: 20 })
+      + D.p(`• Akademik ball qo'yilmagan tahlil akademik o'rtachaga qo'shilmaydi. «25 / 25 *» — ustozga akademik ball umuman qo'yilmagan, jami faqat intizomiydan (${IB_MAX} dan); bunday ustozlar o'rinda to'liq baholanganlardan keyin turadi.`, { sz: 18, af: 20 })
+      + D.p(byFil ? "• O'rin — shu filialdagi shu fan ustozlari orasida; ballar teng bo'lsa, o'rin ham bir xil." : "• O'rin — tanlangan filiallardagi shu fan ustozlari orasida; ballar teng bo'lsa, o'rin ham bir xil.", { sz: 18, af: 60 })
+      + D.tableX([{ h: "", w: 3600, al: "center" }, { h: "", w: 3600, al: "center" }, { h: "", w: 3600, al: "center" }], [{ cells: [
+        { v: `90% va yuqori · ${IB_MAX + AB_MAX} dan 54+`, b: 1, ...COL(0.95) }, { v: `70–89% · ${IB_MAX + AB_MAX} dan 42–53,9`, b: 1, ...COL(0.8) }, { v: `70% dan past · ${IB_MAX + AB_MAX} dan 42 dan kam`, b: 1, ...COL(0.5) }] }], { noHead: 1, bc: "FFFFFF", sz: 17, af: 200 });
+    // --- asosiy jadvallar
+    if (byFil) fils.forEach((f, i) => { const items = all.filter(s => s.x.filial === f); const a = agg(items);
+      body += (i ? `<w:p><w:r><w:br w:type="page"/></w:r></w:p>` : `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`)
+        + D.h2(`${f} filiali — ${a.n} ta ustoz, ${a.seen} tasi ko'rilgan`) + section(items); });
+    else body += `<w:p><w:r><w:br w:type="page"/></w:r></w:p>` + section(all);
+    return tlSave(D.build(body, true, `Registon maktabi · Monitoring bo'limi · Ustozlar reytingi · ${fmtDate(t)} ${t.slice(0, 4)}`), o, t);
+  }
+  function tlSave(blob, o, t) {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `ustozlar_${(o.sub || "barcha-fanlar").replace(/[^A-Za-z0-9ʻ'-]+/g, "-")}_${t}.docx`; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
@@ -8465,7 +8556,7 @@ window.METODISTLAR = [
     const X = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const T = s => X(window.yA ? window.yA(String(s == null ? "" : s)) : s);
     const run = (text, o = {}) => String(text == null ? "" : text).split("\n").map((ln, i) => `<w:r><w:rPr>${o.b ? "<w:b/>" : ""}${o.i ? "<w:i/>" : ""}${o.c ? `<w:color w:val="${o.c}"/>` : ""}<w:sz w:val="${o.sz || 21}"/></w:rPr>${i ? "<w:br/>" : ""}<w:t xml:space="preserve">${T(ln)}</w:t></w:r>`).join("");
-    const para = (content, o = {}) => `<w:p><w:pPr>${o.al ? `<w:jc w:val="${o.al}"/>` : ""}<w:spacing w:before="${o.bf || 0}" w:after="${o.af ?? 80}"/>${o.shd ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.shd}"/>` : ""}${o.keep ? "<w:keepNext/>" : ""}</w:pPr>${content}</w:p>`;
+    const para = (content, o = {}) => `<w:p><w:pPr>${o.keep ? "<w:keepNext/>" : ""}${o.shd ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.shd}"/>` : ""}<w:spacing w:before="${o.bf || 0}" w:after="${o.af ?? 80}"/>${o.al ? `<w:jc w:val="${o.al}"/>` : ""}</w:pPr>${content}</w:p>`;
     const cell = (v, o = {}) => `<w:tc><w:tcPr>${o.w ? `<w:tcW w:w="${o.w}" w:type="dxa"/>` : ""}${o.shd ? `<w:shd w:val="clear" w:color="auto" w:fill="${o.shd}"/>` : ""}</w:tcPr><w:p><w:pPr><w:spacing w:before="20" w:after="20"/>${o.al ? `<w:jc w:val="${o.al}"/>` : ""}</w:pPr>${run(v, { b: o.b, sz: o.sz || 18, c: o.c })}</w:p></w:tc>`;
     function table(head, rows, widths, o = {}) {
       const bd = `<w:tblBorders>${["top", "left", "bottom", "right", "insideH", "insideV"].map(k => `<w:${k} w:val="single" w:sz="4" w:space="0" w:color="B7C3D3"/>`).join("")}</w:tblBorders>`;
@@ -8474,6 +8565,21 @@ window.METODISTLAR = [
         <w:tblGrid>${W.map(w => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>
         <w:tr><w:trPr><w:tblHeader/></w:trPr>${head.map((h, i) => cell(h, { b: 1, shd: "E3EAF4", w: W[i] })).join("")}</w:tr>
         ${rows.map(r => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${r.map((v, i) => cell(v && typeof v === "object" ? v.v : v, { w: W[i], ...(v && typeof v === "object" ? v : {}), al: (o.center || []).includes(i) ? "center" : undefined })).join("")}</w:tr>`).join("")}</w:tbl>${para("", { af: 60 })}`;
+    }
+    // Boy jadval: ustunlar [{h, w, al}], qatorlar [{cells:[{v,b,i,c,shd,al,vm:"r"|"c",span}], keep, shd, b}]
+    function tableX(cols, rows, o = {}) {
+      const bc = o.bc || "AEBBCC";
+      const bd = `<w:tblBorders>${["top", "left", "bottom", "right", "insideH", "insideV"].map(k => `<w:${k} w:val="single" w:sz="4" w:space="0" w:color="${bc}"/>`).join("")}</w:tblBorders>`;
+      const tc = (c, w, r, isH) => { c = c && typeof c === "object" ? c : { v: c };
+        const al = c.al || (isH ? "center" : cols[c._i] && cols[c._i].al);
+        return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${c.span > 1 ? `<w:gridSpan w:val="${c.span}"/>` : ""}${c.vm === "r" ? `<w:vMerge w:val="restart"/>` : c.vm === "c" ? `<w:vMerge/>` : ""}${(c.shd || r.shd) ? `<w:shd w:val="clear" w:color="auto" w:fill="${c.shd || r.shd}"/>` : ""}<w:vAlign w:val="center"/></w:tcPr>`
+          + `<w:p><w:pPr>${r.keep ? "<w:keepNext/>" : ""}<w:spacing w:before="30" w:after="30" w:line="240" w:lineRule="auto"/>${al ? `<w:jc w:val="${al}"/>` : ""}</w:pPr>${c.vm === "c" ? "" : run(c.v, { b: c.b || r.b || isH, i: c.i, sz: c.sz || (isH ? 18 : o.sz || 19), c: c.c || (isH ? "1F3A5F" : undefined) })}</w:p></w:tc>`; };
+      const tr = (r, isH) => { let gi = 0; const cells = r.cells.map(c0 => { const c = c0 && typeof c0 === "object" ? { ...c0 } : { v: c0 }; c._i = gi; const span = c.span || 1;
+          const w = cols.slice(gi, gi + span).reduce((a, x) => a + x.w, 0); gi += span; return tc(c, w, r, isH); }).join("");
+        return `<w:tr><w:trPr><w:cantSplit/>${isH ? "<w:tblHeader/>" : ""}</w:trPr>${cells}</w:tr>`; };
+      return `<w:tbl><w:tblPr><w:tblW w:w="${cols.reduce((a, x) => a + x.w, 0)}" w:type="dxa"/>${bd}<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>
+        <w:tblGrid>${cols.map(c => `<w:gridCol w:w="${c.w}"/>`).join("")}</w:tblGrid>
+        ${o.noHead ? "" : tr({ cells: cols.map(c => ({ v: c.h, shd: o.hshd || "DCE6F2" })), keep: 1 }, true)}${rows.map(r => tr(r, false)).join("")}</w:tbl>${para("", { af: o.af ?? 120 })}`;
     }
     const crcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
     const crc = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = crcT[(c ^ u[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -8494,23 +8600,25 @@ window.METODISTLAR = [
       const e = new DataView(new ArrayBuffer(22)); e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csz, true); e.setUint32(16, off, true);
       return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     }
-    function build(bodyXml, landscape) {
-      const sect = landscape ? `<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="400" w:footer="400" w:gutter="0"/></w:sectPr>`
-        : `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="900" w:bottom="1000" w:left="1100" w:header="400" w:footer="400" w:gutter="0"/></w:sectPr>`;
+    function build(bodyXml, landscape, footer) {
+      const fr = footer ? `<w:footerReference w:type="default" r:id="rId2"/>` : "";
+      const sect = landscape ? `<w:sectPr>${fr}<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="400" w:footer="400" w:gutter="0"/></w:sectPr>`
+        : `<w:sectPr>${fr}<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="900" w:bottom="1000" w:left="1100" w:header="400" w:footer="400" w:gutter="0"/></w:sectPr>`;
       const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${bodyXml}${sect}</w:body></w:document>`;
       const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/><w:sz w:val="21"/><w:lang w:val="uz-Latn-UZ"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
       return zip([
-        ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
+        ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>${footer ? `<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>` : ""}</Types>`],
         ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`],
-        ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
-        ["word/document.xml", doc], ["word/styles.xml", styles]]);
+        ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${footer ? `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>` : ""}</Relationships>`],
+        ["word/document.xml", doc], ["word/styles.xml", styles],
+        ...(footer ? [["word/footer1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="${landscape ? 15000 : 9900}"/></w:tabs><w:spacing w:after="0"/></w:pPr>${run(footer, { sz: 16, c: "7B8FA8" })}<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:tab/><w:t xml:space="preserve">${T("Sahifa ")}</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/><w:color w:val="7B8FA8"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`]] : [])]);
     }
     const h1 = t => para(run(t, { b: 1, sz: 32, c: "1F3A5F" }), { af: 40 });
     const h2 = t => para(run(t, { b: 1, sz: 25, c: "1F3A5F" }), { bf: 200, af: 80, keep: 1 });
     const h3 = (t, right) => para(run(t, { b: 1, sz: 22 }) + (right ? run("   " + right, { sz: 21, c: "3B5B86", b: 1 }) : ""), { bf: 160, af: 60, shd: "F1F5FA", keep: 1 });
     const p = (t, o = {}) => para(run(t, o), o);
     const kv = (k, v) => para(run(k + ": ", { b: 1 }) + run(v));
-    return { build, table, h1, h2, h3, p, kv, para, run };
+    return { build, table, tableX, h1, h2, h3, p, kv, para, run };
   })();
 
   // Davr: kunlik / haftalik (Du–Sha) / 2 haftalik (KPI bosqichi) / oraliq
