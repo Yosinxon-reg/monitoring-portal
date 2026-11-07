@@ -4949,7 +4949,7 @@ window.METODISTLAR = [
         <div class="card pl-main"><div class="small muted">Oylik reja bajarilishi — ${mLabel(ms)}</div>
           <div class="pl-big">${P.pct ?? 0}<span>%</span></div>
           <div class="pl-bar"><i style="width:${Math.min(100, P.pct || 0)}%"></i>${P.cur ? `<u style="left:${exp}%" title="Bugungacha kutilgan: ${exp}%"></u>` : ""}</div>
-          <div class="small muted">${P.got} / ${P.sumPlan} kuzatuv${P.cur ? ` · bugungacha kutilgan: <b>${exp}%</b> · oy oxirigacha <b>${P.left}</b> ish kuni` : " · oy yakunlangan"}</div></div>
+          <div class="small muted"><b>${P.got}</b> ta kuzatuv bajarildi, oylik rejada <b>${P.sumPlan}</b> ta (${P.rows.length} ta ustoz, har biri oyiga ${PLAN_BASE} martadan${P.rows.some(r => isBogT(r.t)) ? `, bog'cha ${PLAN_BOG}` : ""})${P.cur ? `. Bugungacha <b>${exp}%</b> bajarilgan bo'lishi kerak edi — ${(P.pct ?? 0) >= exp ? "reja bo'yicha ketyapmiz ✅" : `<b style="color:var(--bad)">${Math.max(0, Math.round(P.sumPlan * P.pace) - P.got)} ta kuzatuv orqadamiz</b>`}. Oy oxirigacha <b>${P.left}</b> ish kuni.` : ". Oy yakunlangan."}</div></div>
         <div class="stats st5 pl-stats">
           ${stat("Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${stat("Qisman", `<span class="pl-c mid">${P.part}</span>`)}${stat("Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
           ${stat("Xavf ostida", `<span class="pl-c no">${P.cur ? P.risk.length : "—"}</span>`)}${stat("Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
