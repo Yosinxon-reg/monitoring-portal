@@ -1095,6 +1095,52 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .ok-text{color:#1f9d55;font-size:13px;margin-top:8px}
 .code-pill{display:inline-block;padding:2px 9px;border-radius:7px;background:#eef3fa;color:#1f3a5f;font-family:ui-monospace,Consolas,monospace;letter-spacing:.5px}
 
+/* 46: Bosqich g'oliblari va tabriknoma */
+.win-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.win-col { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--border); }
+.win-dept { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.win-col .top-item { min-width: 0; }
+.win-medal { font-size: 28px; line-height: 1; width: 34px; text-align: center; flex: none; }
+.win-2 .top-score { color: #7b8794; }
+.rk-tbl tr.rk-me td { background: var(--info-soft); }
+.tabrik { position: relative; overflow: hidden; text-align: center; padding: 30px 22px 22px; border-radius: 16px; border: 3px double #c99a2e;
+  background: radial-gradient(circle at 50% 0%, #fff7dc, #fffdf6 60%); color: #3b2f12; }
+.tabrik-2 { border-color: #9aa6b2; background: radial-gradient(circle at 50% 0%, #eef2f6, #fbfcfd 60%); color: #25303b; }
+.tb-medal { font-size: 64px; line-height: 1; animation: tbPop .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.tb-kicker { margin-top: 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.tb-title { margin: 8px 0 4px; font-size: 24px; }
+.tb-name { font-family: Georgia, "Times New Roman", serif; font-size: 26px; font-style: italic; margin: 6px 0 10px; }
+.tb-text { max-width: 420px; margin: 0 auto 12px; line-height: 1.55; }
+.tb-score { font-size: 30px; font-weight: 800; color: #b07d12; }
+.tabrik-2 .tb-score { color: #5d6b78; }
+.tb-sign { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(0, 0, 0, .12); font-size: 13px; opacity: .75; }
+.tb-conf { position: absolute; inset: 0; pointer-events: none; }
+.tb-conf i { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: .85; animation: tbFall 3.2s linear infinite; }
+.tb-conf i:nth-child(6n+1) { background: #e8b730; } .tb-conf i:nth-child(6n+2) { background: #3c7be0; } .tb-conf i:nth-child(6n+3) { background: #e2574c; }
+.tb-conf i:nth-child(6n+4) { background: #3fb27f; } .tb-conf i:nth-child(6n+5) { background: #9b6ae0; } .tb-conf i:nth-child(6n) { background: #f08a3c; }
+
+.tb-conf i:nth-child(1) { left: 32%; animation-delay: 0.91s; animation-duration: 3.75s; }
+.tb-conf i:nth-child(2) { left: 63%; animation-delay: 0.46s; animation-duration: 2.71s; }
+.tb-conf i:nth-child(3) { left: 53%; animation-delay: 1.65s; animation-duration: 3.06s; }
+.tb-conf i:nth-child(4) { left: 9%; animation-delay: 0.67s; animation-duration: 3.46s; }
+.tb-conf i:nth-child(5) { left: 37%; animation-delay: 2.34s; animation-duration: 3.92s; }
+.tb-conf i:nth-child(6) { left: 35%; animation-delay: 0.64s; animation-duration: 4.08s; }
+.tb-conf i:nth-child(7) { left: 84%; animation-delay: 2.42s; animation-duration: 3.88s; }
+.tb-conf i:nth-child(8) { left: 26%; animation-delay: 0.49s; animation-duration: 3.06s; }
+.tb-conf i:nth-child(9) { left: 95%; animation-delay: 2.88s; animation-duration: 3.96s; }
+.tb-conf i:nth-child(10) { left: 49%; animation-delay: 0.26s; animation-duration: 3.57s; }
+.tb-conf i:nth-child(11) { left: 87%; animation-delay: 1.16s; animation-duration: 3.00s; }
+.tb-conf i:nth-child(12) { left: 33%; animation-delay: 1.42s; animation-duration: 2.74s; }
+.tb-conf i:nth-child(13) { left: 72%; animation-delay: 2.52s; animation-duration: 2.61s; }
+.tb-conf i:nth-child(14) { left: 39%; animation-delay: 1.72s; animation-duration: 4.01s; }
+.tb-conf i:nth-child(15) { left: 67%; animation-delay: 0.59s; animation-duration: 3.28s; }
+.tb-conf i:nth-child(16) { left: 38%; animation-delay: 1.29s; animation-duration: 2.86s; }
+.tb-conf i:nth-child(17) { left: 41%; animation-delay: 0.78s; animation-duration: 3.88s; }
+.tb-conf i:nth-child(18) { left: 12%; animation-delay: 0.14s; animation-duration: 3.60s; }
+@keyframes tbFall { 0% { transform: translateY(0) rotate(0); } 100% { transform: translateY(520px) rotate(540deg); } }
+@keyframes tbPop { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tb-conf i, .tb-medal { animation: none; } .tb-conf { display: none; } }
+
 </style>
 </head>
 <body>
@@ -1722,6 +1768,15 @@ window.LESSONS = [
       async listAwards(from, to) { return ok((load().awards || []).filter(r => r.period_start >= from && r.period_start <= to)); },
       async setAward(period, user_id) { const d = load(); d.awards = (d.awards || []).filter(r => r.period_start !== period);
         if (user_id) d.awards.push({ period_start: period, user_id }); save(); return true; },
+      async listStages(from, to) { const d = load(); const m = me();
+        const st = (d.stages || []).filter(r => r.period_start >= from && r.period_start <= to);
+        const myD = r => { const p = (d.profiles || []).find(x => x.id === m.id); const c = p && p.ceo_id && (d.profiles || []).find(x => x.id === p.ceo_id); return p && p.role === "ceo" ? (p.bolim || "intizomiy") : c ? (c.bolim || "intizomiy") : "administratsiya"; };
+        const ranks = (d.sranks || []).filter(r => r.period_start >= from && r.period_start <= to && (m.role === "asoschi" || m.role === "ceo" || r.user_id === m.id || r.dept === myD()));
+        return ok({ stages: st, ranks }); },
+      async finalizeStage(ps, rows, notify) { const d = load(); if (me().role !== "asoschi") return fail("Ruxsat yo'q");
+        d.stages = (d.stages || []).filter(r => r.period_start !== ps).concat([{ period_start: ps, finalized_at: new Date().toISOString(), finalized_by: me().id }]);
+        d.sranks = (d.sranks || []).filter(r => r.period_start !== ps).concat(rows.map(r => ({ ...r, period_start: ps, seen_at: null }))); save(); return rows.length; },
+      async stageSeen(ps) { const d = load(); (d.sranks || []).forEach(r => { if (r.period_start === ps && r.user_id === me().id && !r.seen_at) r.seen_at = new Date().toISOString(); }); save(); return true; },
       async listSelfLogs(from, to, uid) { const d = load(); const m = me();
         return ok((d.slogs || []).filter(r => r.log_date >= from && r.log_date <= to && (!uid || r.user_id === uid) && (m.role === "asoschi" || r.user_id === m.id)).sort((a, b) => a.log_date < b.log_date ? 1 : -1)); },
       async saveSelfLog(date, body) { const d = load(); const m = me(); d.slogs = d.slogs || []; const now = new Date().toISOString();
@@ -1766,6 +1821,10 @@ window.LESSONS = [
       async amalDel(tb, match) { const d = load(); d["amal_" + tb] = (d["amal_" + tb] || []).filter(x => !Object.entries(match).every(([k, v]) => x[k] === v)); save(); return ok(true); },
       // ---- 42: tavsiyalar navbati (demo)
       async listRecs(from, to) { return ok((load().recs || []).filter(o => o.day >= from && o.day <= to)); },
+      async recLastSeen() { const d = load(), m = {}, ms = new Date().toISOString().slice(0, 8) + "01", td = new Date().toISOString().slice(0, 10);
+        (d.tobs || []).forEach(o => { const x = m[o.teacher_id] = m[o.teacher_id] || { teacher_id: o.teacher_id, last_day: null, last_by: null, days: new Set() };
+          if (!x.last_day || o.day > x.last_day) { x.last_day = o.day; x.last_by = o.author_id; } if (o.day >= ms && o.day <= td) x.days.add(o.day); });
+        return ok(Object.values(m).map(x => ({ teacher_id: x.teacher_id, last_day: x.last_day, last_by: x.last_by, n_month: x.days.size }))); },
       async listNoLesson() { return ok(load().nolesson || []); },
       async recTake(day, cands, n) { const d = load(); d.recs = d.recs || []; d.nolesson = d.nolesson || []; const m = me().id; const dw = new Date(day + "T00:00:00").getDay() || 7;
         let have = d.recs.filter(o => o.day === day && o.user_id === m && o.status === "taklif").length;
@@ -1773,6 +1832,7 @@ window.LESSONS = [
           if (d.recs.some(o => o.day === day && o.teacher_id === c && (["taklif", "tanlandi"].includes(o.status) || (o.status === "rad" && (o.user_id === m || ["kamera", "dars_yoq", "kasal"].includes(o.reason)))))) continue;
           if (d.nolesson.some(z => z.teacher_id === c && z.dow === dw)) continue;
           if ((d.helpreq || []).some(h => h.kind === "yonaltirish" && h.status === "qabul" && h.due >= day && (h.teacher_ids || []).includes(c) && h.to_id !== m)) continue;
+          { const lim = new Date(new Date(day + "T12:00:00") - 7 * 864e5).toISOString().slice(0, 10); if ((d.tobs || []).some(o => o.teacher_id === c && o.day > lim && o.day <= day)) continue; }
           d.recs.push({ id: Date.now() + Math.random(), day, teacher_id: c, user_id: m, status: "taklif", reason: "", note: "", created_at: new Date().toISOString() }); have++; }
         save(); return ok(d.recs.filter(o => o.day === day && o.user_id === m)); },
       async recDecide(id, okk, why, msg) { const d = load(); const o = (d.recs || []).find(x => x.id === id); if (!o) return fail("Topilmadi");
@@ -2020,6 +2080,12 @@ window.LESSONS = [
         if (!user_id) { chk(await sb.from("kpi_award").delete().eq("period_start", period)); return true; }
         chk(await sb.from("kpi_award").upsert({ period_start: period, user_id }, { onConflict: "period_start" })); return true;
       },
+      async listStages(from, to) {
+        const [st, rk] = await Promise.all([sb.from("kpi_stage").select("*").gte("period_start", from).lte("period_start", to),
+          sb.from("kpi_stage_rank").select("*").gte("period_start", from).lte("period_start", to)]);
+        return { stages: chk(st), ranks: chk(rk) }; },
+      async finalizeStage(ps, rows, notify) { return chk(await sb.rpc("kpi_finalize", { ps, items: rows, notify: !!notify })); },
+      async stageSeen(ps) { try { await sb.rpc("kpi_stage_seen", { ps }); } catch (e) {} return true; },
       async listSelfLogs(from, to, uid) { let q = sb.from("self_logs").select("*").gte("log_date", from).lte("log_date", to).order("log_date", { ascending: false }); if (uid) q = q.eq("user_id", uid); return chk(await q); },
       async saveSelfLog(date, body) { chk(await sb.from("self_logs").upsert({ user_id: meCache.id, log_date: date, body }, { onConflict: "user_id,log_date" })); return true; },
       async listCeoReports(from, to) { return (await pageAll(() => sb.from("ceo_reports").select("*").gte("report_date", from).lte("report_date", to).order("report_date").order("ceo_id"))).map(normRep); },
@@ -2087,6 +2153,7 @@ window.LESSONS = [
       async amalDel(tb, match) { chk(await sb.from("amal_" + tb).delete().match(match)); return true; },
       async amalAssign(iid, tid) { chk(await sb.rpc("amal_assign", { iid, tid })); return true; },
       // ---- 42: tavsiyalar navbati
+      async recLastSeen() { return chk(await sb.rpc("rec_last_seen")) || []; },
       async listRecs(from, to) { return pageSoft(() => sb.from("rec_offers").select("*").gte("day", from).lte("day", to).order("id")); },
       async listNoLesson() { return pageSoft(() => sb.from("teacher_nolesson").select("*").order("teacher_id")); },
       async recTake(d, cands, n) { return chk(await sb.rpc("rec_take", { d, cands: cands || [], n })) || []; },
@@ -2744,6 +2811,7 @@ window.METODISTLAR = [
       if (db.listMetBookings) { try { await metReload(); } catch (e) { S.mpcs = S.mpcs || []; S.mbook = S.mbook || []; } }
       if ((S.me.role === "asoschi" || isPersonal(S.me)) && db.listSelfLogs) { try { S.slogs = await db.listSelfLogs(addD(today(), -7), today()); } catch (e) { S.slogs = []; } }
       touchSeen();
+      stagePopup().catch(() => {});
     }
   }
   let lastTouch = 0;
@@ -4755,8 +4823,9 @@ window.METODISTLAR = [
   function planRecommend(opts = {}) {
     const t = today(), P = planCalc(mStart(t), { fil: opts.fil || "", bog: "all" });
     const skip = opts.skip || new Set();
-    return P.rows.filter(r => r.need > 0 && !skip.has(r.t.id) && tLive(r.t) && (r.gap === null || r.gap >= GAP_DAYS) && (!opts.only || opts.only(r.t)))
-      .sort((a, b) => (b.risk - a.risk) || (a.n - b.n) || ((b.gap ?? 999) - (a.gap ?? 999)) || a.t.full_name.localeCompare(b.t.full_name)).slice(0, opts.limit || 8);
+    const L = r => recLast(r, t), wk = r => { const g = L(r).gap; return g === null ? 1e6 : Math.min(Math.floor(g / 7), 3); };
+    return P.rows.filter(r => r.plan - L(r).n > 0 && !skip.has(r.t.id) && tLive(r.t) && (L(r).gap === null || L(r).gap >= REC_GAP) && (!opts.only || opts.only(r.t)))
+      .sort((a, b) => (wk(b) - wk(a)) || (b.risk - a.risk) || (L(a).n - L(b).n) || ((L(b).gap ?? 1e6) - (L(a).gap ?? 1e6)) || a.t.full_name.localeCompare(b.t.full_name)).slice(0, opts.limit || 8);
   }
   // =====================================================================
   // 42: Kunlik tavsiyalar — umumiy navbat (bitta ustoz bir kunda bitta xodimga), tanlash / rad etish, rejaga kiritish
@@ -4782,8 +4851,29 @@ window.METODISTLAR = [
       if (!out.includes(id) && !(S.tobs || []).some(x => x.teacher_id === id && x.author_id === S.me.id && x.day >= since)) out.push(id); }));
     return out;
   }
-  // Ustuvorlik: bu oy ko'rilmagan → kam ko'rilgan → (xavf) → oxirgi marta boshqa xodim ko'rgan → eng uzoq ko'rilmagan.
-  // Filiallar nisbati: har fan bo'yicha filialdagi ustozlar soniga mos (ko'p ustozli filialdan ko'proq).
+  // ---- 47: Ustuvorlik — eng uzoq ko'rilmagan ustoz birinchi
+  // Oxirgi kuzatuv sanasi butun bazadan olinadi (rec_last_seen), brauzer keshidagi yangiroq yozuv bo'lsa — o'sha.
+  // Tartib: CEO yo'naltirgan → hech qachon ko'rilmagan → ko'rilmagan haftalar soni ko'p (3+ hafta, 2 hafta, 1 hafta)
+  //   → bir hafta ichida: rejaga ulgurmaslik xavfi → shu oy kam ko'rilgan → oxirgi marta boshqa xodim ko'rgan → kunlar soni.
+  // Bir xil haftalik guruh ichida filiallar ustozlar soniga mos navbatlanadi. Oxirgi 7 kunda ko'rilgan ustoz tavsiya qilinmaydi.
+  const REC_GAP = 7;
+  const RLS = { m: null, at: 0, busy: null };
+  async function recSeenLoad(force) {
+    if (!db.recLastSeen) return;
+    if (!force && RLS.m && Date.now() - RLS.at < 60e3) return;
+    if (RLS.busy) return RLS.busy;
+    RLS.busy = db.recLastSeen().then(rows => { RLS.m = new Map((rows || []).map(r => [r.teacher_id, r])); RLS.at = Date.now(); }).catch(e => console.warn("recSeen", e)).finally(() => { RLS.busy = null; });
+    return RLS.busy;
+  }
+  // { last: "YYYY-MM-DD" | null, by, n (shu oy ko'rilgan kunlar), gap (kalendar kun) }
+  function recLast(r, day) {
+    const s = RLS.m ? RLS.m.get(r.t.id) : null, loc = r.last || null;
+    let last = s ? String(s.last_day).slice(0, 10) : null, by = s ? s.last_by : null;
+    if (loc && (!last || loc.day > last)) { last = loc.day; by = loc.author_id; }
+    const sameM = mStart(day) === mStart(today());
+    const n = Math.max(r.n || 0, s && sameM ? +s.n_month || 0 : 0);
+    return { last, by, n, gap: last ? dayDiff(last, day) : null };
+  }
   function recCands(day) {
     const me = S.me.id, dw = dowOf(day);
     const akad = deptOf(S.me) === "akademik" || canMetAdmin();
@@ -4794,29 +4884,38 @@ window.METODISTLAR = [
     const scope = P.rows.filter(r => tLive(r.t, day) && recFits(r.t));
     const key = r => canonSubj(r.t.subject) + "|" + (r.t.filial || "—");
     const w = {}; scope.forEach(r => { w[key(r)] = (w[key(r)] || 0) + 1; });
-    const byMe = r => r.last && r.last.author_id === me ? 1 : 0;
-    const cmp = (a, b) => (a.n - b.n) || (b.risk - a.risk) || (byMe(a) - byMe(b)) || ((b.gap ?? 999) - (a.gap ?? 999)) || a.t.full_name.localeCompare(b.t.full_name);
-    const groups = {};
-    scope.filter(r => r.need > 0 && (r.gap === null || r.gap >= GAP_DAYS) && !blocked.has(r.t.id) && !first.includes(r.t.id)).forEach(r => (groups[key(r)] = groups[key(r)] || []).push(r));
-    Object.values(groups).forEach(g => g.sort(cmp));
-    const took = {}, out = [...first];
-    for (let guard = 0; guard < 400; guard++) {
-      let best = null, bv = Infinity;
-      Object.keys(groups).forEach(k => { if (!groups[k].length) return; const v = ((took[k] || 0) + 1) / (w[k] || 1); const h = groups[k][0];
-        if (v < bv - 1e-9 || (Math.abs(v - bv) < 1e-9 && best && cmp(h, groups[best][0]) < 0)) { bv = v; best = k; } });
-      if (!best) break;
-      out.push(groups[best].shift().t.id); took[best] = (took[best] || 0) + 1;
-    }
-    return out.slice(0, 80);
+    const cand = scope.filter(r => !blocked.has(r.t.id) && !first.includes(r.t.id)).map(r => { const L = recLast(r, day); return { r, L, need: r.plan - L.n }; })
+      .filter(x => x.need > 0 && (x.L.gap === null || x.L.gap >= REC_GAP));
+    const wk = x => x.L.gap === null ? 1e6 : Math.min(Math.floor(x.L.gap / 7), 3);
+    const byMe = x => x.L.by === me ? 1 : 0;
+    const cmp = (a, b) => (wk(b) - wk(a)) || (b.r.risk - a.r.risk) || (a.L.n - b.L.n) || (byMe(a) - byMe(b)) || ((b.L.gap ?? 1e6) - (a.L.gap ?? 1e6)) || a.r.t.full_name.localeCompare(b.r.t.full_name);
+    const out = [...first];
+    [...new Set(cand.map(wk))].sort((a, b) => b - a).forEach(b => {
+      const groups = {}; cand.filter(x => wk(x) === b).forEach(x => (groups[key(x.r)] = groups[key(x.r)] || []).push(x));
+      Object.values(groups).forEach(g => g.sort(cmp));
+      const took = {};
+      for (let guard = 0; guard < 2000; guard++) {
+        let best = null, bv = Infinity;
+        Object.keys(groups).forEach(k => { if (!groups[k].length) return; const v = ((took[k] || 0) + 1) / (w[k] || 1);
+          if (v < bv - 1e-9 || (Math.abs(v - bv) < 1e-9 && best && cmp(groups[k][0], groups[best][0]) < 0)) { bv = v; best = k; } });
+        if (!best) break;
+        out.push(groups[best].shift().r.t.id); took[best] = (took[best] || 0) + 1;
+      }
+    });
+    return out.slice(0, 150);
   }
   async function recFill(day, force) {
     if (!db.recTake || REC.busy) return false;
     const pend = recMine(day, ["taklif"]).length, want = recWant(day);
-    if (pend >= want) return false;
+    // reja to'lgan va yaqinda tekshirilgan bo'lsa — serverga bormaymiz; aks holda server eskirgan takliflarni tozalaydi va to'ldiradi
     if (!force && REC.at[day] && Date.now() - REC.at[day] < 60e3) return false;
+    if (!want && !pend) return false;
     REC.busy = true;
-    try { const rows = await db.recTake(day, recCands(day), want);
-      S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); REC.at[day] = Date.now(); return true; }
+    try { await recSeenLoad(force);
+      const rows = await db.recTake(day, recCands(day), want);
+      const before = JSON.stringify(recMine(day).map(o => o.id + o.status));
+      S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); REC.at[day] = Date.now();
+      return before !== JSON.stringify(recMine(day).map(o => o.id + o.status)); }
     catch (e) { console.warn("recFill", e); return false; }
     finally { REC.busy = false; }
   }
@@ -4832,11 +4931,11 @@ window.METODISTLAR = [
       const dir = new Set(recDirected(day));
       const info = id => { const tt = hrTeacher(id) || { full_name: "—" }; const r = pr[id];
         return `<div style="flex:1;min-width:0"><div class="t">${esc(tt.full_name)}${dir.has(id) ? ` <span class="pl-tag2">CEO yo'naltirgan</span>` : ""}${r && r.risk ? ` <span class="pl-tag">xavf</span>` : ""}</div>
-          <div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}${r ? (r.last ? ` · oxirgi: ${fmtDate(r.last.day)} (${esc(r.last.author_id === S.me.id ? "o'zingiz" : shortName(r.last.author_id))})` : " · bu oy hali ko'rilmagan") : ""}</div></div>${r ? plCount(r) : ""}`; };
+          <div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}${r ? (() => { const L = recLast(r, today()); return L.last ? ` · oxirgi: ${fmtDate(L.last)} (${esc(L.by === S.me.id ? "o'zingiz" : shortName(L.by))}) — <b>${L.gap === 0 ? "bugun" : L.gap + " kun oldin"}</b>` : " · <b>hech qachon ko'rilmagan</b>"; })() : ""}</div></div>${r ? plCount(r) : ""}`; };
       box.innerHTML = `<div class="card pl-rec rec-w" style="margin:0 0 16px"><div class="card-head"><h2>📌 Tavsiyalar</h2>
           <div class="seg" style="margin-left:8px">${tOff ? "" : `<button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button>`}<button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
           <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b></span></div>
-        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng. Avval bu oy ko'rilmagan va kam ko'rilgan, oxirgi marta boshqa xodim ko'rgan ustozlar; filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
+        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng. Navbat: avval hech qachon ko'rilmagan, keyin eng uzoq ko'rilmagan ustozlar (3+ hafta → 2 hafta → 1 hafta); oxirgi ${REC_GAP} kunda ko'rilganlar tavsiya qilinmaydi. Bir xil muddatdagilar ichida filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
           : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
         ${ch.length ? `<div class="small muted" style="margin:12px 0 4px"><b>Tanlanganlar — ${day === t ? "bugungi" : fmtDate(day)} rejangizda</b></div>
@@ -4855,9 +4954,9 @@ window.METODISTLAR = [
       $("#rec-more", box).onclick = async () => { const before = recMine(day, ["taklif"]).length; await recFillMore(day); draw(); if (recMine(day, ["taklif"]).length === before) toast("Boshqa mos ustoz qolmadi"); };
     };
     draw();
-    if (recMine(day, ["taklif"]).length < recWant(day)) recFill(day).then(ch => { if (ch && box.isConnected) draw(); });
+    recFill(day).then(ch => { if (ch && box.isConnected) draw(); });
   }
-  async function recFillMore(day) { if (!db.recTake) return; try { const rows = await db.recTake(day, recCands(day), recMine(day, ["taklif"]).length + REC_N);
+  async function recFillMore(day) { if (!db.recTake) return; try { await recSeenLoad(); const rows = await db.recTake(day, recCands(day), recMine(day, ["taklif"]).length + REC_N);
     S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); } catch (e) { toast(e.message, true); } }
   function recRejectModal(o, done) {
     if (!o) return; const tt = hrTeacher(o.teacher_id) || { full_name: "—" };
@@ -6220,11 +6319,94 @@ window.METODISTLAR = [
     const final = picked ? 100 : fin && fin.final_score !== null ? +fin.final_score : pct;
     return { p, cells, sum: rnd(sum), maxT, pct, final, overridden: !!fin && !picked, picked, has: cells.some(c => c.val !== null) || !!fin || picked };
   }
-  // G'oliblar: reytingdagi 1-o'rin + asoschi tanlovi (bo'lsa), aks holda eng yaxshi 2 natija
-  function winners(rows, awardId) {
-    const rated = rows.filter(x => x.has && !x.picked).sort((a, b) => b.final - a.final);
-    const pick = rows.find(x => x.picked);
-    return pick ? [...rated.slice(0, 1), pick] : rated.slice(0, 2);
+  // 46: Bo'lim ichidagi o'rinlar: teng foizda — bir xil o'rin; asoschi tanlovi — 0; ball yo'q — null
+  const RANK_DEPTS = ["intizomiy", "akademik"];
+  function deptRanks(rows) {
+    const out = {};
+    rows.forEach(x => { const k = deptOf(x.p); if (RANK_DEPTS.includes(k)) (out[k] = out[k] || []).push(x); });
+    Object.values(out).forEach(a => {
+      const rated = a.filter(x => x.has && !x.picked).sort((p, q) => q.final - p.final);
+      let r = 0, prev = null; rated.forEach((x, i) => { if (prev === null || x.final !== prev) r = i + 1; prev = x.final; x.rank = r; });
+      a.forEach(x => { x.n = rated.length; if (x.picked) x.rank = 0; else if (!x.has) x.rank = null; });
+      a.sort((p, q) => (p.rank === null) - (q.rank === null) || (p.rank ?? 99) - (q.rank ?? 99) || p.p.full_name.localeCompare(q.p.full_name));
+    });
+    return out;
+  }
+  const MEDAL = r => r === 1 ? "🥇" : r === 2 ? "🥈" : r === 0 ? "⭐" : "";
+  const STG = { list: null, at: 0 };
+  async function stagesLoad(force) {
+    if (!db.listStages) return { stages: [], ranks: [] };
+    if (!force && STG.list && Date.now() - STG.at < 60e3) return STG.list;
+    try { STG.list = await db.listStages(KPI_ANCHOR, addD(today(), 14)); STG.at = Date.now(); } catch (e) { STG.list = STG.list || { stages: [], ranks: [] }; }
+    return STG.list;
+  }
+  // G'oliblar kartasi: har bo'lim bo'yicha 1- va 2-o'rin (+ asoschi tanlovi)
+  function winCard(byDept, d, opts = {}) {
+    const col = (k, a) => { const top = a.filter(x => x.rank === 1 || x.rank === 2).slice(0, 3), pick = a.filter(x => x.rank === 0);
+      return `<div class="win-col"><div class="win-dept">${esc(DEPTS[k].l)}</div>
+        ${top.length || pick.length ? [...top, ...pick].map(x => `<div class="top-item win-${x.rank}"><div class="win-medal">${MEDAL(x.rank)}</div>${avatar(x.p.full_name, photoOf(x.p))}<div><div class="small muted">${x.rank === 0 ? "Monitoring bo'limi rahbari tanlovi" : x.rank + "-o'rin"}</div><b>${esc(x.p.full_name)}</b><div class="top-score">${x.final}%</div></div></div>`).join("")
+          : `<span class="muted small">Hali ballar qo'yilmagan</span>`}</div>`; };
+    const ks = RANK_DEPTS.filter(k => byDept[k] && byDept[k].length);
+    return `<div class="card top-card"><div class="card-head"><h2>🏆 ${bosqichNo(d)}-bosqich g'oliblari</h2>${opts.done ? `<span class="pill tasdiqlandi" style="margin-left:8px">✓ Yakunlangan · ${fmtDate(String(opts.done.finalized_at).slice(0, 10))}</span>` : ""}<span class="spacer"></span>${opts.right || ""}</div>
+      ${ks.length ? `<div class="win-grid">${ks.map(k => col(k, byDept[k])).join("")}</div>` : `<span class="muted">Hali ballar qo'yilmagan</span>`}${opts.foot || ""}</div>`;
+  }
+  // Yakunlangan bosqich: saqlangan natijadan bo'lim reytingi (xodim o'z bo'limini ko'radi)
+  function savedByDept(ranks, ps) {
+    const out = {};
+    ranks.filter(r => r.period_start === ps).forEach(r => { const p = person(r.user_id) || { id: r.user_id, full_name: "—" };
+      (out[r.dept] = out[r.dept] || []).push({ p, rank: r.rank, n: r.n, final: r.final === null ? null : +r.final, has: r.rank !== null }); });
+    Object.values(out).forEach(a => a.sort((p, q) => (p.rank === null) - (q.rank === null) || (p.rank ?? 99) - (q.rank ?? 99)));
+    return out;
+  }
+  function deptRankTable(a, hi) {
+    return `<div class="table-wrap"><table class="rk-tbl"><thead><tr><th>O'rin</th><th>Xodim</th><th>Natija</th></tr></thead><tbody>
+      ${a.map(x => `<tr class="${x.p.id === hi ? "rk-me" : ""}"><td><b>${x.rank === 0 ? "⭐" : x.rank ? MEDAL(x.rank) + " " + x.rank : "—"}</b></td><td>${esc(x.p.full_name)}${x.p.id === hi ? " <span class='small muted'>(siz)</span>" : ""}${x.rank === 0 ? " <span class='small muted'>· rahbar tanlovi</span>" : ""}</td><td>${x.final !== null && x.final !== undefined ? `<b>${x.final}%</b>` : "<span class='muted'>ball yo'q</span>"}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  function finalizeModal(d, byDept, done, after) {
+    const to = addD(d, 13), early = to >= today();
+    const rows = []; Object.entries(byDept).forEach(([k, a]) => a.forEach(x => rows.push({ user_id: x.p.id, dept: k, rank: x.rank, n: x.n, final: x.has ? x.final : null })));
+    const list = RANK_DEPTS.filter(k => byDept[k]).map(k => `<div class="win-dept" style="margin-top:8px">${esc(DEPTS[k].l)}</div>` + byDept[k].filter(x => x.rank !== null && x.rank <= 2).map(x => `<div>${MEDAL(x.rank)} <b>${esc(x.p.full_name)}</b> — ${x.rank === 0 ? "rahbar tanlovi" : x.rank + "-o'rin"}, ${x.final}%</div>`).join("")).join("");
+    const m = openModal(`🏁 ${bosqichNo(d)}-bosqichni yakunlash`, `
+      ${early ? `<div class="note" style="margin:0 0 12px">⚠ Bosqich hali tugamagan (${fmtDate(to)} gacha). Hozir yakunlasangiz, shu kungacha qo'yilgan ballar bilan o'rinlar belgilanadi.</div>` : ""}
+      ${done ? `<div class="note" style="margin:0 0 12px">Bu bosqich ${fmtDate(String(done.finalized_at).slice(0, 10))} da yakunlangan. Qayta yakunlasangiz, o'rinlar hozirgi ballar bo'yicha yangilanadi.</div>` : ""}
+      <p class="small muted" style="margin-top:0">Yakunlangach:</p>
+      <ul class="small" style="margin:0 0 10px;padding-left:18px"><li>har bir xodimga botda o'z natijasi va bo'limdagi o'rni boradi;</li><li>1- va 2-o'rin egalariga (va rahbar tanloviga) <b>tabriknoma</b> boradi, portalga kirganda tabrik oynasi chiqadi;</li><li>har bir xodim o'z bo'limi reytingini «KPI va reyting»da ko'radi.</li></ul>
+      <div class="card" style="margin:0 0 12px;padding:10px 14px">${list || "<span class='muted'>G'oliblar yo'q</span>"}</div>
+      <label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="fz-n" ${done ? "" : "checked"} style="width:auto"> Botga xabar yuborish (${rows.length} xodim)</label>`,
+      `<button class="btn ghost" data-close>Bekor qilish</button><button class="btn primary" id="fz-go">🏁 ${done ? "Qayta yakunlash" : "Bosqichni yakunlash"}</button>`);
+    $("#fz-go", m).onclick = async () => { const b = $("#fz-go", m); b.disabled = true; b.textContent = "Yuborilmoqda…";
+      try { await db.finalizeStage(d, rows, $("#fz-n", m).checked); STG.at = 0; closeModal(); toast(`${bosqichNo(d)}-bosqich yakunlandi${$("#fz-n", m) && $("#fz-n", m).checked ? " — xodimlarga xabar yuborildi" : ""}`); after && after(); }
+      catch (e) { b.disabled = false; b.textContent = "🏁 Bosqichni yakunlash"; toast(e.message || String(e), true); } };
+  }
+  // Portalga kirganda: yangi yakunlangan bosqich — g'oliblarga tabriknoma, qolganlarga o'z natijasi (bir marta)
+  async function stagePopup() {
+    if (!S.me || S.me.role === "asoschi" || S.me.role === "oqituvchi" || !isStaff() || S._stagePop) return;
+    S._stagePop = true;
+    const L = await stagesLoad(true);
+    const mine = (L.ranks || []).filter(r => r.user_id === S.me.id && !r.seen_at).sort((a, b) => a.period_start < b.period_start ? 1 : -1);
+    if (!mine.length) return;
+    const r = mine[0], ps = r.period_start, dl = DEPTS[r.dept] ? DEPTS[r.dept].l : r.dept, fin = r.final === null ? null : +r.final;
+    const show = () => { if ($("#modal-root").innerHTML) return setTimeout(show, 3000);
+      const win = r.rank === 1 || r.rank === 2 || r.rank === 0;
+      const body = win ? `<div class="tabrik tabrik-${r.rank}"><div class="tb-conf">${"<i></i>".repeat(18)}</div>
+          <div class="tb-medal">${r.rank === 1 ? "🏆" : r.rank === 2 ? "🥈" : "⭐"}</div>
+          <div class="tb-kicker">${bosqichNo(ps)}-bosqich · ${esc(periodLabel(ps))}</div>
+          <h3 class="tb-title">${r.rank === 1 ? "Tabriklaymiz — siz g'olibsiz!" : r.rank === 2 ? "Tabriklaymiz — siz 2-o'rindasiz!" : "Tabriklaymiz — siz rahbar tanlovisiz!"}</h3>
+          <div class="tb-name">${esc(S.me.full_name)}</div>
+          <p class="tb-text">${r.rank === 1 ? `Siz <b>${esc(dl)}</b>da <b>1-o'rinni</b> egalladingiz. Mehnatingiz, mas'uliyatingiz va natijangiz uchun rahmat — shu ruhda davom eting!`
+            : r.rank === 2 ? `Siz <b>${esc(dl)}</b>da <b>2-o'rinni</b> egalladingiz. Ajoyib natija — g'alabaga bir qadam qoldi, keyingi bosqichda omad!`
+            : `Alohida mehnatingiz uchun Monitoring bo'limi rahbari tanlovi bilan taqdirlandingiz. Rahmat!`}</p>
+          ${fin !== null ? `<div class="tb-score">${fin}%</div>` : ""}
+          <div class="tb-sign">Monitoring bo'limi rahbari</div></div>`
+        : `<div style="text-align:center;padding:8px 0"><div style="font-size:42px">📊</div><h3 style="margin:6px 0">${bosqichNo(ps)}-bosqich yakunlandi</h3>
+          <div class="small muted">${esc(periodLabel(ps))} · ${esc(dl)}</div>
+          ${r.rank ? `<div class="tb-score" style="margin:14px 0 4px">${r.rank}-o'rin</div><div>${r.n} xodimdan · natijangiz <b>${fin}%</b></div>` : `<p>Bu bosqichda sizga ball qo'yilmagan, reytingga kirmadingiz.</p>`}
+          <p class="small muted">Keyingi bosqichda omad!</p></div>`;
+      const m = openModal(win ? "🎉 Tabriknoma" : "📊 Bosqich natijangiz", body, `<button class="btn ghost" data-close>Yopish</button><button class="btn primary" id="tb-rk">Bo'lim reytingini ko'rish</button>`);
+      $("#tb-rk", m).onclick = () => { S.ui.kpiMode = "bosqich"; S.ui.kpiP = ps; closeModal(); location.hash = "#/kpi"; };
+      mine.forEach(x => db.stageSeen(x.period_start));
+    };
+    setTimeout(show, 1200);
   }
   const canRate = p => S.me.role === "asoschi" || (S.me.role === "ceo" && p.ceo_id === S.me.id);
   const bosqichNo = ps => dayDiff(KPI_ANCHOR, ps) / 14 + 1;
@@ -6243,7 +6425,7 @@ window.METODISTLAR = [
     const mode = S.ui.kpiMode || (isManager() ? "kun" : "bosqich");
     const modes = [["kun", "Kunlik"], ["hafta", "Haftalik"], ["bosqich", "2 haftalik (bosqich)"], ["yil", "Yillik"]];
     const modeBar = `<div class="seg">${modes.map(([k, l]) => `<button data-km="${k}" class="${k === mode ? "active" : ""}">${l}</button>`).join("")}</div>`;
-    page.innerHTML = head("KPI va reyting", "Har 2 haftada yangi bosqich. Bosqichning 1-o'rini va asoschi tanlovi taqdirlanadi.", `<button class="btn" id="kpi-hist">🧾 Ball tarixi</button>`) + modeBar + `<div id="kpi-body"><div class="card empty">Yuklanmoqda…</div></div>`;
+    page.innerHTML = head("KPI va reyting", "Har 2 haftada yangi bosqich. Har bo'limda 1- va 2-o'rin egalari (va rahbar tanlovi) taqdirlanadi.", `<button class="btn" id="kpi-hist">🧾 Ball tarixi</button>`) + modeBar + `<div id="kpi-body"><div class="card empty">Yuklanmoqda…</div></div>`;
     $$("[data-km]", page).forEach(b => b.onclick = () => { S.ui.kpiMode = b.dataset.km; PAGES.kpi(page); });
     $("#kpi-hist", page).onclick = () => kpiHistory();
     const body = $("#kpi-body", page);
@@ -6264,7 +6446,11 @@ window.METODISTLAR = [
     const periods = []; for (let i = 0; i < 26; i++) { const x = addD(cur, -14 * i); if (x >= KPI_ANCHOR) periods.push(x); }
     const weeks = []; for (let i = -1; i < 12; i++) { const w = addD(weekOf(t), -7 * i); if (w >= KPI_ANCHOR) weeks.push(w); }
     const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
-    const win = lvl === "bosqich" ? winners(rankPool().map(p => kpiRow(p, lvl, d, K, awardId, reps)), awardId) : [];
+    const L = lvl === "bosqich" ? await stagesLoad() : { stages: [], ranks: [] };
+    const done = (L.stages || []).find(z => z.period_start === d) || null;
+    const byDept = lvl === "bosqich" && rankPool().length ? deptRanks(rankPool().map(p => kpiRow(p, lvl, d, K, awardId, reps))) : {};
+    const saved = done ? savedByDept(L.ranks || [], d) : {};
+    const myDept = deptOf(S.me), showSaved = lvl === "bosqich" && done && !isA && saved[myDept];
     const rows = tab.rows.map(p => kpiRow(p, lvl, d, K, awardId, reps)).sort((a, b) => b.final - a.final);
     const items = rows.length ? rows[0].cells.map(c => c.it) : (tab.simple ? [SIMPLE] : KPI_TPL[DEPTS[tab.id]?.tpl || DEPTS[deptOf(S.me)].tpl].items);
     const isMax = x => x.cells.every(c => scoreOf(c.man) === c.it.max);
@@ -6272,16 +6458,20 @@ window.METODISTLAR = [
     const label = lvl === "kun" ? `${fmtDate(d)}, ${KUN[dowOf(d)].toLowerCase()}` : lvl === "hafta" ? `${fmtDate(d)} – ${fmtDate(to)}` : `${bosqichNo(d)}-bosqich: ${periodLabel(d)}`;
     const sel = lvl === "kun" ? `<input type="date" id="kpi-d" value="${d}" max="${t}" min="${KPI_ANCHOR}" style="width:auto">`
       : lvl === "hafta" ? `<select id="kpi-d" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === d ? "selected" : ""}>${fmtDate(w)} – ${fmtDate(addD(w, 6))}${w === weekOf(t) ? " (joriy)" : w > t ? " (keyingi)" : ""}</option>`).join("")}</select>`
-      : `<select id="kpi-d" style="width:auto">${periods.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${bosqichNo(x)}-bosqich: ${periodLabel(x)}${x === cur ? " (joriy)" : ""}</option>`).join("")}</select>`;
+      : `<select id="kpi-d" style="width:auto">${periods.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${bosqichNo(x)}-bosqich: ${periodLabel(x)}${x === cur ? " (joriy)" : ""}${(L.stages || []).some(z => z.period_start === x) ? " ✓ yakunlangan" : ""}</option>`).join("")}</select>`;
     const how = { kun: "Har kuni har bir mezonga ball qo'ying. «avto» belgili mezon kunlik hisobot bahosidan o'zi qo'yiladi (o'zgartirsa bo'ladi).",
       hafta: "Haftalik ball — kunlik ballarning o'rtachasi (kulrang). Kerak bo'lsa katakka yozib, o'zgartirasiz.",
       bosqich: "2 haftalik ball — ikki haftaning o'rtachasi (kulrang). Kerak bo'lsa o'zgartirasiz. Yakuniy natija reytingga kiradi." }[lvl];
     const anyEd = rows.some(x => canRate(x.p));
     body.innerHTML = `<div class="row" style="margin:14px 0">${sel}<span class="small muted">${how}</span></div>
-      ${lvl === "bosqich" && (win.length || isA) ? `<div class="card top-card"><div class="card-head"><h2>🏆 ${bosqichNo(d)}-bosqich g'oliblari</h2><span class="spacer"></span>
-        ${isA ? `<label class="small" style="margin:0">Asoschi tanlovi (ixtiyoriy):</label><select id="kpi-award" style="width:auto"><option value="">— yo'q —</option>${rankPool().map(p => `<option value="${p.id}" ${awardId === p.id ? "selected" : ""}>${esc(p.full_name)}</option>`).join("")}</select>` : ""}</div>
-        <div class="row" style="gap:16px">${win.map(x => `<div class="top-item">${avatar(x.p.full_name, photoOf(x.p))}<div><div class="small muted">${x.picked ? "Asoschi tanlovi" : "Reyting 1-o'rni"} · ${esc(DEPTS[deptOf(x.p)].l)}</div><b>${esc(x.p.full_name)}</b><div class="top-score">${x.final}%</div></div></div>`).join("") || `<span class="muted">Hali ballar qo'yilmagan</span>`}</div>
-        ${awardId ? `<p class="small muted" style="margin:10px 0 0">Asoschi tanlagan xodimning bu bosqichdagi barcha ballari 100 qilingan.</p>` : ""}</div>` : ""}
+      ${lvl === "bosqich" && isA ? winCard(byDept, d, { done,
+          right: `<label class="small" style="margin:0">Rahbar tanlovi (ixtiyoriy):</label><select id="kpi-award" style="width:auto"><option value="">— yo'q —</option>${rankPool().map(p => `<option value="${p.id}" ${awardId === p.id ? "selected" : ""}>${esc(p.full_name)}</option>`).join("")}</select>
+            <button class="btn ${done ? "ghost" : "primary"} sm" id="kpi-fin">🏁 ${done ? "Qayta yakunlash" : "Bosqichni yakunlash"}</button>`,
+          foot: (awardId ? `<p class="small muted" style="margin:10px 0 0">Rahbar tanlagan xodimning bu bosqichdagi barcha ballari 100 qilingan.</p>` : "")
+            + (done ? "" : `<p class="small muted" style="margin:10px 0 0">«Bosqichni yakunlash»ni bosganingizda har bir xodimga o'z natijasi va o'rni, 1- va 2-o'rin egalariga tabriknoma boradi.</p>`) }) : ""}
+      ${lvl === "bosqich" && !isA && showSaved ? winCard(saved, d, { done }) + `<div class="card" style="margin-top:16px"><div class="card-head"><h2>📊 ${esc(DEPTS[myDept].l)} reytingi — ${bosqichNo(d)}-bosqich</h2><span class="spacer"></span>${(() => { const me = saved[myDept].find(x => x.p.id === S.me.id); return me && me.rank !== null ? `<span class="pill ${me.rank <= 2 ? "tasdiqlandi" : ""}">Siz: ${me.rank === 0 ? "rahbar tanlovi" : me.rank + "-o'rin"} · ${me.final}%</span>` : ""; })()}</div>${deptRankTable(saved[myDept], S.me.id)}</div>`
+        : lvl === "bosqich" && !isA && S.me.role === "ceo" && Object.keys(byDept).length ? winCard(byDept, d, { done }) : ""}
+      ${lvl === "bosqich" && !isA && !done && S.me.role === "xodim" ? `<div class="note" style="margin:0 0 12px">Bosqich yakunlangach, bu yerda o'rningiz va bo'limingiz reytingi chiqadi.</div>` : ""}
       ${tabBar(tabs, tab)}
       ${tab.simple && isA ? `<div class="note" style="margin:0 0 12px">Bu xodimlarni siz baholaysiz: alohida mezonlar yo'q, bitta umumiy ball (100 dan). <b>Maksimal ball</b> tugmasi bir bosishda 100 qo'yadi.</div>` : ""}
       <div class="card"><div class="card-head"><h2>${LVL[lvl]} ballar · ${label}</h2><span class="spacer"></span>${maxOk ? `<button class="btn sm max-btn" id="kpi-maxall" title="Ro'yxatdagi barcha xodimga 100 ball">★ Hammasiga maksimal ball</button>` : ""}</div><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>
@@ -6307,6 +6497,7 @@ window.METODISTLAR = [
     const rerun = () => kpiTable(body, lvl);
     $("#kpi-d", body).onchange = e => { S.ui[lvl === "kun" ? "kpiDay" : lvl === "hafta" ? "kpiWeek" : "kpiP"] = e.target.value; rerun(); };
     bindTabs(body, rerun);
+    if ($("#kpi-fin", body)) $("#kpi-fin", body).onclick = () => finalizeModal(d, byDept, done, async () => { await stagesLoad(true); rerun(); });
     if ($("#kpi-award", body)) $("#kpi-award", body).onchange = async e => { await act(() => db.setAward(d, e.target.value || null), e.target.value ? "Asoschi tanlovi belgilandi" : "Tanlov olib tashlandi"); rerun(); };
     $$("[data-c]", body).forEach(inp => inp.onchange = async () => {
       const v = inp.value === "" ? null : Math.max(0, Math.min(+inp.dataset.max, +inp.value));
@@ -6378,7 +6569,7 @@ window.METODISTLAR = [
     const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
     const wins = {};
     periods.forEach(ps => { const awardId = aw.find(a => a.period_start === ps)?.user_id;
-      winners(rankPool().map(p => kpiRow(p, "bosqich", ps, K, awardId, reps)), awardId).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
+      Object.values(deptRanks(rankPool().map(p => kpiRow(p, "bosqich", ps, K, awardId, reps)))).flat().filter(w => w.rank === 1 || w.rank === 0).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
     const rows = tab.rows.map(p => {
       const per = periods.map(ps => kpiRow(p, "bosqich", ps, K, aw.find(a => a.period_start === ps)?.user_id, reps));
       const has = per.filter(x => x.has);
