@@ -1638,13 +1638,14 @@ window.LESSONS = [
       async listPosts() {
         const m = me(); if (!m || !["asoschi", "ceo", "xodim"].includes(m.role)) return [];
         const d = load(); d.posts = d.posts || []; d.comments = d.comments || [];
-        return ok(d.posts.map(p => ({ ...p, comment_count: d.comments.filter(c => c.post_id === p.id).length }))
+        const see = p => ["asoschi", "ceo"].includes(m.role) || p.author_id === m.id || (p.recipients || []).includes(m.id);
+        return ok(d.posts.filter(see).map(p => ({ ...p, comment_count: d.comments.filter(c => c.post_id === p.id).length }))
           .sort((a, b) => a.created_at < b.created_at ? 1 : -1));
       },
       async createPost(p) {
         const m = me(); const d = load();
         if (!["asoschi", "ceo", "xodim"].includes(m.role)) return fail("Ruxsat yo'q");
-        const row = { id: d.nextPost++, category: p.category, body: p.body, link: p.link || "", images: p.images || [], author_id: m.id, status: "ochiq", created_at: new Date().toISOString() };
+        const row = { id: d.nextPost++, category: p.category, body: p.body, link: p.link || "", images: p.images || [], recipients: p.recipients && p.recipients.length ? p.recipients : null, author_id: m.id, status: "ochiq", created_at: new Date().toISOString() };
         d.posts.push(row); save(); return ok(row);
       },
       async updatePost(id, patch) {
@@ -1692,7 +1693,7 @@ window.LESSONS = [
       async listLessonViews() { const d = load(); const m = me(); return ok((d.lviews || []).filter(r => m.role === "asoschi" || r.user_id === m.id || isMember(r.user_id))); },
       async markLesson(id) { const d = load(); d.lviews = d.lviews || []; const m = me();
         if (!d.lviews.some(r => r.user_id === m.id && r.lesson_id === id)) { d.lviews.push({ user_id: m.id, lesson_id: id, viewed_at: new Date().toISOString() }); save(); } return true; },
-      async listDeptTasks() { const d = load(); return ok(d.dtasks || []); },
+      async listDeptTasks() { const d = load(); const m = me(); return ok((d.dtasks || []).filter(t => ["asoschi", "ceo"].includes(m.role) || t.created_by === m.id || (t.recipients && t.recipients.length ? t.recipients.includes(m.id) : true))); },
       async createDeptTask(t) { const d = load(); d.dtasks = d.dtasks || []; d.nextDt = d.nextDt || 1;
         const row = { ...t, id: d.nextDt++, created_by: me().id, created_at: new Date().toISOString() }; d.dtasks.push(row); save(); return ok(row); },
       async deleteDeptTask(id) { const d = load(); d.dtasks = (d.dtasks || []).filter(x => x.id !== id); d.dts = (d.dts || []).filter(x => x.task_id !== id); save(); return true; },
@@ -2202,7 +2203,7 @@ window.LESSONS = [
         const rows = chk(await sb.from("posts").select("*, post_comments(count)").order("created_at", { ascending: false }).limit(300));
         return rows.map(r => ({ ...r, comment_count: r.post_comments?.[0]?.count || 0 }));
       },
-      async createPost(p) { return chk(await sb.from("posts").insert({ category: p.category, body: p.body, link: p.link || "", images: p.images || [], author_id: meCache.id }).select().single()); },
+      async createPost(p) { return chk(await sb.from("posts").insert({ category: p.category, body: p.body, link: p.link || "", images: p.images || [], recipients: p.recipients && p.recipients.length ? p.recipients : null, author_id: meCache.id }).select().single()); },
       async uploadImage(blob) {
         const path = `${meCache.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const up = await sb.storage.from("rasmlar").upload(path, blob, { contentType: "image/jpeg", upsert: false });
@@ -4132,7 +4133,7 @@ window.METODISTLAR = [
       ? (mgr ? `<button class="btn" id="rc-open" title="Takrorlanuvchi topshiriqlar">🔁</button><button class="btn" id="tt-open" title="Shablonlar">📋</button><button class="btn" id="new-dt">+ Eslatma</button><button class="btn primary" id="new-task">+ Topshiriq</button>` : "")
       : cat === "metodistlar" ? `<button class="btn primary" id="met-new">+ Band qilish</button>`
       : `<button class="btn primary" id="new-post">+ Yangi masala</button>`;
-    page.innerHTML = head("Masalalar", mgr ? "Topshiriqlar, eslatmalar va masalalar — bitta joyda. Har bir xodim ko'rgani va bajargani ko'rinib turadi." : "Sizga kelgan topshiriq va eslatmalar hamda bo'lim masalalari — bitta joyda.", `<div class="row" style="gap:8px">${right}</div>`) + `
+    page.innerHTML = head("Masalalar", mgr ? "Topshiriqlar, eslatmalar va masalalar — bitta joyda. Har bir xodim ko'rgani va bajargani ko'rinib turadi." : "Faqat sizga kelgan topshiriq, eslatma va masalalar hamda o'zingiz yuborganlaringiz — bitta joyda.", `<div class="row" style="gap:8px">${right}</div>`) + `
       <div class="posts-layout">
         <div class="card cat-list">
           <button class="cat-row te-row ${cat === "te" ? "active" : ""}" data-cat="te"><div class="cat-dot" style="background:#8e4ec6">✓</div><span>${S.me.role === "xodim" ? "Topshiriq va eslatmalarim" : "Topshiriqlar va eslatmalar"}</span><span class="spacer"></span><span data-tail="te">${mzTail("te")}</span></button>
@@ -5980,13 +5981,19 @@ window.METODISTLAR = [
     const m = openModal(p ? "Masalani tahrirlash" : "Yangi masala", `<form id="pform">
       <div class="field"><label>Bo'lim</label><select name="category">${Object.entries(PCATS).filter(([k]) => k !== "topshiriq_eslatma" || cur === k).map(([k, [l]]) => `<option value="${k}" ${cur === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
       <div class="field"><label>Matn *</label><textarea name="body" required style="min-height:130px" placeholder="Masalan: 426-xonada doska ishlamayapti">${esc(p?.body)}</textarea></div>
+      ${p ? "" : `<div class="field"><label>Kimga</label>
+        <div class="small muted" style="margin-bottom:6px">Masalani faqat siz, tanlangan xodimlar, Monitoring bo'limi rahbari va bo'lim rahbarlari ko'radi. Hech kim tanlanmasa — faqat rahbariyatga boradi.</div>
+        <input type="search" id="p-rq" placeholder="Xodimni qidiring…" style="margin-bottom:6px">
+        <div id="p-rcp" style="max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px">${S.profiles.filter(x => x.active && !x.archived && ["xodim", "ceo", "asoschi"].includes(x.role) && x.id !== S.me.id).sort((a, b) => a.full_name.localeCompare(b.full_name)).map(x => `<label class="row" data-rn="${esc(x.full_name.toLowerCase())}" style="gap:8px;align-items:center;font-weight:400;margin:3px 0"><input type="checkbox" data-rcp="${x.id}" style="width:auto">${esc(x.full_name)} <span class="small muted">· ${esc(titleOf(x))}</span></label>`).join("")}</div></div>`}
       <div class="field"><label>Havola (ixtiyoriy: video, hujjat)</label><input name="link" type="url" placeholder="https://..." value="${esc(p?.link)}"></div>
       <div class="field"><label>Rasm <span class="muted">(ixtiyoriy, 6 tagacha)</span></label>${p && (p.images || []).length ? `<div class="small muted">Mavjud rasmlar: ${p.images.length} ta — yangilari qo'shiladi</div>` : ""}<div id="p-img"></div></div>
     </form>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="psave">${p ? "Saqlash" : "Yuborish"}</button>`);
     const getPImg = imgPicker($("#p-img", m));
+    const rq = $("#p-rq", m); if (rq) rq.oninput = () => { const q = rq.value.trim().toLowerCase(); $$("[data-rn]", m).forEach(l => { l.style.display = !q || l.dataset.rn.includes(q) ? "" : "none"; }); };
     $("#psave", m).onclick = async e => {
       const f = $("#pform", m); if (!f.reportValidity()) return;
       const d = Object.fromEntries(new FormData(f)); d.body = d.body.trim();
+      if (!p) d.recipients = $$("[data-rcp]", m).filter(x => x.checked).map(x => x.dataset.rcp);
       if (!d.body) return toast("Matnni yozing", true);
       e.target.disabled = true;
       try { const add = await getPImg(); if (add.length || !p) d.images = [...((p && p.images) || []), ...add]; } catch (err) { e.target.disabled = false; return toast(err.message, true); }
@@ -6002,7 +6009,7 @@ window.METODISTLAR = [
     const canStatus = mine || isManager();
     const comments = await db.listComments(p.id).catch(() => []);
     const m = openModal(`${esc(PCATS[p.category]?.[0] || "Umumiy")}`, `
-      <div class="row" style="gap:10px;margin-bottom:10px">${catBadge(p.category, 30)}<div><b>${esc(nameOf(p.author_id))}</b><div class="small muted">${fmtDate(p.created_at)}</div></div><span class="spacer"></span>${pill(PSTAT_CLS[p.status], PSTAT[p.status])}</div>
+      <div class="row" style="gap:10px;margin-bottom:10px">${catBadge(p.category, 30)}<div><b>${esc(nameOf(p.author_id))}</b><div class="small muted">${fmtDate(p.created_at)} · Kimga: ${p.recipients && p.recipients.length ? esc(p.recipients.map(nameOf).join(", ")) + " va rahbariyat" : "rahbariyatga"}</div></div><span class="spacer"></span>${pill(PSTAT_CLS[p.status], PSTAT[p.status])}</div>
       <div style="white-space:pre-wrap">${linkify(p.body)}</div>
       ${imgGallery(p.images)}
       ${p.link ? `<p><a class="btn sm" href="${esc(p.link)}" target="_blank" rel="noopener">Havolani ochish ↗</a></p>` : ""}
