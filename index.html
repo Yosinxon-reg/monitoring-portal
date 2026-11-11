@@ -1141,6 +1141,19 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 @keyframes tbPop { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .tb-conf i, .tb-medal { animation: none; } .tb-conf { display: none; } }
 
+/* 50: Kun o'qituvchilari */
+.ku-card .ku-f { margin-bottom: 10px; }
+.ku-fh { font-weight: 700; font-size: 13px; margin: 8px 0 4px; }
+.ku-r { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.4fr) auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); margin-bottom: 4px; font-size: 14px; }
+.ku-r.click { cursor: pointer; }
+.ku-r.click:hover { outline: 1px solid var(--brand); }
+.ku-n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ku-m { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ku-a { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.ku-b { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #fff6dd; color: #8a6400; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ku-b[hidden] { display: none; }
+@media (max-width: 640px) { .ku-r { grid-template-columns: 1fr auto; } .ku-m { grid-column: 1 / -1; grid-row: 2; } }
+
 </style>
 </head>
 <body>
@@ -1821,6 +1834,9 @@ window.LESSONS = [
       async amalDel(tb, match) { const d = load(); d["amal_" + tb] = (d["amal_" + tb] || []).filter(x => !Object.entries(match).every(([k, v]) => x[k] === v)); save(); return ok(true); },
       // ---- 42: tavsiyalar navbati (demo)
       async listRecs(from, to) { return ok((load().recs || []).filter(o => o.day >= from && o.day <= to)); },
+      async kunUstozlari(d1, d2) { const d = load(); const T = id => (d.teachers || []).find(t => t.id === id) || {}; const P = id => (d.profiles || []).find(p => p.id === id) || {};
+        return ok((d.tobs || []).filter(o => +o.ib === 25 && ((o.day >= d1 && o.day <= d2) || (o.report_date >= d1 && o.report_date <= d2)))
+          .map(o => ({ teacher_id: o.teacher_id, full_name: T(o.teacher_id).full_name || "—", subject: o.subject, filial: o.filial, klass: o.klass, soat: o.soat, day: o.day, report_date: o.report_date || o.day, author_id: o.author_id, author_name: P(o.author_id).full_name || "", ab: o.ab }))); },
       async recLastSeen() { const d = load(), m = {}, ms = new Date().toISOString().slice(0, 8) + "01", td = new Date().toISOString().slice(0, 10);
         (d.tobs || []).forEach(o => { const x = m[o.teacher_id] = m[o.teacher_id] || { teacher_id: o.teacher_id, last_day: null, last_by: null, days: new Set() };
           if (!x.last_day || o.day > x.last_day) { x.last_day = o.day; x.last_by = o.author_id; } if (o.day >= ms && o.day <= td) x.days.add(o.day); });
@@ -2154,6 +2170,7 @@ window.LESSONS = [
       async amalAssign(iid, tid) { chk(await sb.rpc("amal_assign", { iid, tid })); return true; },
       // ---- 42: tavsiyalar navbati
       async recLastSeen() { return chk(await sb.rpc("rec_last_seen")) || []; },
+      async kunUstozlari(d1, d2) { return chk(await sb.rpc("kun_ustozlari", { d1, d2 })) || []; },
       async listRecs(from, to) { return pageSoft(() => sb.from("rec_offers").select("*").gte("day", from).lte("day", to).order("id")); },
       async listNoLesson() { return pageSoft(() => sb.from("teacher_nolesson").select("*").order("teacher_id")); },
       async recTake(d, cands, n) { return chk(await sb.rpc("rec_take", { d, cands: cands || [], n })) || []; },
@@ -3109,6 +3126,33 @@ window.METODISTLAR = [
       if (rk) out.push({ done: null, txt: `Rejadan orqada qolayotgan ustozlar: ${rk} ta`, sub: "Intizomiy bo'limga yo'naltirish mumkin", href: "#/oylik-reja" }); }
     return out;
   }
+  // 50: «🏅 Kun o'qituvchilari» — intizomiydan 25 olgan ustozlar (hisobot kiritilgan kun bo'yicha), filiallar kesimida
+  const KU = { d: "bugun", all: false };
+  async function kunInsert(page) {
+    if (!S.me || !["asoschi", "ceo", "xodim"].includes(S.me.role) || !db.kunUstozlari) return;
+    const t = today(), y = addD(t, -1), y2 = dowOf(y) === 7 ? addD(y, -1) : y;
+    let rows; try { rows = await db.kunUstozlari(y2, t); } catch (e) { return; }
+    if (!page.isConnected) return;
+    const old = $("#ku-card", page); if (old) old.remove();
+    const pick = KU.d === "bugun" ? t : y2, R = (rows || []).filter(r => r.report_date === pick || (!r.report_date && r.day === pick));
+    const byF = {}; R.forEach(r => (byF[r.filial || "—"] = byF[r.filial || "—"] || []).push(r));
+    const fl = Object.keys(byF).sort((a, b) => byF[b].length - byF[a].length || a.localeCompare(b));
+    const short = n => { const p = String(n || "").split(" "); return p[0] + (p[1] ? " " + p[1][0] + "." : ""); };
+    const lim = KU.all ? 999 : 12; let shown = 0;
+    const body = R.length ? fl.map(f => { const a = byF[f].sort((p, q) => p.full_name.localeCompare(q.full_name)).filter(() => shown++ < lim); if (!a.length) return "";
+      return `<div class="ku-f"><div class="ku-fh">🏫 ${esc(f)} <span class="muted">· ${byF[f].length}</span></div>${a.map(r => `<div class="ku-r ${teacherById(r.teacher_id) ? "click" : ""}" data-kt="${r.teacher_id}"><span class="ku-n">${esc(r.full_name)}</span><span class="ku-m">${esc([canonSubj(r.subject), r.klass, r.soat ? r.soat + "-soat" : ""].filter(Boolean).join(" · "))}${r.day !== pick ? ` · dars ${fmtDate(r.day)}` : ""}</span><span class="ku-a">${esc(short(r.author_name))}</span></div>`).join("")}</div>`; }).join("")
+      : `<div class="empty" style="padding:14px">${KU.d === "bugun" ? "Bugun hali yo'q — intizomiydan 25 ball olgan ustozlar shu yerda chiqadi" : "Yo'q"}</div>`;
+    const html = `<div class="card ku-card" id="ku-card"><div class="card-head"><h2>🏅 Kun o'qituvchilari</h2><span class="pill bajarildi" style="margin-left:8px">${R.length}</span><span class="spacer"></span>
+      <div class="seg"><button class="${KU.d === "bugun" ? "active" : ""}" data-kud="bugun">Bugun</button><button class="${KU.d === "kecha" ? "active" : ""}" data-kud="kecha">${y2 === y ? "Kecha" : "Shanba"}</button></div></div>
+      <p class="small muted" style="margin:0 0 10px">Intizomiydan ${IB_MAX} ball olgan ustozlar · hisobot kiritilgan kun bo'yicha</p>${body}
+      ${R.length > 12 ? `<button class="btn sm ghost" id="ku-all" style="margin-top:8px">${KU.all ? "Qisqartirish" : `Barchasi (${R.length})`}</button>` : ""}</div>`;
+    const anchor = $(".today-card", page) || $(".page-head", page); if (!anchor) return;
+    anchor.insertAdjacentHTML("afterend", html);
+    const c = $("#ku-card", page);
+    $$("[data-kud]", c).forEach(b => b.onclick = () => { KU.d = b.dataset.kud; KU.all = false; kunInsert(page); });
+    const all = $("#ku-all", c); if (all) all.onclick = () => { KU.all = !KU.all; kunInsert(page); };
+    $$("[data-kt]", c).forEach(el => { if (teacherById(el.dataset.kt)) el.onclick = () => teacherModal(el.dataset.kt); });
+  }
   function todayInsert(page) {
     const it = todayItems(); if (!it.length) return;
     const left = it.filter(x => x.done === false).length;
@@ -3182,7 +3226,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -3228,7 +3272,7 @@ window.METODISTLAR = [
             ${active.length ? active.slice(0, 6).map(taskLine).join("") : `<div class="empty">Faol topshiriq yo'q</div>`}</div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); todayInsert(page);
+    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page);
     const nb = $("#notif-on", page);
     if (nb) nb.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "Eslatmalar yoqildi" : "Eslatmalar yoqilmadi"); } catch (e) {} nb.remove(); };
   }
@@ -3852,7 +3896,7 @@ window.METODISTLAR = [
           <div class="field"><label>Sinf *</label><input data-r="${i}" data-f="klass" value="${esc(x.klass || "")}" list="mr-kl-${i}" placeholder="5-A">
             <datalist id="mr-kl-${i}">${((tt && tt.classes) || []).map(c => `<option value="${esc(c)}">`).join("")}</datalist></div>
           <div class="field"><label>Nechanchi soat${subj === BOG ? "" : " *"}</label><select data-r="${i}" data-f="soat"><option value="">—</option>${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${String(x.soat) === String(n) ? "selected" : ""}>${n}-soat</option>`).join("")}</select></div>
-          <div class="field"><label>Intizomiy <span class="muted">/${IB_MAX}</span></label>${subj === BOG ? `<input class="num" disabled placeholder="—" title="Bog'chada intizomiy ball qo'yilmaydi"><span class="ar-na">bog'chada qo'yilmaydi</span>` : `<input data-r="${i}" data-f="ib" type="number" step="0.5" min="0" max="${IB_MAX}" value="${esc(x.ib ?? "")}" class="num">`}</div>
+          <div class="field"><label>Intizomiy <span class="muted">/${IB_MAX}</span></label>${subj === BOG ? `<input class="num" disabled placeholder="—" title="Bog'chada intizomiy ball qo'yilmaydi"><span class="ar-na">bog'chada qo'yilmaydi</span>` : `<input data-r="${i}" data-f="ib" type="number" step="0.5" min="0" max="${IB_MAX}" value="${esc(x.ib ?? "")}" class="num"><span class="ku-b" data-ku="${i}" ${+x.ib === IB_MAX ? "" : "hidden"} title="Intizomiydan ${IB_MAX} ball — shu dars kunining «Kun o'qituvchisi»">🏅 Kun o'qituvchisi</span>`}</div>
           <div class="field"><label>Akademik <span class="muted">/${abMax(subj)}</span></label>${akad || !subj ? `<input data-r="${i}" data-f="ab" type="number" step="0.5" min="0" max="${abMax(subj)}" value="${esc(x.ab ?? "")}" class="num">` : `<input class="num" disabled placeholder="—" title="Bu fanda akademik ball qo'yilmaydi"><span class="ar-na">bu fanda qo'yilmaydi</span>`}</div>
           <div class="field"><label>Sana</label><input data-r="${i}" data-f="date" type="date" value="${esc(x.date || date)}" max="${t}"></div>
         </div>
@@ -3943,7 +3987,8 @@ window.METODISTLAR = [
         if (h) h.innerHTML = tt ? teacherHint(tt) : x.teacher.trim() ? (ms.length ? `<span class="th-new">Ro'yxatdan tanlang — ustoz shu yerda bo'lishi mumkin</span>` : newTHint()) : ""; };
       $$("[data-r]", root).forEach(i => {
         const ri = +i.dataset.r, f = i.dataset.f;
-        i.oninput = () => { F.rows[ri][f] = i.value; if (f === "teacher") { F.rows[ri].teacher_id = ""; showAc(ri); } saveDraft(); };
+        i.oninput = () => { F.rows[ri][f] = i.value; if (f === "teacher") { F.rows[ri].teacher_id = ""; showAc(ri); }
+          if (f === "ib") { const kb = $(`[data-ku="${ri}"]`, root); if (kb) kb.hidden = +i.value !== IB_MAX || i.value === ""; } saveDraft(); };
         if (i.tagName === "SELECT") i.onchange = () => { F.rows[ri][f] = i.value; saveDraft(); if (f === "subject") { if (!isAkadSubj(i.value)) F.rows[ri].ab = ""; if (canonSubj(i.value) === BOG) F.rows[ri].ib = ""; draw(); } };
         if (f === "teacher") {
           i.onfocus = () => showAc(ri);
@@ -5509,7 +5554,7 @@ window.METODISTLAR = [
     const { obs } = teachFilter();
     const by = {}; obs.forEach(o => { (by[o.teacher_id] = by[o.teacher_id] || []).push(o); });
     const rows = Object.entries(by).map(([id, a]) => { const t = teacherById(id) || { id, full_name: "—", filial: "", subject: "" };
-      return { t, n: a.length, ib: avg(a.map(o => o.ib)), ab: avg(a.map(o => o.ab)), last: a.reduce((m, o) => o.day > m ? o.day : m, "") }; })
+      return { t, n: a.length, ib: avg(a.map(o => o.ib)), ab: avg(a.map(o => o.ab)), ku: a.filter(o => +o.ib === IB_MAX).length, last: a.reduce((m, o) => o.day > m ? o.day : m, "") }; })
       .sort((a, b) => (b.ab ?? -1) - (a.ab ?? -1) || b.n - a.n);
     const scored = rows.filter(r => r.ab !== null);
     const top = scored.slice(0, 5), low = scored.slice(-5).reverse().filter(r => !top.includes(r));
@@ -5524,8 +5569,8 @@ window.METODISTLAR = [
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Filiallar solishtirmasi</h2></div><div class="table-wrap"><table><thead><tr><th>Filial</th><th>Kuzatuvlar</th><th>Ustozlar</th><th>O'rt. intizomiy</th><th>O'rt. akademik</th></tr></thead><tbody>
         ${fl.map(x => `<tr class="click" data-fl="${esc(x.f)}"><td><b>${esc(x.f)}</b></td><td>${x.n}</td><td>${x.t}</td><td>${x.ib ?? "—"}</td><td><b>${x.ab ?? "—"}</b></td></tr>`).join("")}</tbody></table></div></div>
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Ustozlar bo'yicha</h2><span class="spacer"></span><span class="small muted">Ustozni bosing — barcha kuzatuvlari</span></div><div class="table-wrap">
-        ${rows.length ? `<table><thead><tr><th>Ustoz</th><th class="hide-sm">Fan</th><th>Filial</th><th>Kuzatuv</th><th>O'rt. I</th><th>O'rt. A</th><th class="hide-sm">Oxirgi</th></tr></thead><tbody>
-        ${rows.map(r => `<tr class="click" data-tid="${r.t.id}"><td><b>${esc(r.t.full_name)}</b></td><td class="hide-sm">${esc(r.t.subject || "—")}</td><td>${esc(r.t.filial || "—")}</td><td>${r.n}</td><td>${r.ib ?? "—"}</td><td><b>${r.ab ?? "—"}</b></td><td class="hide-sm small">${r.last ? fmtDate(r.last) : "—"}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Bu davrda kuzatuv yo'q</div>`}</div></div>
+        ${rows.length ? `<table><thead><tr><th>Ustoz</th><th class="hide-sm">Fan</th><th>Filial</th><th>Kuzatuv</th><th title="Kun o'qituvchisi (intizomiy ${IB_MAX})">🏅</th><th>O'rt. I</th><th>O'rt. A</th><th class="hide-sm">Oxirgi</th></tr></thead><tbody>
+        ${rows.map(r => `<tr class="click" data-tid="${r.t.id}"><td><b>${esc(r.t.full_name)}</b></td><td class="hide-sm">${esc(r.t.subject || "—")}</td><td>${esc(r.t.filial || "—")}</td><td>${r.n}</td><td>${r.ku || "—"}</td><td>${r.ib ?? "—"}</td><td><b>${r.ab ?? "—"}</b></td><td class="hide-sm small">${r.last ? fmtDate(r.last) : "—"}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Bu davrda kuzatuv yo'q</div>`}</div></div>
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Xodimlar nechta dars kuzatdi</h2></div>${Object.keys(staffN).length ? Object.entries(staffN).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<div class="list-item"><div style="flex:1"><div class="t">${esc(nameOf(id))}</div></div><b>${n} ta dars</b></div>`).join("") : `<div class="empty">—</div>`}</div>`;
     bindTeachFilters(root, () => teachStat(root));
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
@@ -5597,9 +5642,9 @@ window.METODISTLAR = [
     if (!again && TC && TC.from > addD(today(), -HIST_DAYS)) ensureHistory(() => { if ($("#modal-root").innerHTML !== "") { closeModal(); teacherModal(id, true); } });
     const ob = obsOf(id); const f = teacherFacts(t);
     openModal(esc(t.full_name), `<p class="small muted" style="margin-top:0">${esc([canonSubj(t.subject), t.filial].filter(Boolean).join(" · ") || "—")}${t.lead_class ? " · sinf rahbari " + esc(t.lead_class) : ""}${(t.classes || []).length ? " · Sinflari: " + esc(t.classes.join(", ")) : ""}</p>
-      <div class="stats" style="grid-template-columns:repeat(4,1fr)">${stat("Kuzatuvlar", f.n)}${stat("O'rt. intizomiy", f.ib ?? "—")}${stat("O'rt. akademik", f.ab ?? "—")}${stat("Oxirgi kuzatuv", f.days === null ? "—" : f.days === 0 ? "bugun" : f.days + " kun", f.long ? "warn" : "ok")}</div>
+      <div class="stats" style="grid-template-columns:repeat(5,1fr)">${stat("Kuzatuvlar", f.n)}${stat("O'rt. intizomiy", f.ib ?? "—")}${stat("O'rt. akademik", f.ab ?? "—")}${stat("🏅 Kun o'qituvchisi", ob.filter(o => +o.ib === IB_MAX).length ? ob.filter(o => +o.ib === IB_MAX).length + " marta" : "—", ob.some(o => +o.ib === IB_MAX) ? "ok" : "")}${stat("Oxirgi kuzatuv", f.days === null ? "—" : f.days === 0 ? "bugun" : f.days + " kun", f.long ? "warn" : "ok")}</div>
       ${ob.length ? `<div class="table-wrap"><table><thead><tr><th>Sana</th><th>Sinf</th><th>Soat</th><th>Filial</th><th>I</th><th>A</th><th>Kuzatdi</th></tr></thead><tbody>
-        ${ob.map(o => `<tr><td class="small" style="white-space:nowrap">${fmtDate(o.day)}</td><td>${esc(o.klass || "—")}</td><td>${esc(soatTxt(o))}</td><td class="small">${esc(o.filial || "—")}</td><td>${o.ib ?? "—"}</td><td><b>${o.ab ?? "—"}</b></td><td class="small">${esc(nameOf(o.author_id))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Hali kuzatuv yo'q</div>`}${teacherDyn(t)}`);
+        ${ob.map(o => `<tr><td class="small" style="white-space:nowrap">${fmtDate(o.day)}</td><td>${esc(o.klass || "—")}</td><td>${esc(soatTxt(o))}</td><td class="small">${esc(o.filial || "—")}</td><td style="white-space:nowrap">${o.ib ?? "—"}${+o.ib === IB_MAX ? ` <span title="Kun o'qituvchisi">🏅</span>` : ""}</td><td><b>${o.ab ?? "—"}</b></td><td class="small">${esc(nameOf(o.author_id))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Hali kuzatuv yo'q</div>`}${teacherDyn(t)}`);
     const md = $(".modal", $("#modal-root")); md.style.maxWidth = "820px";
     { const nl = noLessonDays(id); const mb0 = $(".modal-body", md); if (nl.length && mb0) { mb0.insertAdjacentHTML("afterbegin", `<div class="note" style="margin:0 0 10px">📅 Darsi yo'q kunlar (tavsiya qilinmaydi): ${nl.map(dw => `<b>${esc(KUN[dw])}</b> <button type="button" class="btn sm ghost" data-nlx="${dw}" title="Olib tashlash">✕</button>`).join(" ")}</div>`);
       $$("[data-nlx]", mb0).forEach(b => b.onclick = async () => { try { await db.noLessonClear(id, +b.dataset.nlx); S.nolesson = (S.nolesson || []).filter(z => !(z.teacher_id === id && +z.dow === +b.dataset.nlx)); toast("Olib tashlandi"); b.previousElementSibling && b.previousElementSibling.remove(); b.remove(); } catch (e) { toast(e.message, true); } }); } }
