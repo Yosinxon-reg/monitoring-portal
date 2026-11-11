@@ -2192,7 +2192,9 @@ window.LESSONS = [
       async setCeoRating(month, ceo_id, score, note) { chk(await sb.from("ceo_ratings").upsert({ month, ceo_id, score, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "month,ceo_id" })); return true; },
       async getSettings() { const r = await sb.from("portal_settings").select("key,value"); return r.error ? {} : Object.fromEntries((r.data || []).map(x => [x.key, x.value])); },
       async setSetting(key, value) { chk(await sb.from("portal_settings").upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" })); return true; },
-      async saveAkademikObs(day, rows) { chk(await sb.rpc("save_akademik_obs", { d: day, rows })); return true; },
+      async saveAkademikObs(day, rows) { const r = chk(await sb.rpc("save_akademik_obs", { d: day, rows }));
+        const miss = (Array.isArray(r) ? r : []).filter(x => x && typeof x === "object" && x.miss).map(x => x.miss + (x.filial ? ` (${x.filial})` : ""));
+        return { miss }; },
       async listTeacherEditors() { const r = await sb.from("teacher_editors").select("*"); return r.error ? [] : r.data; },
       async setTeacherKind(id, kind) { chk(await sb.rpc("set_teacher_kind", { tid: id, kind })); return true; },
       async setTeacherLead(id, v) { chk(await sb.rpc("set_teacher_lead", { tid: id, klass: v })); return true; },
@@ -3987,8 +3989,9 @@ window.METODISTLAR = [
     const fail = (m, sel) => { $("#mr-err", root).textContent = m; const el = sel && $(sel, root); if (el) { el.focus(); el.scrollIntoView({ block: "center" }); } return null; };
     // Kuzatilgan darslar qatorlarini tekshirish
     const collectRows = () => {
-      const rows = F.rows.map(x => { const tt = x.teacher_id ? teacherById(x.teacher_id) : teacherByName(x.teacher);
-          const same = tt && tkey(tt.full_name) === tkey(x.teacher); const gr = same && isGranted(tt.id) && !tPool(tt);
+      const rows = F.rows.map(x => { const fz = !x.teacher_id && !teacherByName(x.teacher) ? teacherFuzzy(x.teacher, (x.filial || "").trim(), canonSubj(x.subject)) : null;
+          const tt = x.teacher_id ? teacherById(x.teacher_id) : (teacherByName(x.teacher) || fz);
+          const same = tt && (tkey(tt.full_name) === tkey(x.teacher) || tt === fz); const gr = same && isGranted(tt.id) && !tPool(tt);
           const subj = gr ? canonSubj(tt.subject) : bOnly ? kidSubj(x.subject) : scSubs.length === 1 ? scSubs[0] : canonSubj(x.subject);
           return { known: !!same, teacher: (same ? tt.full_name : x.teacher).trim(), teacher_id: same ? tt.id : (x.teacher_id || ""), subject: subj, filial: (x.filial || "").trim(),
             klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib: subj === BOG ? null : fnum(x.ib), ab: isAkadSubj(subj) ? fnum(x.ab) : null,
@@ -4034,7 +4037,7 @@ window.METODISTLAR = [
       e.target.disabled = true;
       try { await db.saveMyReport({ report_date: date, done: reportSummary(kind, data), problems: "", plan: "", hours: 0, data });
         if (db.saveAkademikObs && (kind === "akademik" || (data.rows || []).length || (d0.rows || []).length)) {
-          try { await db.saveAkademikObs(date, data.rows || []); } catch (x) { toast("Hisobot yuborildi, lekin ustozlar bazasi yangilanmadi: " + x.message, true); } }
+          try { const sv = await db.saveAkademikObs(date, data.rows || []); obsMissWarn(sv); } catch (x) { toast("Hisobot yuborildi, lekin ustozlar bazasi yangilanmadi: " + x.message, true); } }
         clearTimeout(saveDraft._t); try { localStorage.removeItem(DKEY); } catch (x) {}
         const wasW = isWritten(r); if (S.ui.mrEdit) delete S.ui.mrEdit[date];
         toast(wasW ? "Hisobot yangilandi" : "Hisobot yuborildi — rahbaringiz baholaydi"); await refresh(); render(); }
@@ -4613,6 +4616,33 @@ window.METODISTLAR = [
   const LONG_DAYS = 7;
   const teacherById = id => (S.teachers || []).find(t => t.id === id) || (S.tExt && S.tExt.get(id));
   const teacherByName = n => { const k = tkey(n); return k ? (S.teachers || []).find(t => t.name_key === k || tkey(t.full_name) === k) : null; };
+  // 49: Ism qisqa / to'liq / teskari / bosh harf bilan yozilsa ham shu filialdagi BITTA mos ustozni topadi (serverdagi teacher_match bilan bir xil qoida)
+  const tnNorm = x => String(x || "").toLowerCase().replace(/[‘’ʻʼ`´'.]/g, "").replace(/h/g, "x");
+  const lev1 = (a, b) => { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, d = 0;
+    while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++d > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+    return d + (a.length - i) + (b.length - j) <= 1; };
+  const tnLike = (as, af, bs, bf) => !!(as && bs && af && bf) && (as === bs || (as.length >= 6 && lev1(as, bs)))
+    && (af.length <= 1 || bf.length <= 1 ? af[0] === bf[0] : af.slice(0, 4) === bf.slice(0, 4));
+  function teacherFuzzy(nm, fil, sub) {
+    const k = tkey(nm); if (!k) return null;
+    const T = S.teachers || [], key = t => t.name_key || tkey(t.full_name);
+    const tok = k.split(" "), ks = [k]; if (tok.length >= 2) ks.push([tok[1], tok[0], ...tok.slice(2)].join(" "));
+    const one = (a, strict) => { if (a.length === 1) return a[0]; if (a.length > 1 && sub) { const b = a.filter(t => canonSubj(t.subject) === sub && t.status !== "arxiv"); if (b.length === 1) return b[0]; } return null; };
+    for (const rk of ks) {
+      const ex = T.find(t => key(t) === rk); if (ex) return ex;
+      const inF = T.filter(t => !fil || t.filial === fil);
+      let m = one(inF.filter(t => key(t).startsWith(rk + " ") || rk.startsWith(key(t) + " "))); if (m) return m;
+      if (!fil) continue;
+      const [s1, f1] = rk.split(" ").map(tnNorm); if (!f1) continue;
+      m = one(T.filter(t => t.filial === fil && tnLike(s1, f1, tnNorm(key(t).split(" ")[0]), tnNorm(key(t).split(" ")[1] || "")))); if (m) return m;
+    }
+    return null;
+  }
+  // Hisobot saqlangach: bazadan topilmagan ustozlar haqida aniq xabar (qolgan qatorlar saqlangan)
+  function obsMissWarn(sv) {
+    const miss = (sv && sv.miss) || []; if (!miss.length) return;
+    toast(`${miss.length} ta qator ustozlar bazasiga tushmadi — ustoz topilmadi: ${miss.join(", ")}. Hisobotni tahrirlab, ustozni ro'yxatdan tanlang (qolgan qatorlar saqlandi).`, true);
+  }
   const obsOf = id => (S.tobs || []).filter(o => o.teacher_id === id).sort((a, b) => a.day < b.day ? 1 : -1);
   const avg = a => { const v = a.filter(x => x !== null && x !== undefined && x !== "" && !isNaN(+x)).map(Number); return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length * 10) / 10 : null; };
   const shortName = id => { const n = nameOf(id).split(" "); return n.length > 1 ? `${n[0]} ${n[1][0]}.` : n[0]; };
@@ -6868,7 +6898,7 @@ window.METODISTLAR = [
       const mineRows = [];
       if (kind === "akademik") for (let i = 0; i < F.mine.length; i++) { const x = F.mine[i], n = i + 1, q = f => `[data-rm="${i}"][data-f=${f}]`;
         if (!(x.teacher || "").trim() && x.ib === "" && x.ab === "") continue;
-        const subj = canonSubj(x.subject), tt = x.teacher_id ? teacherById(x.teacher_id) : teacherByName(x.teacher);
+        const subj = canonSubj(x.subject), tt = x.teacher_id ? teacherById(x.teacher_id) : (teacherByName(x.teacher) || teacherFuzzy(x.teacher, x.filial, subj));
         if (!(x.teacher || "").trim()) return fail(`O'zim ko'rgan darslar, ${n}-qator: ustozni yozing`, q("teacher"));
         if (!subj) return fail(`O'zim ko'rgan darslar, ${n}-qator: fanni tanlang`, q("subject"));
         if (!x.filial) return fail(`O'zim ko'rgan darslar, ${n}-qator: filialni tanlang`, q("filial"));
@@ -6883,7 +6913,7 @@ window.METODISTLAR = [
       try {
         await db.saveCeoReport(date, kind, data, summary);
         if (kind === "akademik" && db.saveAkademikObs && (mineRows.length || (S.tobs || []).some(o => o.author_id === S.me.id && o.report_date === date))) {
-          try { await db.saveAkademikObs(date, mineRows); await teachReload(); } catch (x) { toast("Hisobot yuborildi, lekin ko'rgan darslaringiz bazaga yozilmadi: " + x.message, true); } }
+          try { const sv = await db.saveAkademikObs(date, mineRows); obsMissWarn(sv); await teachReload(); } catch (x) { toast("Hisobot yuborildi, lekin ko'rgan darslaringiz bazaga yozilmadi: " + x.message, true); } }
         toast("Hisobot yuborildi — Monitoring bo'limi rahbariga yetib bordi");
         S.creps = await db.listCeoReports(t, t).catch(() => S.creps || []);
         render();
