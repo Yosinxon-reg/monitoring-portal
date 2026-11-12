@@ -5976,13 +5976,17 @@ window.METODISTLAR = [
   }
   // ===== Oy o'qituvchisi: nomzodlar va infografika (rasm / PDF / e'lon matni) =====
   const OY_MIN = 98;
-  const oyWinners = out => RK_GROUPS.map(g => ({ g, xs: (out[g] || []).filter(z => z.n >= 1 && z.total !== null && z.total !== undefined && +z.total >= OY_MIN)
-    .sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) })).filter(w => w.xs.length);
+  // har fan bo'yicha: 98–100% natijalilar + (98% ga yetmasa ham) fan bo'yicha oyning eng yuqori natijasi egasi (best)
+  const oyWinners = out => RK_GROUPS.map(g => { const L = (out[g] || []).filter(z => z.n >= 1 && z.total !== null && z.total !== undefined);
+    const xs = L.filter(z => +z.total >= OY_MIN).map(z => ({ ...z, best: false }));
+    const top = L.filter(z => z.rank === 1)[0] || L.slice().sort((a, b) => b.total - a.total || b.n - a.n)[0];
+    if (top && !xs.some(z => z.t.id === top.t.id)) xs.push({ ...top, best: true });
+    return { g, xs: xs.sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) }; }).filter(w => w.xs.length);
   const YA = v => window.yA ? window.yA(String(v)) : String(v);
   function oyAnnounce(winners, m, cur, fil) {
     const L = [cur ? `🏅 ${monthLabel(m)} — «Oy o'qituvchisi» nomzodlari${fil ? " (" + fil + ")" : ""}` : `🏆 ${monthLabel(m)} — Oy o'qituvchilari${fil ? " (" + fil + ")" : ""}`, "",
       cur ? `Oy davomida dars kuzatuvlarida ${OY_MIN}–100% natija ko'rsatgan ustozlarimiz:` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlarimiz — tabriklaymiz!`];
-    winners.forEach(w => { L.push("", `📚 ${w.g}`); w.xs.forEach((x, i) => L.push(`${i + 1}. ${x.t.full_name} — ${canonSubj(x.t.subject) || w.g}, ${x.t.filial || "—"} (${x.total}%)`)); });
+    winners.forEach(w => { L.push("", `📚 ${w.g}`); w.xs.forEach((x, i) => L.push(`${i + 1}. ${x.t.full_name} — ${canonSubj(x.t.subject) || w.g}, ${x.t.filial || "—"} (${x.total}%)${x.best ? " — fan bo'yicha oyning eng yuqori natijasi" : ""}`)); });
     L.push("", cur ? `💪 Oy oxirigacha shu natijani saqlab qolganlar «Oy o'qituvchisi» unvoni bilan taqdirlanadi! Har bir dars muhim — natijangizni saqlang. Qolgan ustozlarimiz, sizda ham imkoniyat bor: ro'yxatga kirish uchun harakat qiling!` : `👏 Mehnatingiz uchun rahmat! Keyingi oyda yanada ko'p ustozlarimizni shu ro'yxatda ko'rishni istaymiz.`,
       "", "Registon maktabi · Monitoring bo'limi");
     return YA(L.join("\n"));
@@ -6018,7 +6022,7 @@ window.METODISTLAR = [
       ctx.fillStyle = r.i < 3 ? ["#c9a227", "#9aa7b8", "#c27c3a"][r.i] : "#e9f1fc"; ctx.beginPath(); ctx.arc(PAD + 52, y + 48, 30, 0, Math.PI * 2); ctx.fill();
       txt(ctx, String(r.i + 1), PAD + 52, y + 58, 28, r.i < 3 ? "#ffffff" : "#1565d8", 1, "center");
       ctx.font = font(30, 1); txt(ctx, fit(ctx, x.t.full_name, 640, 30, 1), PAD + 100, y + 42, 30, "#0b1f3f", 1);
-      txt(ctx, `${canonSubj(x.t.subject) || r.g} · ${x.t.filial || "—"}`, PAD + 100, y + 78, 22, "#5d6f88");
+      txt(ctx, `${canonSubj(x.t.subject) || r.g} · ${x.t.filial || "—"}${x.best ? " · fan bo'yicha eng yuqori natija" : ""}`, PAD + 100, y + 78, 22, x.best ? "#9a6b00" : "#5d6f88");
       txt(ctx, `${x.total}%`, W - PAD - 26, y + 52, 40, "#1f9d55", 1, "right");
       txt(ctx, `${x.n} ta kuzatuv${x.ib !== null && x.ib !== undefined ? ` · I ${x.ib}/${IB_MAX}` : ""}${x.ab !== null && x.ab !== undefined ? ` · A ${x.ab}/${abMax(x.t.subject)}` : ""}`, W - PAD - 26, y + 80, 19, "#8a9ab0", 0, "right");
       y += 112;
@@ -6085,8 +6089,8 @@ window.METODISTLAR = [
     const isCur = P.mode === "oy" && P.m === monthOf(t);
     const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} · ${esc(monthLabel(P.m))}${nWin ? ` <span class="badge">${nWin}</span>` : ""}</h2><span class="spacer"></span>
         ${nWin ? `<button class="btn sm" id="oy-exp" title="Infografika: rasm, PDF va e'lon matni">🖼 Rasm / PDF / e'lon</button>` : ""}</div>
-      <p class="small muted" style="margin:-4px 0 10px">${isCur ? `Oy davomida <b>${OY_MIN}–100%</b> natija qayd etgan ustozlar (1 marta ko'rilgan bo'lsa ham). Oy oxirigacha shu natijani saqlab qolganlar <b>«Oy o'qituvchisi»</b> bo'ladi — soni cheklanmagan.` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlar.`}${fil ? " Filial: " + esc(fil) + "." : ""} Ustoz ustiga bosing — tahlillari ochiladi.</p>
-      ${winners.length ? winners.map(w => `<div class="oy-g"><div class="oy-gh">${esc(w.g)} <span class="small muted">· ${w.xs.length} ta</span></div><div class="oy-grid">${w.xs.map(x => `<div class="oy-w click ${w.g === BOG ? "bog" : ""}" data-tid="${x.t.id}" title="Tahlillarni ko'rish"><div class="oy-m">🏅</div><div style="min-width:0;flex:1"><b>${esc(x.t.full_name)}</b>
+      <p class="small muted" style="margin:-4px 0 10px">${isCur ? `Oy davomida <b>${OY_MIN}–100%</b> natija qayd etgan ustozlar (1 marta ko'rilgan bo'lsa ham). Oy oxirigacha shu natijani saqlab qolganlar <b>«Oy o'qituvchisi»</b> bo'ladi — soni cheklanmagan. ${OY_MIN}% ga hech kim yetmagan fanda — fan bo'yicha oyning eng yuqori natijasi egasi 🥇.` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlar va har fan bo'yicha oyning eng yuqori natijasi egalari 🥇.`}${fil ? " Filial: " + esc(fil) + "." : ""} Ustoz ustiga bosing — tahlillari ochiladi.</p>
+      ${winners.length ? winners.map(w => `<div class="oy-g"><div class="oy-gh">${esc(w.g)} <span class="small muted">· ${w.xs.length} ta</span></div><div class="oy-grid">${w.xs.map(x => `<div class="oy-w click ${w.g === BOG ? "bog" : ""}" data-tid="${x.t.id}" title="Tahlillarni ko'rish"><div class="oy-m">${x.best ? "🥇" : "🏅"}</div><div style="min-width:0;flex:1"><b>${esc(x.t.full_name)}</b>${x.best ? ` <span class="kpi-badge warn" title="${OY_MIN}% ga yetmagan, lekin shu fan bo'yicha oyning eng yuqori natijasi">fan bo'yicha eng yuqori</span>` : ""}
           <div class="small">${esc(canonSubj(x.t.subject) || w.g)} · <b>${esc(x.t.filial || "—")}</b></div>
           <div class="small muted">${x.n} ta kuzatuv${x.ib !== null && x.ib !== undefined ? ` · I ${x.ib}/${IB_MAX}` : ""}${x.ab !== null && x.ab !== undefined ? ` · A ${x.ab}/${abMax(x.t.subject)}` : ""} · <b style="color:#1f9d55">${x.total}%</b></div></div>
           ${isCur ? "" : `<button class="btn sm" data-oyp="${esc(w.g)}" data-oyt="${x.t.id}" title="Tabriknoma">🎉</button>`}</div>`).join("")}</div></div>`).join("")
