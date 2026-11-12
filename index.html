@@ -4924,7 +4924,11 @@ window.METODISTLAR = [
   const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
   const recFromPlan = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); return !!m && +m[0] >= 1 && +m[0] <= 30; };
   // Yana qancha «taklif» kerak: reja − tanlanganlar
-  const recWant = day => !isWorkdayOn(S.me, day) ? 0 : Math.max(0, recTarget(day) - recMine(day, ["tanlandi"]).length);
+  // Kunlik rejadan tashqari yana REC_EXTRA tagacha «qo'shimcha» tanlash mumkin (15:00 gacha ko'rilmasa — navbatga qaytadi)
+  const REC_EXTRA = 2;
+  const recWant = day => !isWorkdayOn(S.me, day) ? 0 : Math.max(0, recTarget(day) + REC_EXTRA - recMine(day, ["tanlandi"]).length);
+  const recExtraIds = day => { const ch = recMine(day, ["tanlandi"]).slice().sort((a, b) => String(a.decided_at || "").localeCompare(String(b.decided_at || "")) || a.id - b.id);
+    return new Set(ch.slice(recTarget(day)).map(o => o.id)); };
   // Intizomiy (va boshqa) xodimga CEO yo'naltirgan ustozlar — tavsiyada birinchi
   function recDirected(day) {
     const mine = (S.help || []).filter(h => h.to_id === S.me?.id && h.status === "qabul" && h.due >= day);
@@ -5015,21 +5019,22 @@ window.METODISTLAR = [
           <div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}${r ? (() => { const L = recLast(r, today()); return L.last ? ` · oxirgi: ${fmtDate(L.last)} (${esc(L.by === S.me.id ? "o'zingiz" : shortName(L.by))}) — <b>${L.gap === 0 ? "bugun" : L.gap + " kun oldin"}</b>` : " · <b>hech qachon ko'rilmagan</b>"; })() : ""}</div></div>${r ? plCount(r) : ""}`; };
       box.innerHTML = `<div class="card pl-rec rec-w" style="margin:0 0 16px"><div class="card-head"><h2>📌 Tavsiyalar</h2>
           <div class="seg" style="margin-left:8px">${tOff ? "" : `<button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button>`}<button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
-          <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b></span></div>
-        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng. Navbat: avval hech qachon ko'rilmagan, keyin eng uzoq ko'rilmagan ustozlar (3+ hafta → 2 hafta → 1 hafta); oxirgi ${REC_GAP} kunda ko'rilganlar tavsiya qilinmaydi. Bir xil muddatdagilar ichida filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
+          <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b>${ch.length > recTarget(day) ? ` <span class="muted">(${ch.length - recTarget(day)} qo'shimcha)</span>` : ""}</span></div>
+        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng; reja to'lgach yana ${REC_EXTRA} tagacha qo'shimcha tanlash mumkin (qo'shimchalar soat 15:00 gacha ko'rilmasa, boshqalarga qaytadi). Navbat: avval hech qachon ko'rilmagan, keyin eng uzoq ko'rilmagan ustozlar (3+ hafta → 2 hafta → 1 hafta); oxirgi ${REC_GAP} kunda ko'rilganlar tavsiya qilinmaydi. Bir xil muddatdagilar ichida filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
-          : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
+          : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) va ${REC_EXTRA} ta qo'shimcha to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
         ${ch.length ? `<div class="small muted" style="margin:12px 0 4px"><b>Tanlanganlar — ${day === t ? "bugungi" : fmtDate(day)} rejangizda</b></div>
-          ${ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Tanlovni bekor qilish — navbatga qaytadi">Bekor</button>`}</div>`; }).join("")}` : ""}
+          ${(() => { const ex = recExtraIds(day); return ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${ex.has(o.id) ? `<span class="pl-tag2" title="Kunlik rejadan tashqari — soat 15:00 gacha ko'rilmasa, navbatga qaytadi">qo'shimcha</span>` : ""}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Tanlovni bekor qilish — navbatga qaytadi">Bekor</button>`}</div>`; }).join(""); })()}` : ""}
         <div class="row" style="margin-top:8px"><span class="spacer"></span><button type="button" class="btn sm ghost" id="rec-more">+ Yana tavsiya</button></div></div>`;
       $$("[data-rd]", box).forEach(b => b.onclick = async () => { S.ui.recDay = b.dataset.rd; await recFill(b.dataset.rd); recWidget(box, opts); });
       $$("[data-rok]", box).forEach(b => b.onclick = async () => { b.disabled = true; const o = (S.recs || []).find(x => String(x.id) === b.dataset.rok);
         if (!o) { b.disabled = false; return; }
-        try { await db.recDecide(o.id, true); recLocal(o, "tanlandi"); const tt = hrTeacher(o.teacher_id);
+        try { await db.recDecide(o.id, true); recLocal(o, "tanlandi"); o.decided_at = new Date().toISOString(); const tt = hrTeacher(o.teacher_id);
           if (opts.onPick && day === t && tt) opts.onPick(tt); toast(`${tt ? tt.full_name : "Ustoz"} rejangizga qo'shildi`);
           // kunlik reja to'lsa — qolgan takliflar boshqalarga bo'shatiladi
-          if (!recWant(day)) { for (const x of recMine(day, ["taklif"])) { try { await db.recCancel(x.id); recLocal(x, "bekor"); } catch (e) {} } toast("Kunlik rejangiz to'ldi"); }
-          else await recFill(day, true); draw(); } catch (e) { toast(e.message, true); b.disabled = false;
+          if (!recWant(day)) { for (const x of recMine(day, ["taklif"])) { try { await db.recCancel(x.id); recLocal(x, "bekor"); } catch (e) {} } toast("Kunlik reja va qo'shimchalar to'ldi"); }
+          else { if (recMine(day, ["tanlandi"]).length === recTarget(day)) toast(`Kunlik rejangiz to'ldi — xohlasangiz yana ${REC_EXTRA} tagacha qo'shimcha tanlashingiz mumkin`); await recFill(day, true); }
+          draw(); } catch (e) { toast(e.message, true); b.disabled = false;
           // ro'yxat eskirgan bo'lsa — serverdan yangilab, qayta chizamiz
           await recFill(day, true); draw(); } });
       $$("[data-rno]", box).forEach(b => b.onclick = () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rno); recRejectModal(o, async () => { await recFill(day, true); draw(); }); });
