@@ -1188,6 +1188,8 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .rep-adv td { color: var(--muted, #6b7a90); border-top: 0 !important; padding-top: 0 !important; }
 .apl-card { border-left: 4px solid var(--brand); }
 .rv-att .att-ctl { min-width: 0; }
+.oy-g + .oy-g { margin-top: 14px; }
+.oy-gh { font-weight: 700; margin: 0 0 8px; color: var(--text, inherit); }
 
 </style>
 </head>
@@ -5983,14 +5985,16 @@ window.METODISTLAR = [
     const arrow = x => { if (x.rank === null) return ""; const p = prank(x.t.id); if (p === null) return `<span class="rk-new" title="${esc(P.pLabel)}da reytingda yo'q edi">yangi</span>`;
       const d = p - x.rank; return d > 0 ? `<span class="rk-up" title="${esc(P.pLabel)}: ${p}-o'rin">↑${d}</span>` : d < 0 ? `<span class="rk-down" title="${esc(P.pLabel)}: ${p}-o'rin">↓${-d}</span>` : `<span class="rk-eq" title="${esc(P.pLabel)}: ${p}-o'rin">=</span>`; };
     const over = obs.filter(o => (o.ib !== null && +o.ib > IB_MAX) || (o.ab !== null && +o.ab > abMax(o.subject)));
-    // Oy ustozi: har bir fan (Bog'cha alohida) bo'yicha oyning 1-o'rni
-    const winners = P.mode === "oy" ? RK_GROUPS.map(g => ({ g, x: (out[g] || []).find(z => z.rank === 1) })).filter(w => w.x) : [];
+    // Oy o'qituvchisi: oy davomida 99–100% natija qayd etgan barcha ustozlar (har fan alohida, Bog'cha alohida). Joriy oyda — nomzodlar, oy tugagach shu natija bilan qolganlar — «Oy o'qituvchisi» (soni cheklanmagan)
+    const OY_MIN = 99;
+    const winners = P.mode === "oy" ? RK_GROUPS.map(g => ({ g, xs: (out[g] || []).filter(z => z.rank !== null && z.rank !== undefined && +z.total >= OY_MIN).sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) })).filter(w => w.xs.length) : [];
+    const nWin = winners.reduce((a, w) => a + w.xs.length, 0);
     const isCur = P.mode === "oy" && P.m === monthOf(t);
-    const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy ustozi — hozircha yetakchilar" : "Oy ustozi"} · ${esc(monthLabel(P.m))}</h2><span class="spacer"></span><span class="small muted">${isCur ? "oy oxirida aniq bo'ladi" : "har bir fan bo'yicha 1-o'rin"}${fil ? " · " + esc(fil) : ""}</span></div>
-      ${winners.length ? `<div class="oy-grid">${winners.map(w => `<div class="oy-w ${w.g === BOG ? "bog" : ""}"><div class="oy-m">🥇</div><div style="min-width:0;flex:1"><div class="small muted">${esc(w.g)}</div><b class="click" data-tid="${w.x.t.id}">${esc(w.x.t.full_name)}</b>
-          <div class="small muted">${esc(w.x.t.filial || "—")} · ${w.x.n} ta kuzatuv · <b style="color:#1f9d55">${w.x.total}%</b></div></div>
-          ${isCur ? "" : `<button class="btn sm" data-oyp="${esc(w.g)}" title="Tabriknoma">🎉 Tabriknoma</button>`}</div>`).join("")}</div>`
-        : `<div class="empty">Bu oyda reytingga kirgan (kamida ${MIN_OBS} marta kuzatilgan) ustoz hali yo'q</div>`}</div>`;
+    const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} · ${esc(monthLabel(P.m))}${nWin ? ` <span class="badge">${nWin}</span>` : ""}</h2><span class="spacer"></span><span class="small muted">${isCur ? `${OY_MIN}–100% natija · oy oxirigacha shu natijani saqlaganlar «Oy o'qituvchisi» bo'ladi` : `oy yakunida ${OY_MIN}–100% natija`}${fil ? " · " + esc(fil) : ""}</span></div>
+      ${winners.length ? winners.map(w => `<div class="oy-g"><div class="oy-gh">${esc(w.g)} <span class="small muted">· ${w.xs.length} ta</span></div><div class="oy-grid">${w.xs.map(x => `<div class="oy-w ${w.g === BOG ? "bog" : ""}"><div class="oy-m">🏅</div><div style="min-width:0;flex:1"><b class="click" data-tid="${x.t.id}">${esc(x.t.full_name)}</b>
+          <div class="small muted">${esc(x.t.filial || "—")} · ${x.n} ta kuzatuv · <b style="color:#1f9d55">${x.total}%</b></div></div>
+          ${isCur ? "" : `<button class="btn sm" data-oyp="${esc(w.g)}" data-oyt="${x.t.id}" title="Tabriknoma">🎉 Tabriknoma</button>`}</div>`).join("")}</div></div>`).join("")
+        : `<div class="empty">${isCur ? `Hozircha ${OY_MIN}–100% natija qayd etgan ustoz yo'q (kamida ${MIN_OBS} marta kuzatilgan bo'lishi kerak)` : `Bu oyda ${OY_MIN}–100% natija bilan yakunlagan ustoz yo'q`}</div>`}</div>`;
     // kuzatuvchilar o'rtasidagi farq (aynan intizomiy yoki aynan akademik ballda 10 va undan ko'p)
     const diffs = [];
     const byT = {}; obs.forEach(o => (byT[o.teacher_id] = byT[o.teacher_id] || []).push(o));
@@ -6040,7 +6044,7 @@ window.METODISTLAR = [
     const rt = $("#rk-t", root); if (rt) rt.onchange = e => { S.ui.rto = e.target.value; teachRating(root); };
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachRating(root); };
     $$("[data-rg]", root).forEach(b => b.onclick = () => { S.ui.rgrp = b.dataset.rg; teachRating(root); });
-    $$("[data-oyp]", root).forEach(b => b.onclick = () => { const w = winners.find(z => z.g === b.dataset.oyp); if (!w) return; const r = oyWord(w.x, w.g, P.m); wDeliver(r.blob, r.name, r.cap); });
+    $$("[data-oyp]", root).forEach(b => b.onclick = () => { const w = winners.find(z => z.g === b.dataset.oyp); const x = w && w.xs.find(z => z.t.id === b.dataset.oyt); if (!x) return; const r = oyWord(x, w.g, P.m); wDeliver(r.blob, r.name, r.cap); });
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
   }
   // O'qituvchining oyma-oy dinamikasi (oxirgi 6 oy)
@@ -9431,11 +9435,11 @@ window.METODISTLAR = [
     const P = (txt, o = {}) => D.para(D.run(txt, { b: o.b, i: o.i, sz: o.sz || 28, c: o.c || "13233D" }), { al: "center", af: o.af ?? 120, bf: o.bf || 0 });
     const gold = `<w:pgBorders w:offsetFrom="page"><w:top w:val="double" w:sz="18" w:space="24" w:color="C9A227"/><w:left w:val="double" w:sz="18" w:space="24" w:color="C9A227"/><w:bottom w:val="double" w:sz="18" w:space="24" w:color="C9A227"/><w:right w:val="double" w:sz="18" w:space="24" w:color="C9A227"/></w:pgBorders>`;
     const body = P("REGISTON MAKTABI · MONITORING BO'LIMI", { b: 1, sz: 26, c: "066ECF", bf: 600 }) + P("🏅", { sz: 80, af: 0 }) + P("TABRIKNOMA", { b: 1, sz: 84, c: "8A6A00", af: 60 })
-      + P(`${monthLabel(mKey)} — «${g}» yo'nalishi bo'yicha oy ustozi`, { b: 1, sz: 30, c: "40526B", af: 360 })
+      + P(`${monthLabel(mKey)} — «${g}» yo'nalishi bo'yicha Oy o'qituvchisi`, { b: 1, sz: 30, c: "40526B", af: 360 })
       + P(x.t.full_name, { b: 1, sz: 64, af: 300 })
-      + P(`${x.t.filial ? x.t.filial + " filiali ustozi sifatida " : ""}${monthLabel(mKey).toLowerCase()} davomida o'tkazgan darslari monitoring kuzatuvlarida eng yuqori natijani ko'rsatgani — ${J === null ? x.total + "%" : String(J).replace(".", ",") + " / " + jm + " ball"} (${x.n} ta kuzatuv) — uchun samimiy tabriklaymiz va yangi yutuqlar tilaymiz!`, { sz: 30, af: 700 })
+      + P(`${x.t.filial ? x.t.filial + " filiali ustozi sifatida " : ""}${monthLabel(mKey).toLowerCase()} davomida o'tkazgan darslari monitoring kuzatuvlarida a'lo natija ko'rsatgani — ${J === null ? x.total + "%" : String(J).replace(".", ",") + " / " + jm + " ball"} (${x.n} ta kuzatuv) — uchun samimiy tabriklaymiz va yangi yutuqlar tilaymiz!`, { sz: 30, af: 700 })
       + D.tableX([{ h: "", w: 6500, al: "center" }, { h: "", w: 2000 }, { h: "", w: 6500, al: "center" }], [{ cells: [{ v: "______________________________\nMonitoring bo'limi rahbari", sz: 24 }, "", { v: `______________________________\n${wDay(today())}`, sz: 24 }] }], { noHead: 1, bc: "FFFFFF" });
-    return { blob: D.build(body, true, null, { sect: gold }), name: wFile("Tabriknoma", monthLabel(mKey), x.t.full_name), cap: `🏅 Tabriknoma — ${x.t.full_name}, ${monthLabel(mKey)} oy ustozi («${g}»)` };
+    return { blob: D.build(body, true, null, { sect: gold }), name: wFile("Tabriknoma", monthLabel(mKey), x.t.full_name), cap: `🏅 Tabriknoma — ${x.t.full_name}, ${monthLabel(mKey)} Oy o'qituvchisi («${g}»)` };
   }
 
   // Davr: kunlik / haftalik (Du–Sha) / 2 haftalik (KPI bosqichi) / oraliq
