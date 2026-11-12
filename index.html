@@ -2819,7 +2819,7 @@ window.METODISTLAR = [
       S.plans = pl || []; if (isManager()) S.creps = cr || []; S.help = hp || [];
       if (db.amalAccess) { try { S.amalAcc = await db.amalAccess(); } catch (e) {} }
       if (db.listRecs) { try { const [rc, nl] = await Promise.all([db.listRecs(addD(w0, -7), addD(w0, 13)), db.listNoLesson()]);
-        const keep = (S.recs || []).filter(o => o.day < addD(w0, -7) || o.day > addD(w0, 13)); S.recs = keep.concat(rc || []); S.nolesson = nl || []; } catch (e) {} }
+        const keep = (S.recs || []).filter(o => o.day < addD(w0, -7) || o.day > addD(w0, 13)); S.recs = keep.concat(recFix(rc)); S.nolesson = nl || []; } catch (e) {} }
       // Intizomiy bo'lim rahbariga akademik kuzatuvlar kerak emas (Filiallar sahifasida — kerak bo'lganda yuklanadi)
       if (S.me.role === "asoschi" || deptOf(S.me) === "akademik" || (deptOf(S.me) === "intizomiy" && S.me.role === "xodim")) await teachReload();
       { const need = [...new Set((S.help || []).flatMap(h => h.teacher_ids || []))].filter(id => !hrTeacher(id));
@@ -4909,6 +4909,12 @@ window.METODISTLAR = [
   const REC_WHY = [["kamera", "Bugun bu filial kameralari ishlamayabdi"], ["dars_yoq", "Ustozning bugun darsi yo'q"], ["kasal", "Ustoz ishlamayapti / kasal"], ["boshqa", "Boshqa"]];
   const recWhyTxt = k => (REC_WHY.find(x => x[0] === k) || [k, k])[1];
   const REC = { at: {}, busy: false };
+  // Mahalliy qaror (tanlash/bekor/rad) serverdan kech qaytgan eski javob bilan qayta «taklif»ga aylanib qolmasin
+  REC.loc = {};
+  const recLocal = (o, st) => { if (!o) return; o.status = st; REC.loc[o.id] = { st, t: Date.now() }; };
+  const recFix = rows => (rows || []).map(r => { const L = REC.loc[r.id]; if (!L || Date.now() - L.t > 120e3 || r.status === L.st) return r;
+    const stale = (r.status === "taklif") || (r.status === "tanlandi" && L.st === "bekor") || (r.status === "bekor" && L.st === "tanlandi");
+    return stale ? { ...r, status: L.st } : r; });
   const recMine = (day, st) => (S.recs || []).filter(o => o.user_id === S.me?.id && o.day === day && (!st || st.includes(o.status)));
   const recChosen = (uid, day) => (S.recs || []).filter(o => o.user_id === uid && o.day === day && o.status === "tanlandi");
   const noLessonDays = tid => (S.nolesson || []).filter(z => z.teacher_id === tid).map(z => +z.dow).sort();
@@ -4989,7 +4995,7 @@ window.METODISTLAR = [
     try { await recSeenLoad(force);
       const rows = await db.recTake(day, recCands(day), want);
       const before = JSON.stringify(recMine(day).map(o => o.id + o.status));
-      S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); REC.at[day] = Date.now();
+      S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(recFix(rows)); REC.at[day] = Date.now();
       return before !== JSON.stringify(recMine(day).map(o => o.id + o.status)); }
     catch (e) { console.warn("recFill", e); return false; }
     finally { REC.busy = false; }
@@ -5018,21 +5024,24 @@ window.METODISTLAR = [
         <div class="row" style="margin-top:8px"><span class="spacer"></span><button type="button" class="btn sm ghost" id="rec-more">+ Yana tavsiya</button></div></div>`;
       $$("[data-rd]", box).forEach(b => b.onclick = async () => { S.ui.recDay = b.dataset.rd; await recFill(b.dataset.rd); recWidget(box, opts); });
       $$("[data-rok]", box).forEach(b => b.onclick = async () => { b.disabled = true; const o = (S.recs || []).find(x => String(x.id) === b.dataset.rok);
-        try { await db.recDecide(o.id, true); o.status = "tanlandi"; const tt = hrTeacher(o.teacher_id);
+        if (!o) { b.disabled = false; return; }
+        try { await db.recDecide(o.id, true); recLocal(o, "tanlandi"); const tt = hrTeacher(o.teacher_id);
           if (opts.onPick && day === t && tt) opts.onPick(tt); toast(`${tt ? tt.full_name : "Ustoz"} rejangizga qo'shildi`);
           // kunlik reja to'lsa — qolgan takliflar boshqalarga bo'shatiladi
-          if (!recWant(day)) { for (const x of recMine(day, ["taklif"])) { try { await db.recCancel(x.id); x.status = "bekor"; } catch (e) {} } toast("Kunlik rejangiz to'ldi"); }
-          else await recFill(day, true); draw(); } catch (e) { toast(e.message, true); b.disabled = false; } });
+          if (!recWant(day)) { for (const x of recMine(day, ["taklif"])) { try { await db.recCancel(x.id); recLocal(x, "bekor"); } catch (e) {} } toast("Kunlik rejangiz to'ldi"); }
+          else await recFill(day, true); draw(); } catch (e) { toast(e.message, true); b.disabled = false;
+          // ro'yxat eskirgan bo'lsa — serverdan yangilab, qayta chizamiz
+          await recFill(day, true); draw(); } });
       $$("[data-rno]", box).forEach(b => b.onclick = () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rno); recRejectModal(o, async () => { await recFill(day, true); draw(); }); });
       $$("[data-rcx]", box).forEach(b => b.onclick = async () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rcx);
-        try { await db.recCancel(o.id); o.status = "bekor"; draw(); } catch (e) { toast(e.message, true); } });
+        try { await db.recCancel(o.id); recLocal(o, "bekor"); draw(); } catch (e) { toast(e.message, true); await recFill(day, true); draw(); } });
       $("#rec-more", box).onclick = async () => { const before = recMine(day, ["taklif"]).length; await recFillMore(day); draw(); if (recMine(day, ["taklif"]).length === before) toast("Boshqa mos ustoz qolmadi"); };
     };
     draw();
     recFill(day).then(ch => { if (ch && box.isConnected) draw(); });
   }
   async function recFillMore(day) { if (!db.recTake) return; try { await recSeenLoad(); const rows = await db.recTake(day, recCands(day), recMine(day, ["taklif"]).length + REC_N);
-    S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(rows || []); } catch (e) { toast(e.message, true); } }
+    S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(recFix(rows)); } catch (e) { toast(e.message, true); } }
   function recRejectModal(o, done) {
     if (!o) return; const tt = hrTeacher(o.teacher_id) || { full_name: "—" };
     const m = openModal("✕ Tavsiyani rad etish", `<div class="card" style="margin:0 0 12px;padding:12px 14px"><b>${esc(tt.full_name)}</b><div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))} · ${fmtDate(o.day)}, ${esc(KUN[dowOf(o.day)].toLowerCase())}</div></div>
@@ -5046,7 +5055,7 @@ window.METODISTLAR = [
     $("#rw-go", m).onclick = async e => { const why = ($("input[name=rw]:checked", m) || {}).value, note = $("#rw-n", m).value.trim(), err = $("#rw-e", m);
       if (!why) return err.textContent = "Sababini tanlang"; if (why === "boshqa" && note.length < 3) return err.textContent = "Sababini izohda yozing";
       e.target.disabled = true;
-      try { await db.recDecide(o.id, false, why, note); o.status = "rad"; o.reason = why; o.note = note;
+      try { await db.recDecide(o.id, false, why, note); recLocal(o, "rad"); o.reason = why; o.note = note;
         if (why === "dars_yoq") { S.nolesson = S.nolesson || []; S.nolesson.push({ teacher_id: o.teacher_id, dow: dowOf(o.day) }); }
         closeModal(); toast("Rad etildi — o'rniga boshqa ustoz tavsiya qilinadi"); done && done(); }
       catch (x) { err.textContent = x.message; e.target.disabled = false; } };
@@ -5054,7 +5063,7 @@ window.METODISTLAR = [
   // Haftalik rejada: «Tanlangan kuzatuvlar» (KPI'dagi «reja bajarildi» hisobiga ta'sir qilmaydi)
   const recPlanLine = (uid, day) => { const ch = recChosen(uid, day); if (!ch.length) return "";
     return `<div class="pd-rec small" title="Tavsiyalardan tanlangan — KPI'dagi «reja bajarildi» hisobiga ta'sir qilmaydi">👁 <b>Tanlangan kuzatuvlar:</b> ${ch.map(o => { const tt = hrTeacher(o.teacher_id); return `<span class="${recSeen(o) ? "rec-ok" : ""}">${esc(tt ? tt.full_name : "—")}${recSeen(o) ? " ✓" : ""}</span>`; }).join(", ")}</div>`; };
-  async function recLoad(from, to) { if (!db.listRecs) return; try { const rows = await db.listRecs(from, to); const keep = (S.recs || []).filter(o => o.day < from || o.day > to); S.recs = keep.concat(rows || []); } catch (e) {} }
+  async function recLoad(from, to) { if (!db.listRecs) return; try { const rows = await db.listRecs(from, to); const keep = (S.recs || []).filter(o => o.day < from || o.day > to); S.recs = keep.concat(recFix(rows)); } catch (e) {} }
 
   // ---- CEO: rejadan orqada qolayotganlarni intizomiy bo'lim xodimlariga yo'naltirish
   const intStaff = () => S.profiles.filter(p => p.active && !p.archived && p.role === "xodim" && deptOf(p) === "intizomiy").sort((a, b) => a.full_name.localeCompare(b.full_name));
