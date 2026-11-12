@@ -931,6 +931,7 @@ tr.unseen td { background: var(--brand-soft); }
 .pl-top .stats { margin: 0; }
 .pl-main .pl-big { font-size: 42px; font-weight: 800; line-height: 1.1; margin: 6px 0 8px; color: var(--brand); }
 .pl-main .pl-big span { font-size: 20px; font-weight: 700; margin-left: 2px; }
+.pl-main .pl-rec-line { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
 .pl-bar { position: relative; height: 10px; border-radius: 99px; background: var(--surface-2); overflow: visible; margin-bottom: 8px; }
 .pl-bar i { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
 .pl-bar u { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); opacity: .55; text-decoration: none; }
@@ -5109,6 +5110,16 @@ window.METODISTLAR = [
   const planBadge = () => { if (!S.me || S.me.role !== "xodim" || deptOf(S.me) !== "akademik" || !(S.teachers || []).length) return 0;
     try { return planCalc(mStart(today())).risk.length; } catch (e) { return 0; } };
 
+  // Oylik reja kartasida: bugungi tavsiyalardan rejaga olinganlar (tanlangan / ko'rilgan / javob kutilayotgan)
+  function planRecLine(P, t) {
+    const ids = new Set(P.rows.map(r => r.t.id));
+    const rt = (S.recs || []).filter(o => o.day === t && ids.has(o.teacher_id));
+    const ch = rt.filter(o => o.status === "tanlandi"), wait = rt.filter(o => o.status === "taklif").length;
+    const seen = ch.filter(recSeen).length, who = new Set(ch.map(o => o.user_id)).size;
+    if (!ch.length && !wait) return `<div class="small muted pl-rec-line">📌 Bugungi tavsiyalardan hali hech kim reja qilmagan</div>`;
+    return `<div class="small muted pl-rec-line">📌 Bugun tavsiyalardan reja qilingan: <b>${ch.length}</b> ta ustoz${who ? ` (${who} ta xodim)` : ""} · shundan ko'rildi: <b>${seen}</b> ta${ch.length - seen ? ` · ko'rilishi kerak: <b>${ch.length - seen}</b> ta` : ""}${wait ? ` · javob kutilmoqda: ${wait} ta` : ""}</div>`;
+  }
+
   function planView(root) {
     const t = today(), cur = mStart(t);
     const months = []; for (let m = cur; m >= "2026-10-01" && months.length < 12; m = mStart(addD(m, -1))) months.push(m);
@@ -5138,7 +5149,7 @@ window.METODISTLAR = [
         <div class="card pl-main"><div class="small muted">Oylik reja bajarilishi — ${mLabel(ms)}</div>
           <div class="pl-big">${P.pct ?? 0}<span>%</span></div>
           <div class="pl-bar"><i style="width:${Math.min(100, P.pct || 0)}%"></i>${P.cur ? `<u style="left:${exp}%" title="Bugungacha kutilgan: ${exp}%"></u>` : ""}</div>
-          <div class="small muted"><b>${P.got}</b> ta kuzatuv bajarildi, oylik rejada <b>${P.sumPlan}</b> ta (${P.rows.length} ta ustoz, har biri oyiga ${PLAN_BASE} martadan${P.rows.some(r => isBogT(r.t)) ? `, bog'cha ${PLAN_BOG}` : ""})${P.cur ? `. Bugungacha <b>${exp}%</b> bajarilgan bo'lishi kerak edi — ${(P.pct ?? 0) >= exp ? "reja bo'yicha ketyapmiz ✅" : `<b style="color:var(--bad)">${Math.max(0, Math.round(P.sumPlan * P.pace) - P.got)} ta kuzatuv orqadamiz</b>`}. Oy oxirigacha <b>${P.left}</b> ish kuni.` : ". Oy yakunlangan."}</div></div>
+          <div class="small muted"><b>${P.got}</b> ta kuzatuv bajarildi, oylik rejada <b>${P.sumPlan}</b> ta (${P.rows.length} ta ustoz, har biri oyiga ${PLAN_BASE} martadan${P.rows.some(r => isBogT(r.t)) ? `, bog'cha ${PLAN_BOG}` : ""})${P.cur ? `. Bugungacha <b>${exp}%</b> bajarilgan bo'lishi kerak edi — ${(P.pct ?? 0) >= exp ? "reja bo'yicha ketyapmiz ✅" : `<b style="color:var(--bad)">${Math.max(0, Math.round(P.sumPlan * P.pace) - P.got)} ta kuzatuv orqadamiz</b>`}. Oy oxirigacha <b>${P.left}</b> ish kuni.` : ". Oy yakunlangan."}</div>${P.cur ? planRecLine(P, t) : ""}</div>
         <div class="stats st5 pl-stats">
           ${stat("Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${stat("Qisman", `<span class="pl-c mid">${P.part}</span>`)}${stat("Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
           ${stat("Xavf ostida", `<span class="pl-c no">${P.cur ? P.risk.length : "—"}</span>`)}${stat("Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
