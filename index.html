@@ -5103,7 +5103,7 @@ window.METODISTLAR = [
   const recMine = (day, st) => (S.recs || []).filter(o => o.user_id === S.me?.id && o.day === day && (!st || st.includes(o.status)));
   const recChosen = (uid, day) => (S.recs || []).filter(o => o.user_id === uid && o.day === day && o.status === "tanlandi");
   const noLessonDays = tid => (S.nolesson || []).filter(z => z.teacher_id === tid).map(z => +z.dow).sort();
-  const recSeen = (o) => (S.tobs || []).some(x => x.teacher_id === o.teacher_id && x.author_id === o.user_id && x.day === o.day);
+  const recSeen = (o) => (S.tobs || []).some(x => x.teacher_id === o.teacher_id && x.author_id === o.user_id && (x.day === o.day || x.report_date === o.day));
   const recNextDay = () => nextWorkday(S.me, today());
   // Kunlik reja (haftalik rejadagi shu kun) — akademik xodimlarda kuniga necha dars ko'rishi: «7», «8 ta dars» va h.k.
   const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
