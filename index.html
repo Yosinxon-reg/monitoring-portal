@@ -5980,7 +5980,7 @@ window.METODISTLAR = [
   const oyWinners = out => RK_GROUPS.map(g => { const L = (out[g] || []).filter(z => z.n >= 1 && z.total !== null && z.total !== undefined);
     const xs = L.filter(z => +z.total >= OY_MIN).map(z => ({ ...z, best: false }));
     const top = L.filter(z => z.rank === 1)[0] || L.slice().sort((a, b) => b.total - a.total || b.n - a.n)[0];
-    if (top && !xs.some(z => z.t.id === top.t.id)) xs.push({ ...top, best: true });
+    if (top && !xs.length) xs.push({ ...top, best: true });   // faqat shu fanda 98–100% natija hech kimda bo'lmasa
     return { g, xs: xs.sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) }; }).filter(w => w.xs.length);
   const YA = v => window.yA ? window.yA(String(v)) : String(v);
   function oyAnnounce(winners, m, cur, fil) {
