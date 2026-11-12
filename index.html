@@ -1167,6 +1167,28 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .ku-b[hidden] { display: none; }
 @media (max-width: 640px) { .ku-r { grid-template-columns: 1fr auto; } .ku-m { grid-column: 1 / -1; grid-row: 2; } }
 
+/* 53: Akademik KPI v2 — davomat, e'tirozlar, xavf ogohlantirishi, tavsiyalar */
+.att-ctl { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 150px; }
+.att-ctl input[type=time] { width: 92px; padding: 4px 6px; font-size: 13px; }
+.att-ctl select { width: auto; padding: 4px 6px; font-size: 12px; }
+.att-ctl .att-x { flex-basis: 100%; color: var(--muted, #6b7a90); line-height: 1.3; }
+.att-ctl .att-x.bad { color: var(--bad, #c0392b); font-weight: 600; }
+.kpi-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; margin-left: 4px; white-space: nowrap; vertical-align: middle; }
+.kpi-badge.ok { background: rgba(31, 163, 74, .12); color: #1a8a40; }
+.kpi-badge.warn { background: rgba(245, 179, 1, .16); color: #9a6b00; }
+.kpi-badge.bad { background: rgba(192, 57, 43, .1); color: #b03a2e; }
+.risk-card { border-left: 4px solid var(--warn, #f5b301); }
+.risk-it { padding: 7px 0; border-top: 1px solid var(--border); line-height: 1.45; }
+.risk-it:first-of-type { border-top: 0; }
+.ar-adv { margin: 8px 0 0; }
+.ar-prev { background: rgba(59, 91, 134, .07); border-radius: 8px; padding: 7px 10px; line-height: 1.6; }
+.ar-prev .chip-btn { margin-left: 4px; }
+.sc-apl { margin-top: 6px; }
+.sc-why { margin-top: 4px; line-height: 1.4; }
+.rep-adv td { color: var(--muted, #6b7a90); border-top: 0 !important; padding-top: 0 !important; }
+.apl-card { border-left: 4px solid var(--brand); }
+.rv-att .att-ctl { min-width: 0; }
+
 </style>
 </head>
 <body>
@@ -1869,6 +1891,12 @@ window.LESSONS = [
           if (why === "dars_yoq") { d.nolesson = d.nolesson || []; const dw = new Date(o.day + "T00:00:00").getDay() || 7; if (!d.nolesson.some(z => z.teacher_id === o.teacher_id && z.dow === dw)) d.nolesson.push({ teacher_id: o.teacher_id, dow: dw, set_by: me().id }); } }
         save(); return ok(true); },
       async recCancel(id) { const d = load(); const o = (d.recs || []).find(x => x.id === id); if (o) o.status = "bekor"; save(); return ok(true); },
+      async recUnable(id, why, msg) { const d = load(); const o = (d.recs || []).find(x => x.id === id); if (!o || o.status !== "tanlandi") return fail("Bu ustoz tanlanganlar ro'yxatida emas"); o.status = "rad"; o.reason = why; o.note = msg || ""; save(); return ok(true); },
+      async listAttend(from, to) { const d = load(); return ok((d.attend || []).filter(r => r.day >= from && r.day <= to)); },
+      async setAttend(user_id, day, body) { const d = load(); d.attend = (d.attend || []).filter(r => !(r.user_id === user_id && r.day === day)); if (body) d.attend.push({ user_id, day, ...body }); save(); return ok(true); },
+      async listAppeals() { const d = load(); const m = me(); return ok((d.appeals || []).filter(a => m.role === "asoschi" || m.role === "ceo" || a.user_id === m.id)); },
+      async addAppeal(lv, rd, crit, lbl, msg) { const d = load(); d.appeals = d.appeals || []; d.appeals.push({ id: Date.now(), user_id: me().id, lvl: lv, ref_date: rd, criterion: crit, crit_label: lbl, msg, status: "kutilmoqda", answer: "", created_at: new Date().toISOString() }); save(); return ok(true); },
+      async answerAppeal(aid, okk, ans) { const d = load(); const a = (d.appeals || []).find(x => x.id === aid); if (!a) return fail("Topilmadi"); a.status = okk ? "qabul" : "rad"; a.answer = ans || ""; save(); return ok(true); },
       async noLessonClear(tid, dw) { const d = load(); d.nolesson = (d.nolesson || []).filter(z => !(z.teacher_id === tid && z.dow === dw)); save(); return ok(true); },
       async assignHelp(to, tids, due, msg) { const d = load(); d.helpreq = d.helpreq || []; to.forEach((u, k) => { const part = tids.filter((x, i) => i % to.length === k); if (part.length)
           d.helpreq.unshift({ id: Date.now() + k, from_id: me().id, to_id: u, teacher_ids: part, due, note: msg || "", status: "qabul", kind: "yonaltirish", reply: "", created_at: new Date().toISOString(), answered_at: new Date().toISOString() }); }); save(); return ok(to.length); },
@@ -2189,6 +2217,13 @@ window.LESSONS = [
       async recTake(d, cands, n) { return chk(await sb.rpc("rec_take", { d, cands: cands || [], n })) || []; },
       async recDecide(rid, ok, why, msg) { chk(await sb.rpc("rec_decide", { rid, ok, why: why || "", msg: msg || "" })); return true; },
       async recCancel(rid) { chk(await sb.rpc("rec_cancel", { rid })); return true; },
+      async recUnable(rid, why, msg) { chk(await sb.rpc("rec_unable", { rid, why, msg: msg || "" })); return true; },
+      async listAttend(from, to) { return pageSoft(() => sb.from("kpi_attend").select("*").gte("day", from).lte("day", to).order("day").order("user_id")); },
+      async setAttend(user_id, day, body) { if (!body) { chk(await sb.from("kpi_attend").delete().match({ user_id, day })); return true; }
+        chk(await sb.from("kpi_attend").upsert({ user_id, day, arrived: body.arrived || null, absent: !!body.absent, excused: !!body.excused }, { onConflict: "user_id,day" })); return true; },
+      async listAppeals() { return pageSoft(() => sb.from("kpi_appeals").select("*").gte("created_at", new Date(Date.now() - 60 * 864e5).toISOString()).order("created_at").order("id")); },
+      async addAppeal(lv, rd, crit, lbl, m) { return chk(await sb.rpc("kpi_appeal_add", { lv, rd, crit, lbl, m })); },
+      async answerAppeal(aid, okk, ans) { chk(await sb.rpc("kpi_appeal_answer", { aid, ok: okk, ans: ans || "" })); return true; },
       async noLessonClear(tid, dw) { chk(await sb.rpc("nolesson_clear", { tid, dw })); return true; },
       async assignHelp(to_users, tids, due_date, msg) { return chk(await sb.rpc("assign_help", { to_users, tids, due_date, msg: msg || "" })); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
@@ -3141,6 +3176,26 @@ window.METODISTLAR = [
   }
   // 50: «🏅 Kun o'qituvchilari» — intizomiydan 25 olgan ustozlar (hisobot kiritilgan kun bo'yicha), filiallar kesimida
   const KU = { d: "bugun", all: false };
+  // 53: Bugun KPI'da ball yo'qotish xavfi — xodimning bosh sahifasida (vaqtida to'g'rilash uchun)
+  function riskInsert(page) {
+    if (!S.me || S.me.role !== "xodim" || isPersonal(S.me)) return;
+    const t = today(); if (!isWorkday(S.me)) return;
+    const its = itemsFor(S.me, t, "kun"), has = k => its.some(it => it.auto === k || it.k === k), now = tashNow().mins, out = [];
+    const r = repOf(S.me, t);
+    if (has("vaqt") && !isWritten(r)) { const dl = repDeadline(S.me, t);
+      out.push(now <= toMins(dl) ? `📝 Kunlik hisobot hali yuborilmagan — <b>${dl}</b> gacha yuborsangiz «Hisobot» mezoni to'liq` : `📝 Hisobot kechikdi (${dl} dan keyin) — bugun yuborsangiz 75%, ertaga 50%, yuborilmasa 0`); }
+    if (has("davomat")) { const a = attDay(S.me, t); if (a && a.ded) out.push(`🕘 Bugungi davomat: ${esc(attTxt(a))}`); }
+    if (deptOf(S.me) === "akademik") {
+      const ch = (S.recs || []).filter(o => o.user_id === S.me.id && o.day === t && o.status === "tanlandi" && !recSeen(o));
+      if (ch.length) out.push(`👁 Tavsiyalardan tanlagan <b>${ch.length}</b> ta ustozingiz hali hisobotga kiritilmagan${now < 15 * 60 ? " (rejadan ortiq tanlanganlari 15:00 da bo'shatiladi)" : ""}`);
+      const plan = dayPlan(S.me, t); if (plan && !isWritten(r) && has("reja")) out.push(`📍 Bugungi rejangiz: <b>${esc(plan)}</b> — hisobotdagi filial rejaga mos kelmasa, «Reja» mezoniga 0 ball`);
+    }
+    const od = (S.tasks || []).filter(x => x.assigned_to === S.me.id && isOverdue(x)).length, dueT = (S.tasks || []).filter(x => x.assigned_to === S.me.id && ACTIVE_T.includes(x.status) && x.due_date === t && !isOverdue(x)).length;
+    if (od || dueT) out.push(`⏰ Topshiriqlar: ${dueT ? `bugun muddati — <b>${dueT}</b>` : ""}${dueT && od ? ", " : ""}${od ? `muddati o'tgan — <b>${od}</b>` : ""} («Etika» mezoni)`);
+    if (!out.length) return;
+    const st = $(".stats", page); if (!st) return;
+    st.insertAdjacentHTML("beforebegin", `<div class="card risk-card" style="margin-bottom:16px"><div class="card-head"><h2>⚠ Bugun ball yo'qotmaslik uchun</h2><span class="spacer"></span><a href="#/kpi" class="btn sm">KPI</a></div>${out.map(x => `<div class="risk-it">${x}</div>`).join("")}</div>`);
+  }
   async function kunInsert(page) {
     if (!S.me || !["asoschi", "ceo", "xodim"].includes(S.me.role) || !db.kunUstozlari) return;
     const t = today(), y = addD(t, -1), y2 = dowOf(y) === 7 ? addD(y, -1) : y;
@@ -3285,7 +3340,7 @@ window.METODISTLAR = [
             ${active.length ? active.slice(0, 6).map(taskLine).join("") : `<div class="empty">Faol topshiriq yo'q</div>`}</div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page);
+    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page);
     const nb = $("#notif-on", page);
     if (nb) nb.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "Eslatmalar yoqildi" : "Eslatmalar yoqilmadi"); } catch (e) {} nb.remove(); };
   }
@@ -3570,7 +3625,7 @@ window.METODISTLAR = [
   async function quickMax(p, date) {
     const r = S.reports.find(x => x.author_id === p.id && x.report_date === date);
     await db.saveStaffReport(p.id, date, { done: (r && r.done) || MAX_DONE, problems: (r && r.problems) || "", staff_note: (r && r.staff_note) || "", plan: (r && r.plan) || "", grade: 10 });
-    for (const it of itemsFor(p)) await db.setKpiAt("kun", date, p.id, it.k, it.max, "");
+    for (const it of itemsFor(p, date, "kun")) await db.setKpiAt("kun", date, p.id, it.k, it.max, "");
   }
   // Rahbar xodim haqida kunlik hisobot yozadi va baholaydi
   async function openStaffReport(p, date) {
@@ -3582,7 +3637,7 @@ window.METODISTLAR = [
     let grade = r && r.grade !== null && r.grade !== undefined ? +r.grade : null;
     let KD = { daily: [] }; try { KD = await db.listKpiRange(date, date); } catch (e) {}
     const isA = S.me.role === "asoschi";
-    const kItems = itemsFor(p).filter(it => !it.ceoOnly || isA);
+    const kItems = itemsFor(p, date, "kun").filter(it => !it.ceoOnly || isA);
     const kMan = k => KD.daily.find(x => x.day === date && x.user_id === p.id && x.criterion === k);
     const rejaAuto = it => grade ? rnd(grade / 10 * it.max) : "—";
     const m = openModal(`${esc(p.full_name)} — ${fmtDate(date)}`, `
@@ -3779,13 +3834,18 @@ window.METODISTLAR = [
     return `Filial: ${(d.filials || []).join(", ") || "—"}.${help} ${tot} ta post (${(d.topics || []).map(t => `${t.topic}: ${t.posts}`).join("; ") || "—"}). Rahbariyat javob berdi: ${d.answered ?? 0}/${tot}${d.mgmt ? ", ishlashi: " + d.mgmt : ""}.${d.note ? "\n" + d.note : ""}`;
   }
   // Hisobot mazmunini chiroyli ko'rsatish
+  // Ustozga oxirgi yozilgan tavsiya (shu hisobotdagi o'zimning kuzatuvlarimdan tashqari)
+  function prevAdvice(tid, day, repDate) {
+    return (S.tobs || []).filter(o => o.teacher_id === tid && String(o.advice || "").trim() && o.day <= day && !(o.author_id === S.me.id && o.report_date === repDate))
+      .sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : a.id - b.id).pop() || null;
+  }
   function reportView(r, compact) { const em = r && r.edited_at ? `<div class="rep-edited">✏️ Xodim tahrirlagan · ${fmtDate(r.edited_at)} ${tmOf(r.edited_at)}</div>` : ""; return em + reportView0(r, compact); }
   function reportView0(r, compact) {
     const d = r.data || {};
     if (d.kind === "akademik") {
       const rows = d.rows || [];
       return `${rows.length ? `<div class="table-wrap"><table class="rep-tbl ${compact ? "small" : ""}"><thead><tr><th>#</th><th>Ustozning I/F</th><th>Fan</th><th>Filial</th><th>Sinf</th><th>Soat</th><th>Intizomiy ball</th><th>Akademik ball</th><th>Sana</th></tr></thead><tbody>
-        ${rows.map((x, i) => `<tr><td>${i + 1}</td><td><b>${esc(x.teacher)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.filial)}</td><td>${esc(x.klass || "—")}</td><td>${esc(soatTxt(x))}</td><td>${x.ib ?? "—"}</td><td>${x.ab ?? "—"}</td><td style="white-space:nowrap">${x.date ? fmtDate(x.date) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="small muted">Dars baholanmagan</div>`}
+        ${rows.map((x, i) => `<tr><td>${i + 1}</td><td><b>${esc(x.teacher)}</b></td><td>${esc(x.subject)}</td><td>${esc(x.filial)}</td><td>${esc(x.klass || "—")}</td><td>${esc(soatTxt(x))}</td><td>${x.ib ?? "—"}</td><td>${x.ab ?? "—"}</td><td style="white-space:nowrap">${x.date ? fmtDate(x.date) : "—"}</td></tr>${x.advice || x.prev_ok ? `<tr class="rep-adv"><td></td><td colspan="8" class="small">${x.prev_ok ? `Avvalgi tavsiya: <b>${{ ha: "bajarilgan", qisman: "qisman bajarilgan", yoq: "bajarilmagan" }[x.prev_ok] || ""}</b>${x.advice ? " · " : ""}` : ""}${x.advice ? `💡 Tavsiya: ${esc(x.advice)}` : ""}</td></tr>` : ""}`).join("")}</tbody></table></div>` : `<div class="small muted">Dars baholanmagan</div>`}
         ${d.note ? `<div class="rep-note"><b>Kunlik ishlar bo'yicha izoh:</b>\n${esc(d.note)}</div>` : ""}`;
     }
     if (d.kind === "intizomiy" && d.issues) {
@@ -3919,6 +3979,9 @@ window.METODISTLAR = [
           : `<span class="small muted">🏫 Sinf rahbarligi hali kiritilmagan (Munisa yoki Dilshoda kiritadi)</span>`}</div>` : ""}
         ${boshl ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi *:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-ls="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
         ${tt && (tt.classes || []).length ? `<div class="ar-kl"><span class="small muted">Sinflari (taxminiy):</span>${tt.classes.map(c => `<button type="button" class="chip-btn sm ${x.klass === c ? "on" : ""}" data-kl="${i}" data-v="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
+        ${kind === "akademik" ? (() => { const pv = tt ? prevAdvice(tt.id, x.date || date, date) : null;
+          return `<div class="ar-adv">${pv ? `<div class="ar-prev small">💡 <b>Avvalgi tavsiya</b> (${fmtDate(pv.day)}, ${esc(shortName(pv.author_id))}): «${esc(pv.advice)}» <span class="muted">— bajarildimi?</span> ${[["ha", "Ha"], ["qisman", "Qisman"], ["yoq", "Yo'q"]].map(([k, l]) => `<button type="button" class="chip-btn sm ${x.prev_ok === k ? "on" : ""}" data-pok="${i}" data-v="${k}">${l}</button>`).join("")}</div>` : ""}
+            <div class="field" style="margin:6px 0 0"><label class="small">Ustozga tavsiya <span class="muted">(ixtiyoriy · keyingi kuzatuvda tekshiriladi · KPI «Tahlil»ga ta'sir qiladi)</span></label><textarea data-r="${i}" data-f="advice" rows="2" placeholder="Masalan: dars boshida maqsadni aniq ayting, o'quvchilarni juftlikda ishlating">${esc(x.advice || "")}</textarea></div></div>`; })() : ""}
         <div class="ar-act"><button type="button" class="btn sm" data-rdup="${i}" title="Shu ustozning keyingi darsi">⧉ Shu ustoz, keyingi sinf</button>${F.rows.length > 1 || kind !== "akademik" ? `<button type="button" class="btn sm ghost" data-rdel="${i}">O'chirish</button>` : ""}</div>
       </div>`; };
     const rowsBlock = () => `<div class="ar-list">${F.rows.map(rowHtml).join("")}</div>
@@ -4013,6 +4076,7 @@ window.METODISTLAR = [
       });
       $$("[data-kl]", root).forEach(b => b.onclick = () => { F.rows[+b.dataset.kl].klass = b.dataset.v; saveDraft(); draw(); });
       $$("[data-ls]", root).forEach(b => b.onclick = () => { const x = F.rows[+b.dataset.ls]; x.lesson = x.lesson === b.dataset.v ? "" : b.dataset.v; saveDraft(); draw(); });
+      $$("[data-pok]", root).forEach(b => b.onclick = () => { const x = F.rows[+b.dataset.pok]; x.prev_ok = x.prev_ok === b.dataset.v ? "" : b.dataset.v; saveDraft(); draw(); });
       $$("[data-rdup]", root).forEach(b => b.onclick = () => { const i = +b.dataset.rdup; const x = F.rows[i];
         F.rows.splice(i + 1, 0, blankRow({ teacher: x.teacher, teacher_id: x.teacher_id, subject: x.subject, filial: x.filial, soat: x.soat && +x.soat < 8 ? String(+x.soat + 1) : "", date: x.date || date }));
         saveDraft(); draw(); const k = $(`[data-r="${i + 1}"][data-f=klass]`, root); k && k.focus(); });
@@ -4053,7 +4117,7 @@ window.METODISTLAR = [
           const subj = gr ? canonSubj(tt.subject) : bOnly ? kidSubj(x.subject) : scSubs.length === 1 ? scSubs[0] : canonSubj(x.subject);
           return { known: !!same, teacher: (same ? tt.full_name : x.teacher).trim(), teacher_id: same ? tt.id : (x.teacher_id || ""), subject: subj, filial: (x.filial || "").trim(),
             klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib: subj === BOG ? null : fnum(x.ib), ab: isAkadSubj(subj) ? fnum(x.ab) : null,
-            gr, lesson: subj === BOSHL ? (x.lesson || "") : "", lead: ((x.lead || "").trim() || (bOnly ? x.klass || "" : "")).toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
+            gr, advice: String(x.advice || "").trim().slice(0, 1000), prev_ok: x.prev_ok || "", lesson: subj === BOSHL ? (x.lesson || "") : "", lead: ((x.lead || "").trim() || (bOnly ? x.klass || "" : "")).toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
         .filter(x => x.teacher || x.ib !== null || x.ab !== null);
       for (let i = 0; i < rows.length; i++) { const x = rows[i], n = i + 1;
         if (!x.teacher) return fail(`${n}-qatorda ustozning ism-familiyasini yozing`, `[data-r="${i}"][data-f=teacher]`);
@@ -4111,7 +4175,7 @@ window.METODISTLAR = [
     const tomorrow = dayPlan(p, nd); const plan = dayPlan(p, date);
     let grade = isGraded(r) ? +r.grade : null;
     let KD = { daily: [] }; try { KD = await db.listKpiRange(date, date); } catch (e) {}
-    const kItems = itemsFor(p).filter(it => !it.ceoOnly || S.me.role === "asoschi");
+    const kItems = itemsFor(p, date, "kun").filter(it => !it.ceoOnly || S.me.role === "asoschi");
     const kMan = k => KD.daily.find(x => x.day === date && x.user_id === p.id && x.criterion === k);
     const autoV = it => grade ? rnd(grade / 10 * it.max) : "—";
     try { await kpiPrep(date, date); } catch (e) {}
@@ -4131,11 +4195,13 @@ window.METODISTLAR = [
           <div class="seg"><button type="button" data-irv="${k}" data-v="tasdiq" class="${v === "tasdiq" ? "active" : ""}">✓ Rostan jiddiy</button><button type="button" data-irv="${k}" data-v="rad" class="${v === "rad" ? "active" : ""}">Jiddiy emas</button></div></div>`; }).join("")}</div>` : ""}
       <div class="field" style="margin-top:14px"><label>Baho (1–10) * <span class="muted">— KPI'ga avtomatik o'tadi</span></label><div class="grade-pick">${Array.from({ length: 10 }, (_, i) => `<button type="button" data-g="${i + 1}" class="${grade === i + 1 ? "on" : ""}">${i + 1}</button>`).join("")}</div></div>
       <div class="field staff-band"><label>💬 Izoh <span class="muted">(xodim ko'radi)</span></label><textarea id="rv-note" rows="3" placeholder="Masalan: 7-A sinf baholashida dalil yetarli emas, keyingi safar izoh yozing">${esc(r?.staff_note || "")}</textarea></div>
-      ${kItems.length ? `<details class="rv-kpi" ${pm && !pm.ok ? "open" : ""}><summary>Bugungi KPI ballari <span class="muted">(«avto» mezon bahodan o'zi qo'yiladi)</span></summary><div class="kpi-day-grid" style="margin-top:8px">${kItems.map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
+      ${kItems.some(it => it.k === "davomat") ? `<div class="field rv-att"><label>🕘 Davomat — ${fmtDate(date)} <span class="muted">(ish boshlanishi ${sched(p).start}; 10 daqiqagacha kechikish kechiriladi)</span></label>${attCtl(p, date)}</div>` : ""}
+      ${kItems.length ? `<details class="rv-kpi" ${pm && !pm.ok ? "open" : ""}><summary>Bugungi KPI ballari <span class="muted">(«avto» mezon bahodan o'zi qo'yiladi)</span></summary><div class="kpi-day-grid" style="margin-top:8px">${kItems.filter(it => it.k !== "davomat").map(it => { const mv = kMan(it.k); return `<div class="kd"><div class="kd-l" title="${esc(it.l)}">${esc(it.s)} <span class="muted">/ ${it.max}</span></div>
         <input class="kpi-in" type="number" min="0" max="${it.max}" step="0.5" data-kd="${it.k}" value="${scoreOf(mv) ?? ""}" placeholder="${kpiPh(it)}" title="${esc(it.auto ? autoWhy(p, it, "kun", date, null) : "")}"></div>`; }).join("")}</div></details>` : ""}
       <div class="field"><label>Ertangi reja — ${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)} <span class="muted">(ixtiyoriy)</span></label><textarea id="rv-plan" rows="2">${esc(tomorrow || "")}</textarea></div>
       <div class="err-text" id="rv-err"></div>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="rv-save">Baholash</button>`);
     $(".modal", $("#modal-root")).style.maxWidth = "900px";
+    bindAtt(m);
     const pmb = $("#pm-ok", m); if (pmb) pmb.onclick = () => { const i = $(`[data-kd="${rmK}"]`, m); if (i) i.value = rmIt.max; pmNote = $("#pm-note", m).value.trim(); pmb.textContent = "✓ Ruxsat berildi — «Baholash»ni bosing"; pmb.disabled = true; const dt = $(".rv-kpi", m); if (dt) dt.open = true; };
     $$("[data-irv]", m).forEach(b => b.onclick = async () => { const k = +b.dataset.irv, v = b.dataset.v; b.disabled = true;
       try { await db.setIssueReview(p.id, date, k, v); S._kxKey = null; S.kx = S.kx || { irev: [], act: [] };
@@ -4926,7 +4992,7 @@ window.METODISTLAR = [
   REC.loc = {};
   const recLocal = (o, st) => { if (!o) return; o.status = st; REC.loc[o.id] = { st, t: Date.now() }; };
   const recFix = rows => (rows || []).map(r => { const L = REC.loc[r.id]; if (!L || Date.now() - L.t > 120e3 || r.status === L.st) return r;
-    const stale = (r.status === "taklif") || (r.status === "tanlandi" && L.st === "bekor") || (r.status === "bekor" && L.st === "tanlandi");
+    const stale = (r.status === "taklif") || (r.status === "tanlandi" && (L.st === "bekor" || L.st === "rad")) || (r.status === "bekor" && L.st === "tanlandi");
     return stale ? { ...r, status: L.st } : r; });
   const recMine = (day, st) => (S.recs || []).filter(o => o.user_id === S.me?.id && o.day === day && (!st || st.includes(o.status)));
   const recChosen = (uid, day) => (S.recs || []).filter(o => o.user_id === uid && o.day === day && o.status === "tanlandi");
@@ -5037,7 +5103,7 @@ window.METODISTLAR = [
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
           : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) va ${REC_EXTRA} ta qo'shimcha to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
         ${ch.length ? `<div class="small muted" style="margin:12px 0 4px"><b>Tanlanganlar — ${day === t ? "bugungi" : fmtDate(day)} rejangizda</b></div>
-          ${(() => { const ex = recExtraIds(day); return ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${ex.has(o.id) ? `<span class="pl-tag2" title="Kunlik rejadan tashqari — soat 15:00 gacha ko'rilmasa, navbatga qaytadi">qo'shimcha</span>` : ""}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Tanlovni bekor qilish — navbatga qaytadi">Bekor</button>`}</div>`; }).join(""); })()}` : ""}
+          ${(() => { const ex = recExtraIds(day); return ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${ex.has(o.id) ? `<span class="pl-tag2" title="Kunlik rejadan tashqari — soat 15:00 gacha ko'rilmasa, navbatga qaytadi">qo'shimcha</span>` : ""}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Ustozni ko'ra olmasangiz — sababini belgilang, o'rniga yangi tavsiya chiqadi">Ko'ra olmadim</button>`}</div>`; }).join(""); })()}` : ""}
         <div class="row" style="margin-top:8px"><span class="spacer"></span><button type="button" class="btn sm ghost" id="rec-more">+ Yana tavsiya</button></div></div>`;
       $$("[data-rd]", box).forEach(b => b.onclick = async () => { S.ui.recDay = b.dataset.rd; await recFill(b.dataset.rd); recWidget(box, opts); });
       $$("[data-rok]", box).forEach(b => b.onclick = async () => { b.disabled = true; const o = (S.recs || []).find(x => String(x.id) === b.dataset.rok);
@@ -5051,8 +5117,7 @@ window.METODISTLAR = [
           // ro'yxat eskirgan bo'lsa — serverdan yangilab, qayta chizamiz
           await recFill(day, true); draw(); } });
       $$("[data-rno]", box).forEach(b => b.onclick = () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rno); recRejectModal(o, async () => { await recFill(day, true); draw(); }); });
-      $$("[data-rcx]", box).forEach(b => b.onclick = async () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rcx);
-        try { await db.recCancel(o.id); recLocal(o, "bekor"); draw(); } catch (e) { toast(e.message, true); await recFill(day, true); draw(); } });
+      $$("[data-rcx]", box).forEach(b => b.onclick = () => { const o = (S.recs || []).find(x => String(x.id) === b.dataset.rcx); recUnableModal(o, async () => { await recFill(day, true); draw(); }); });
       $("#rec-more", box).onclick = async () => { const before = recMine(day, ["taklif"]).length; await recFillMore(day); draw(); if (recMine(day, ["taklif"]).length === before) toast("Boshqa mos ustoz qolmadi"); };
     };
     draw();
@@ -5060,6 +5125,23 @@ window.METODISTLAR = [
   }
   async function recFillMore(day) { if (!db.recTake) return; try { await recSeenLoad(); const rows = await db.recTake(day, recCands(day), recMine(day, ["taklif"]).length + REC_N);
     S.recs = (S.recs || []).filter(o => !(o.user_id === S.me.id && o.day === day)).concat(recFix(rows)); } catch (e) { toast(e.message, true); } }
+  // Tanlangan ustozni ko'ra olmadi: sabab bilan bekor qilinadi, o'rniga darhol yangi tavsiya
+  function recUnableModal(o, done) {
+    if (!o) return; const tt = hrTeacher(o.teacher_id) || { full_name: "—" };
+    const W = [...REC_WHY, ["fikr", "Fikrimni o'zgartirdim — boshqa ustozni ko'raman"]];
+    const m = openModal("Ko'ra olmadim", `<div class="card" style="margin:0 0 12px;padding:12px 14px"><b>${esc(tt.full_name)}</b><div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))} · ${fmtDate(o.day)}</div></div>
+      <div class="field"><label>Sababi *</label>${W.map(([k, l]) => `<label class="row" style="gap:8px;align-items:center;font-weight:400;margin:4px 0"><input type="radio" name="ru" value="${k}" style="width:auto">${esc(l)}</label>`).join("")}</div>
+      <div class="field"><label id="ru-nl">Izoh (ixtiyoriy)</label><textarea id="ru-n" rows="2"></textarea></div><p class="small muted" style="margin:0">Ustoz ro'yxatingizdan olinadi va o'rniga darhol yangi tavsiya chiqadi.</p><div class="err-text" id="ru-e"></div>`,
+      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="ru-go">Tasdiqlash</button>`);
+    $$("input[name=ru]", m).forEach(r => r.onchange = () => { $("#ru-nl", m).textContent = r.value === "boshqa" ? "Izoh *" : "Izoh (ixtiyoriy)"; });
+    $("#ru-go", m).onclick = async e => { const why = ($("input[name=ru]:checked", m) || {}).value, note = $("#ru-n", m).value.trim(), err = $("#ru-e", m);
+      if (!why) return err.textContent = "Sababini tanlang"; if (why === "boshqa" && note.length < 3) return err.textContent = "Sababini izohda yozing";
+      e.target.disabled = true;
+      try { if (why === "fikr") { await db.recCancel(o.id); recLocal(o, "bekor"); } else { await db.recUnable(o.id, why, note); recLocal(o, "rad"); o.reason = why;
+          if (why === "dars_yoq") { S.nolesson = S.nolesson || []; S.nolesson.push({ teacher_id: o.teacher_id, dow: dowOf(o.day) }); } }
+        closeModal(); toast("O'rniga yangi tavsiya olinmoqda…"); done && done(); }
+      catch (x) { err.textContent = x.message; e.target.disabled = false; } };
+  }
   function recRejectModal(o, done) {
     if (!o) return; const tt = hrTeacher(o.teacher_id) || { full_name: "—" };
     const m = openModal("✕ Tavsiyani rad etish", `<div class="card" style="margin:0 0 12px;padding:12px 14px"><b>${esc(tt.full_name)}</b><div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))} · ${fmtDate(o.day)}, ${esc(KUN[dowOf(o.day)].toLowerCase())}</div></div>
@@ -5457,9 +5539,40 @@ window.METODISTLAR = [
     if (!r || !isWritten(r)) return d < t ? 0 : null;
     const ts = r.created_at || r.updated_at, cd = localOf(ts);
     if (cd < d) return 1;
-    if (cd === d) return tmOf(ts) <= "18:00" ? 1 : 0.75;
+    if (cd === d) return tmOf(ts) <= repDeadline(p, d) ? 1 : 0.75;
     return cd === addD(d, 1) ? 0.5 : 0;
   }
+  // Hisobotni to'liq ball bilan topshirish chegarasi: 2-bosqichdan — ish tugaganidan 30 daqiqa keyin; oldin — 18:00
+  const repDeadline = (p, d) => d >= AK_V2 ? minsToHM(Math.min(23 * 60 + 59, toMins(sched(p).end) + 30)) : "18:00";
+  // 53: Davomat — CEO kiritgan kelgan vaqt (kpi_attend). { ded: ayiriladigan ball, late: daqiqa, absent, excused, arrived }
+  const attRec = (uid, d) => (S.att && S.att.get(uid + "|" + d)) || null;
+  function attDed(late) { return late <= 10 ? 0 : late <= 60 ? Math.min(5, Math.ceil((late - 10) / 10)) : 7; }
+  function attDay(p, d) {
+    if (!p || d < AK_V2 || !isWorkdayOn(p, d) || d > today()) return null;
+    const a = attRec(p.id, d);
+    if (!a) return isAbsent(p.id, d) ? { absent: true, excused: false, ded: 10, late: null, arrived: null, src: "rahbar hisoboti" } : null;
+    if (a.excused) return { absent: !!a.absent, excused: true, ded: 0, late: null, arrived: null };
+    if (a.absent || !a.arrived) return { absent: true, excused: false, ded: 10, late: null, arrived: null };
+    const arr = String(a.arrived).slice(0, 5), late = Math.max(0, toMins(arr) - toMins(sched(p).start));
+    return { absent: false, excused: false, arrived: arr, late, ded: attDed(late) };
+  }
+  // Davomat kiritish boshqaruvi (CEO): kelgan vaqt + «kelmadi» / «sababli»
+  function attCtl(p, d) {
+    if (!isWorkdayOn(p, d)) return `<span class="muted small">dam</span>`;
+    const a = attRec(p.id, d), st = a ? (a.excused ? "sababli" : a.absent ? "kelmadi" : "") : "", x = attDay(p, d);
+    return `<div class="att-ctl" data-att="${p.id}" data-attd="${d}"><input type="time" class="att-t" value="${a && a.arrived && !a.absent ? String(a.arrived).slice(0, 5) : ""}" title="Kelgan vaqti · ish boshlanishi ${sched(p).start}" ${st ? "disabled" : ""}>
+      <select class="att-s" title="Holat"><option value="">vaqt bo'yicha</option><option value="kelmadi" ${st === "kelmadi" ? "selected" : ""}>kelmadi</option><option value="sababli" ${st === "sababli" ? "selected" : ""}>sababli</option></select>
+      <div class="att-x small ${x && x.ded ? "bad" : ""}">${a || x ? esc(attTxt(x)) : `<span class="muted">${sched(p).start} dan</span>`}</div></div>`;
+  }
+  function bindAtt(root, after) {
+    $$("[data-att]", root).forEach(w => { const uid = w.dataset.att, d = w.dataset.attd, ti = $(".att-t", w), se = $(".att-s", w);
+      const save = async () => { const v = se.value, tm = ti.value; const body = v === "kelmadi" ? { absent: true, excused: false, arrived: null } : v === "sababli" ? { absent: true, excused: true, arrived: null } : tm ? { absent: false, excused: false, arrived: tm } : null;
+        try { await db.setAttend(uid, d, body); S.att = S.att || new Map(); if (body) S.att.set(uid + "|" + d, { user_id: uid, day: d, ...body }); else S.att.delete(uid + "|" + d); toast("Davomat saqlandi");
+          if (after) after(); else { const box = document.createElement("div"); box.innerHTML = attCtl(person(uid), d); const nw = box.firstElementChild; w.replaceWith(nw); bindAtt(nw.parentElement); } }
+        catch (e) { toast(e.message, true); } };
+      ti.onchange = save; se.onchange = () => { ti.disabled = !!se.value; save(); }; });
+  }
+  const attTxt = x => !x ? "kiritilmagan" : x.excused ? "sababli — hisobga olinmaydi" : x.absent ? "kelmadi — −10" : `${x.arrived} keldi${x.late > 0 ? `, ${x.late} daq kechikdi` : ""}${x.ded ? ` — −${x.ded}` : x.late > 0 ? " — kechirildi" : ""}`;
   // Ishga kelganlik: shu kuni hisobot yozgan yoki portalda faol bo'lgan bo'lsa — keldi (1). Aks holda — null: kelmagan/kechikkanga rahbar o'zi ball qo'yadi
   // Bo'lim rahbari «Bugun kelmadi» deb belgilagan kun (rahbarga hisobotdan)
   const isAbsent = (uid, d) => !!(S.abs && S.abs.has(uid + "|" + d));
@@ -5545,7 +5658,10 @@ window.METODISTLAR = [
     if (it.auto === "keldi") { let c = 0, n = 0, a = 0; for (let x = f; x <= to; x = addD(x, 1)) { if (!isWorkdayOn(p, x) || x < KPI_ANCHOR || x > today()) continue; const k = keldiDay(p, x, reps); k ? c++ : k === 0 ? a++ : n++; }
       return `Ishga kelgan kun — to'liq ball: ${c} kun${a ? ` · rahbar «kelmadi» deb belgilagan: ${a} kun — 0 ball` : ""}${n ? ` · ma'lumot yo'q: ${n} kun — ballni rahbar o'zi qo'yadi` : ""}. Kechikkan kuni ballni rahbar o'zi qo'yadi`; }
     if (it.auto === "vaqt") { const v = []; for (let x = f; x <= to; x = addD(x, 1)) { const s = vaqtDay(p, x, reps); if (s !== null) v.push(s); }
-      return v.length ? `${v.length} ish kuni: 18:00 gacha — ${v.filter(x => x === 1).length}, kechroq — ${v.filter(x => x === 0.75).length}, ertasi kuni — ${v.filter(x => x === 0.5).length}, yo'q — ${v.filter(x => x === 0).length}` : "Ish kuni yo'q"; }
+      const bad = []; for (let x = f; x <= to; x = addD(x, 1)) { const sv = vaqtDay(p, x, reps); if (sv !== null && sv < 1) { const r = repFind(p, x, reps); bad.push(`${fmtDate(x)}: ${sv === 0 ? "yuborilmagan — 0" : (r ? tmOf(r.created_at || r.updated_at) : "") + (sv === 0.75 ? " (kech) — 75%" : " (ertasi kuni) — 50%")}`); } }
+      return v.length ? `${v.length} ish kuni: ${repDeadline(p, f)} gacha — ${v.filter(x => x === 1).length}, kechroq — ${v.filter(x => x === 0.75).length}, ertasi kuni — ${v.filter(x => x === 0.5).length}, yo'q — ${v.filter(x => x === 0).length}${bad.length ? ". " + bad.join("; ") : ""}` : "Ish kuni yo'q"; }
+    if (it.auto === "davomat") { const L = []; let miss = 0; for (let x = f; x <= to; x = addD(x, 1)) { if (x < AK_V2 || !isWorkdayOn(p, x) || x > today()) continue; const a = attDay(p, x); if (!a) { miss++; continue; } if (a.ded || a.excused || a.late > 0) L.push(`${fmtDate(x)}: ${attTxt(a)}`); }
+      return `Ish boshlanishi: ${sched(p).start}. ${L.length ? L.join("; ") : "Kechikish yo'q"}${miss ? ` · kiritilmagan: ${miss} kun` : ""}`; }
     if (it.auto === "rejamos" || (it.auto === "reja" && deptOf(p) === "akademik")) { let ok = 0, bad = 0; for (let x = f; x <= to; x = addD(x, 1)) { const m = planMatch(p, x, repFind(p, x, reps)); if (m) m.ok ? ok++ : bad++; }
       return `Haftalik reja bilan mos: ${ok} kun · mos emas: ${bad} kun (rahbar ruxsat bersa — maksimal ball)`; }
     return "";
@@ -5555,6 +5671,8 @@ window.METODISTLAR = [
     if (!(S._kxKey === key && Date.now() - (S._kxAt || 0) < 60e3)) {
       const [ir, ac] = await Promise.all([db.listIssueReviews ? db.listIssueReviews(from, to).catch(() => []) : Promise.resolve([]), db.listActivity ? db.listActivity(from, to).catch(() => []) : Promise.resolve([])]);
       S.kx = { irev: ir || [], act: ac || [] }; S._kxKey = key; S._kxAt = Date.now();
+      if (db.listAttend) { try { const at = await db.listAttend(from, to); S.att = S.att || new Map(); for (let x = from; x <= to; x = addD(x, 1)) S.att.forEach((v, k) => { if (k.endsWith("|" + x)) S.att.delete(k); });
+        (at || []).forEach(r => S.att.set(r.user_id + "|" + String(r.day).slice(0, 10), r)); } catch (e) {} }
     }
     for (let w = weekOf(from); w <= to; w = addD(w, 7)) { try { await ensurePlans(w); } catch (e) {} }
   }
@@ -6323,14 +6441,25 @@ window.METODISTLAR = [
       { k: "filial", l: "Biriktirilgan filiallar bilan ishlash ko'nikmasi", s: "Filial", max: 10, auto: "rejamos", d: "Avtomatik: haftalik rejadagi filialga borgani (hisobotdagi filial bilan mos). Mos kelmagan kun — 0, rahbar ruxsat bersa — maksimal" },
       { k: "ochiqlik", l: "Rahbariyat tomonidan berilgan vazifalarga ochiqligi", s: "Ochiqlik", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "kreativ", l: "Kreativ fikrlash va tashabbuskorlik ko'nikmalari", s: "Kreativ", max: 10, hint: "taklif", d: "Umumstrategik muammolarni aniqlashi va ularga mos yechimlar berishi" }] },
-    akademik: { title: "Akademik kuzatuv xodimlari", items: [
+    akademik_v1: { title: "Akademik kuzatuv xodimlari", items: [
       { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlik va haftalikda — hisobot bahosidan. Haftalik rejadagi filialga bormagan kun — 0 (rahbar ruxsat bersa — maksimal). CEO o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 30, d: "Rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi" },
       { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 15, d: "Konkret holat, pedagogik xulosa, bajarilishi mumkin bo'lgan tavsiya" },
       { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 18:00 gacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
       { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
-      { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] }
+      { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] },
+    // 53: 2-bosqichdan (9-noyabr) — kunlik va haftalik mezonlar ajratilgan; per: "hafta" — CEO haftada bir marta qo'yadi
+    akademik: { title: "Akademik kuzatuv xodimlari", items: [
+      { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "Har kuni. 2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlikda — hisobot bahosidan. Haftalik rejadagi filialga bormagan kun — 0 (rahbar ruxsat bersa — maksimal). CEO o'zgartira oladi" },
+      { k: "davomat", l: "Davomat — ishga o'z vaqtida kelish", s: "Davomat", max: 10, auto: "davomat", d: "Har kuni CEO kelgan vaqtini yozadi. Ish grafigidagi boshlanish vaqtidan: 10 daqiqagacha kechikish kechiriladi; 1 soatgacha har 10 daqiqaga −1 (1 soat — −5); 1 soatdan ko'p — −7; kelmasa — 0 ball. «Sababli» kun hisobga olinmaydi" },
+      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot ish tugaganidan keyin 30 daqiqagacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
+      { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
+      { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 5, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
+      { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 25, per: "hafta", d: "Haftada bir marta CEO qo'yadi: rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi. Portal xodim qo'ygan ballar taqsimotini ko'rsatadi («yumshoq baholash» belgisi)" },
+      { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 10, per: "hafta", d: "Haftada bir marta CEO qo'yadi. Portal tavsiya ball ko'rsatadi: kuzatuvlarda ustozga tavsiya yozilgani va avvalgi tavsiya bajarilgani tekshirilgani" },
+      { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 10, per: "hafta", hint: "taklif", d: "Haftada bir marta CEO qo'yadi: amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] },
+
   };
   const CEO_EXTRA = { k: "jamoa", l: "Jamoaning faolligi", s: "Jamoa", max: 20, ceoOnly: true, d: "Hozircha asoschi qo'yadi, keyinchalik avtomatlashadi" };
   const DEPTS = {
@@ -6358,7 +6487,11 @@ window.METODISTLAR = [
     const c = p.ceo_id && person(p.ceo_id);
     return c ? deptOf(c) : (DEPTS[p.bolim] ? p.bolim : "administratsiya");
   }
-  const itemsFor = p => !p || p.role === "ceo" || isPersonal(p) ? [] : byFounder(p) ? [SIMPLE] : KPI_TPL[DEPTS[deptOf(p)].tpl].items;
+  // d — sana (2-bosqichdan oldin akademikda eski mezonlar), lvl === "kun" — faqat kunlik mezonlar (haftaliklar CEO tomonidan haftada bir marta)
+  const AK_V2 = "2026-11-09";
+  const itemsFor = (p, d, lvl) => { if (!p || p.role === "ceo" || isPersonal(p)) return []; if (byFounder(p)) return [SIMPLE];
+    const tk = DEPTS[deptOf(p)].tpl; const its = (tk === "akademik" && d && d < AK_V2 ? KPI_TPL.akademik_v1 : KPI_TPL[tk]).items;
+    return lvl === "kun" ? its.filter(it => it.per !== "hafta") : its; };
   const KPI_ANCHOR = "2026-10-26"; // 1-bosqich: 26-oktyabr – 8-noyabr, keyin har 14 kun
   const addD = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return window.dateUtil.localDate(d); };
   const dayDiff = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
@@ -6414,6 +6547,8 @@ window.METODISTLAR = [
   const scoreOf = r => r && r.score !== null && r.score !== undefined && r.score !== "" ? +r.score : null;
   // Kunlik: CEO qo'ygani; bo'lmasa "Reja" — shu kungi hisobot bahosidan
   function dayAuto(p, it, d, reps) {
+    if (it.per === "hafta") return null;
+    if (it.auto === "davomat") { const a = attDay(p, d); return a ? (a.excused ? null : rnd(Math.max(0, it.max - a.ded))) : null; }
     if (it.auto === "vaqt") { const x = vaqtDay(p, d, reps); return x === null ? null : rnd(x * it.max); }
     if (it.auto === "keldi") { const k = keldiDay(p, d, reps); return k === null ? null : k ? it.max : 0; }
     if (it.auto === "rejamos") { const pm = planMatch(p, d, repFind(p, d, reps)); return pm ? (pm.ok ? it.max : 0) : null; }
@@ -6425,9 +6560,10 @@ window.METODISTLAR = [
   }
   const dayVal = (p, it, d, K, reps) => scoreOf(manAt(K, "kun", d, p.id, it.k)) ?? dayAuto(p, it, d, reps);
   function weekAuto(p, it, ws, K, reps) { const v = []; for (let i = 0; i < 7; i++) v.push(dayVal(p, it, addD(ws, i), K, reps)); return avgOf(v); }
-  const weekVal = (p, it, ws, K, reps) => scoreOf(manAt(K, "hafta", ws, p.id, it.k)) ?? weekAuto(p, it, ws, K, reps);
+  const weekVal = (p, it, ws, K, reps) => scoreOf(manAt(K, "hafta", ws, p.id, it.k)) ?? (it.per === "hafta" ? null : weekAuto(p, it, ws, K, reps));
   const bosqAuto = (p, it, ps, K, reps) => avgOf([weekVal(p, it, ps, K, reps), weekVal(p, it, addD(ps, 7), K, reps)]);
   function levelAuto(p, it, lvl, d, K, reps) {
+    if (it.per === "hafta") return lvl === "bosqich" ? avgOf([weekVal(p, it, d, K, reps), weekVal(p, it, addD(d, 7), K, reps)]) : null;
     if (AUTO_WIN.has(it.auto)) { const [f, to] = lvl === "kun" ? [d, d] : lvl === "hafta" ? [d, addD(d, 6)] : [d, addD(d, 13)]; const w = autoWin(p, it, f, to, reps); return w ? w.v : null; }
     if (lvl === "bosqich" && it.k === "reja" && deptOf(p) === "akademik") { const v = planKpi(p, it, d); if (v !== null) { let ok = 0, ev = 0;
       for (let x = d; x <= addD(d, 13); x = addD(x, 1)) { const pm = planMatch(p, x, repFind(p, x, reps)); if (!pm) continue; ev++; if (pm.ok || scoreOf(manAt(K, "kun", x, p.id, "reja")) === it.max) ok++; }
@@ -6435,13 +6571,14 @@ window.METODISTLAR = [
     return lvl === "kun" ? dayAuto(p, it, d, reps) : lvl === "hafta" ? weekAuto(p, it, d, K, reps) : bosqAuto(p, it, d, K, reps);
   }
   function kpiRow(p, lvl, d, K, awardId, reps) {
-    const items = itemsFor(p);
+    const items = itemsFor(p, d, lvl);
     const picked = lvl === "bosqich" && awardId === p.id;
     const cells = items.map(it => {
       const man = manAt(K, lvl, d, p.id, it.k);
       const av = levelAuto(p, it, lvl, d, K, reps);
       const val = picked ? it.max : scoreOf(man) ?? av;
-      return { it, man, au: { v: av, why: it.auto ? autoWhy(p, it, lvl, d, reps) : "" }, val };
+      const sug = it.per === "hafta" && lvl !== "kun" ? weekSug(p, it, d, lvl === "hafta" ? addD(d, 6) : addD(d, 13)) : null;
+      return { it, man, au: { v: av, why: it.auto ? autoWhy(p, it, lvl, d, reps) : sug ? sug.txt : "" }, val, sug };
     });
     const sum = cells.reduce((a, c) => a + (c.val || 0), 0);
     const maxT = items.reduce((a, it) => a + it.max, 0);
@@ -6450,14 +6587,52 @@ window.METODISTLAR = [
     const final = picked ? 100 : fin && fin.final_score !== null ? +fin.final_score : pct;
     return { p, cells, sum: rnd(sum), maxT, pct, final, overridden: !!fin && !picked, picked, has: cells.some(c => c.val !== null) || !!fin || picked };
   }
+  // 53: haftalik mezonlar uchun portal tavsiyasi (CEO qo'yadi): Baholash — xodim qo'ygan ballar taqsimoti; Tahlil — tavsiyalar
+  function softRate(p, from, to) {
+    const obs = (S.tobs || []).filter(o => o.author_id === p.id && o.day >= from && o.day <= to && o.ab !== null && o.ab !== undefined && o.ab !== "");
+    if (!obs.length) return null;
+    const r = obs.map(o => +o.ab / abMax(o.subject)), avg = r.reduce((a, x) => a + x, 0) / r.length, hi = r.filter(x => x >= 0.9).length / r.length;
+    const sd = Math.sqrt(r.reduce((a, x) => a + (x - avg) ** 2, 0) / r.length);
+    return { n: obs.length, avg, hi, sd, soft: obs.length >= 10 && hi > 0.8,
+      txt: `${obs.length} ta dars: o'rtacha ${Math.round(avg * 100)}% · ${Math.round(hi * 100)}% darsga 90%+ ball · tarqalish ${Math.round(sd * 100)}%${obs.length >= 10 && hi > 0.8 ? " — ⚠ yumshoq baholash" : ""}` };
+  }
+  function weekSug(p, it, from, to) {
+    if (it.k === "baholash") { const s0 = softRate(p, from, to); return s0 ? { v: null, txt: s0.txt, soft: s0.soft } : null; }
+    if (it.k !== "tahlil") return null;
+    const all = (S.tobs || []), mine = all.filter(o => o.author_id === p.id && o.day >= from && o.day <= to);
+    if (!mine.length) return null;
+    const A = mine.filter(o => String(o.advice || "").trim().length >= 20).length / mine.length;
+    const chk = []; mine.forEach(o => { const prev = all.filter(x => x.teacher_id === o.teacher_id && x.id !== o.id && (x.day < o.day || (x.day === o.day && x.id < o.id)) && String(x.advice || "").trim()).pop(); if (prev) chk.push(o.prev_ok ? 1 : 0); });
+    const B = chk.length ? chk.reduce((a, x) => a + x, 0) / chk.length : null;
+    const v = rnd((B === null ? A : 0.7 * A + 0.3 * B) * it.max);
+    return { v, txt: `Tavsiya: ${v}/${it.max} — ${mine.length} ta kuzatuvdan ${Math.round(A * mine.length)} tasida ustozga tavsiya yozilgan${chk.length ? ` · avvalgi tavsiya tekshirilgan: ${chk.filter(Boolean).length}/${chk.length}` : ""}` };
+  }
   // 46: Bo'lim ichidagi o'rinlar: teng foizda — bir xil o'rin; asoschi tanlovi — 0; ball yo'q — null
   const RANK_DEPTS = ["intizomiy", "akademik"];
-  function deptRanks(rows) {
+  // 53: teng ballda tartib — akademik: reja → davomat → hisobot → kuzatuvlar soni; intizomiy: soni → sifat → vaqt
+  const TIE_KEYS = { akademik: ["reja", "davomat", "hisobot"], intizomiy: ["soni", "sifat", "vaqt"] };
+  const cellV = (x, k) => { const c = (x.cells || []).find(c => c.it.k === k); return c && c.val !== null && c.val !== undefined ? +c.val : -1; };
+  const obsN = (x, d) => d ? (S.tobs || []).filter(o => o.author_id === x.p.id && o.day >= d && o.day <= addD(d, 13)).length : 0;
+  // G'oliblik sharti (1- va 2-o'rin uchun): 2 kundan ko'p sababsiz kelmagan yoki rejani 70% dan kam bajargan — g'olib bo'lmaydi
+  function eligOf(x, d) {
+    if (!d || d < AK_V2) return null; const why = [];
+    let ab = 0; for (let z = d; z <= addD(d, 13) && z <= today(); z = addD(z, 1)) { const a = deptOf(x.p) === "akademik" ? attDay(x.p, z) : (isAbsent(x.p.id, z) ? { absent: true } : null); if (a && a.absent && !a.excused) ab++; }
+    if (ab > 2) why.push(`${ab} kun sababsiz kelmagan`);
+    const rc = (x.cells || []).find(c => c.it.k === "reja"); if (rc && rc.val !== null && rc.val !== undefined && +rc.val / rc.it.max < 0.7) why.push(`reja ${Math.round(+rc.val / rc.it.max * 100)}% bajarilgan`);
+    return why.length ? why.join(", ") : null;
+  }
+  // Bo'lim ichidagi o'rinlar: avval g'oliblik shartini bajarganlar (foiz, keyin teng ballda tartib), keyin bajarmaganlar; asoschi tanlovi — 0; ball yo'q — null
+  function deptRanks(rows, d) {
     const out = {};
     rows.forEach(x => { const k = deptOf(x.p); if (RANK_DEPTS.includes(k)) (out[k] = out[k] || []).push(x); });
-    Object.values(out).forEach(a => {
-      const rated = a.filter(x => x.has && !x.picked).sort((p, q) => q.final - p.final);
-      let r = 0, prev = null; rated.forEach((x, i) => { if (prev === null || x.final !== prev) r = i + 1; prev = x.final; x.rank = r; });
+    Object.entries(out).forEach(([k, a]) => {
+      const keys = TIE_KEYS[k] || [], v2 = d && d >= AK_V2;
+      const sig = x => v2 ? [x.final, ...keys.map(kk => cellV(x, kk)), k === "akademik" ? obsN(x, d) : 0] : [x.final];
+      const cmp = (p, q) => { const A = sig(p), B = sig(q); for (let i = 0; i < A.length; i++) if (A[i] !== B[i]) return B[i] - A[i]; return 0; };
+      const rated = a.filter(x => x.has && !x.picked); rated.forEach(x => { x.inelig = v2 ? eligOf(x, d) : null; });
+      const ok = rated.filter(x => !x.inelig).sort(cmp), no = rated.filter(x => x.inelig).sort(cmp);
+      let r = 0, prev = null; ok.forEach((x, i) => { if (prev === null || cmp(prev, x) !== 0) r = i + 1; prev = x; x.rank = r; });
+      const base = Math.max(ok.length, 2); r = 0; prev = null; no.forEach((x, i) => { if (prev === null || cmp(prev, x) !== 0) r = base + i + 1; prev = x; x.rank = r; });
       a.forEach(x => { x.n = rated.length; if (x.picked) x.rank = 0; else if (!x.has) x.rank = null; });
       a.sort((p, q) => (p.rank === null) - (q.rank === null) || (p.rank ?? 99) - (q.rank ?? 99) || p.p.full_name.localeCompare(q.p.full_name));
     });
@@ -6493,9 +6668,26 @@ window.METODISTLAR = [
     return `<div class="table-wrap"><table class="rk-tbl"><thead><tr><th>O'rin</th><th>Xodim</th><th>Natija</th></tr></thead><tbody>
       ${a.map(x => `<tr class="${x.p.id === hi ? "rk-me" : ""}"><td><b>${x.rank === 0 ? "⭐" : x.rank ? MEDAL(x.rank) + " " + x.rank : "—"}</b></td><td>${esc(x.p.full_name)}${x.p.id === hi ? " <span class='small muted'>(siz)</span>" : ""}${x.rank === 0 ? " <span class='small muted'>· rahbar tanlovi</span>" : ""}</td><td>${x.final !== null && x.final !== undefined ? `<b>${x.final}%</b>` : "<span class='muted'>ball yo'q</span>"}</td></tr>`).join("")}</tbody></table></div>`;
   }
+  // 53: bosqich yakunida xodimga botdan boradigan shaxsiy hisobot: mezonlar, o'tgan bosqichga nisbatan o'zgarish, eng zaif mezon bo'yicha maslahat
+  const TIPS = { reja: "Haftalik rejadagi filialga boring va tavsiyalardan tanlagan ustozlarni o'sha kuni ko'ring.", davomat: "Ishga grafik bo'yicha o'z vaqtida keling — 10 daqiqadan ortiq kechikish ball kamaytiradi.",
+    hisobot: "Kunlik hisobotni ish tugaganidan keyin 30 daqiqa ichida yuboring.", etika: "Topshiriqlarni tez oching, «jarayonda»ga o'tkazing va muddatida bajaring.",
+    qayta: "Uzoq ko'rilmagan va past ball olgan ustozlarni 14 kun ichida qayta ko'ring.", baholash: "Ballarni rubrikaga qat'iy mos va dalil bilan qo'ying — hammaga yuqori ball qo'ymang.",
+    tahlil: "Har kuzatuvda ustozga aniq tavsiya yozing va keyingi safar bajarilganini tekshiring.", tashabbus: "Ishni yaxshilash bo'yicha asosli taklif kiriting.",
+    soni: "Kuzatuv davomida ko'proq holatni aniqlang va kiriting.", sifat: "Holatlarni to'liq yozing: turi, joyi, kim bilan bog'liq, og'irligi, natijasi va izoh.",
+    vaqt: "Ishga o'z vaqtida keling.", filial: "Haftalik rejadagi filialga boring.", ochiqlik: "Topshiriqlarni tez oching va muddatida bajaring.", kreativ: "Muammolarga yechim taklif qiling." };
+  function stageDetail(x, d) {
+    const parts = (x.cells || []).filter(c => c.val !== null && c.val !== undefined).map(c => `${c.it.s} ${c.val}/${c.it.max}`);
+    const prev = ((STG.list && STG.list.ranks) || []).find(r => r.period_start === addD(d, -14) && r.user_id === x.p.id);
+    const diff = prev && prev.final !== null ? rnd(x.final - +prev.final) : null;
+    const weak = (x.cells || []).filter(c => c.val !== null && c.val !== undefined && c.it.max).sort((a, b) => a.val / a.it.max - b.val / b.it.max)[0];
+    return [`Mezonlar: ${parts.join(", ")}.`,
+      diff !== null ? `O'tgan bosqichga nisbatan: ${diff > 0 ? "+" : ""}${diff}% (${prev.final}% → ${x.final}%).` : "",
+      weak && weak.val / weak.it.max < 1 ? `Eng zaif mezon: ${weak.it.l} (${weak.val}/${weak.it.max}). Maslahat: ${TIPS[weak.it.k] || "shu mezonga e'tibor bering."}` : "Barcha mezonlar bo'yicha to'liq ball — barakalla!",
+      x.inelig ? `G'oliblik sharti bajarilmadi: ${x.inelig}.` : ""].filter(Boolean).join("\n");
+  }
   function finalizeModal(d, byDept, done, after) {
     const to = addD(d, 13), early = to >= today();
-    const rows = []; Object.entries(byDept).forEach(([k, a]) => a.forEach(x => rows.push({ user_id: x.p.id, dept: k, rank: x.rank, n: x.n, final: x.has ? x.final : null })));
+    const rows = []; Object.entries(byDept).forEach(([k, a]) => a.forEach(x => rows.push({ user_id: x.p.id, dept: k, rank: x.rank, n: x.n, final: x.has ? x.final : null, detail: x.has ? stageDetail(x, d) : "" })));
     const list = RANK_DEPTS.filter(k => byDept[k]).map(k => `<div class="win-dept" style="margin-top:8px">${esc(DEPTS[k].l)}</div>` + byDept[k].filter(x => x.rank !== null && x.rank <= 2).map(x => `<div>${MEDAL(x.rank)} <b>${esc(x.p.full_name)}</b> — ${x.rank === 0 ? "rahbar tanlovi" : x.rank + "-o'rin"}, ${x.final}%</div>`).join("")).join("");
     const m = openModal(`🏁 ${bosqichNo(d)}-bosqichni yakunlash`, `
       ${early ? `<div class="note" style="margin:0 0 12px">⚠ Bosqich hali tugamagan (${fmtDate(to)} gacha). Hozir yakunlasangiz, shu kungacha qo'yilgan ballar bilan o'rinlar belgilanadi.</div>` : ""}
@@ -6577,9 +6769,9 @@ window.METODISTLAR = [
     const periods = []; for (let i = 0; i < 26; i++) { const x = addD(cur, -14 * i); if (x >= KPI_ANCHOR) periods.push(x); }
     const weeks = []; for (let i = -1; i < 12; i++) { const w = addD(weekOf(t), -7 * i); if (w >= KPI_ANCHOR) weeks.push(w); }
     const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
-    const L = lvl === "bosqich" ? await stagesLoad() : { stages: [], ranks: [] };
+    const L0 = await stagesLoad(), L = lvl === "bosqich" ? L0 : { stages: [], ranks: [] };
     const done = (L.stages || []).find(z => z.period_start === d) || null;
-    const byDept = lvl === "bosqich" && rankPool().length ? deptRanks(rankPool().map(p => kpiRow(p, lvl, d, K, awardId, reps))) : {};
+    const byDept = lvl === "bosqich" && rankPool().length ? deptRanks(rankPool().map(p => kpiRow(p, lvl, d, K, awardId, reps)), d) : {};
     const saved = done ? savedByDept(L.ranks || [], d) : {};
     const myDept = deptOf(S.me), showSaved = lvl === "bosqich" && done && !isA && saved[myDept];
     const rows = tab.rows.map(p => kpiRow(p, lvl, d, K, awardId, reps)).sort((a, b) => b.final - a.final);
@@ -6590,11 +6782,18 @@ window.METODISTLAR = [
     const sel = lvl === "kun" ? `<input type="date" id="kpi-d" value="${d}" max="${t}" min="${KPI_ANCHOR}" style="width:auto">`
       : lvl === "hafta" ? `<select id="kpi-d" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === d ? "selected" : ""}>${fmtDate(w)} – ${fmtDate(addD(w, 6))}${w === weekOf(t) ? " (joriy)" : w > t ? " (keyingi)" : ""}</option>`).join("")}</select>`
       : `<select id="kpi-d" style="width:auto">${periods.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${bosqichNo(x)}-bosqich: ${periodLabel(x)}${x === cur ? " (joriy)" : ""}${(L.stages || []).some(z => z.period_start === x) ? " ✓ yakunlangan" : ""}</option>`).join("")}</select>`;
-    const how = { kun: "Har kuni har bir mezonga ball qo'ying. «avto» belgili mezon kunlik hisobot bahosidan o'zi qo'yiladi (o'zgartirsa bo'ladi).",
-      hafta: "Haftalik ball — kunlik ballarning o'rtachasi (kulrang). Kerak bo'lsa katakka yozib, o'zgartirasiz.",
+    const v2 = d >= AK_V2 && (tab.id === "akademik" || deptOf(S.me) === "akademik");
+    const how = { kun: v2 ? "Har kuni: Davomat ustuniga kelgan vaqtni yozing (yoki «kelmadi» / «sababli»), qolgan kunlik mezonlar avtomatik (o'zgartirsa bo'ladi). Baholash, Tahlil va Tashabbus — «Haftalik»da, haftada bir marta." : "Har kuni har bir mezonga ball qo'ying. «avto» belgili mezon kunlik hisobot bahosidan o'zi qo'yiladi (o'zgartirsa bo'ladi).",
+      hafta: v2 ? "Kunlik mezonlar — kunlik ballar o'rtachasi (kulrang). Baholash, Tahlil, Tashabbus — haftada bir marta siz qo'yasiz (≈ — portal tavsiyasi, katak ustiga olib boring)." : "Haftalik ball — kunlik ballarning o'rtachasi (kulrang). Kerak bo'lsa katakka yozib, o'zgartirasiz.",
       bosqich: "2 haftalik ball — ikki haftaning o'rtachasi (kulrang). Kerak bo'lsa o'zgartirasiz. Yakuniy natija reytingga kiradi." }[lvl];
     const anyEd = rows.some(x => canRate(x.p));
+    const softOf = {}, inelOf = {};
+    if (lvl !== "kun" && d >= AK_V2) rows.forEach(x => { if (deptOf(x.p) === "akademik") { const sr = softRate(x.p, d, to); if (sr && sr.soft) softOf[x.p.id] = sr.txt; } });
+    Object.values(byDept).flat().forEach(x => { if (x.inelig) inelOf[x.p.id] = x.inelig; });
+    const apps = await appealsLoad();
+    const appPend = apps.filter(a => a.status === "kutilmoqda" && canRate(person(a.user_id) || {}));
     body.innerHTML = `<div class="row" style="margin:14px 0">${sel}<span class="small muted">${how}</span></div>
+      ${appPend.length ? appealsCard(appPend) : ""}
       ${lvl === "bosqich" && isA ? winCard(byDept, d, { done,
           right: `<label class="small" style="margin:0">Rahbar tanlovi (ixtiyoriy):</label><select id="kpi-award" style="width:auto"><option value="">— yo'q —</option>${rankPool().map(p => `<option value="${p.id}" ${awardId === p.id ? "selected" : ""}>${esc(p.full_name)}</option>`).join("")}</select>
             <button class="btn ${done ? "ghost" : "primary"} sm" id="kpi-fin">🏁 ${done ? "Qayta yakunlash" : "Bosqichni yakunlash"}</button>`,
@@ -6608,11 +6807,13 @@ window.METODISTLAR = [
       <div class="card"><div class="card-head"><h2>${LVL[lvl]} ballar · ${label}</h2><span class="spacer"></span>${maxOk ? `<button class="btn sm max-btn" id="kpi-maxall" title="Ro'yxatdagi barcha xodimga 100 ball">★ Hammasiga maksimal ball</button>` : ""}</div><div class="table-wrap">${rows.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>
           ${items.map(it => `<th title="${esc(it.l + " — " + it.d)}">${esc(it.s)}<div class="kpi-max">${it.max}${it.auto ? " · avto" : ""}</div></th>`).join("")}
           <th>Jami</th><th>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}</th></tr></thead><tbody>
-          ${rows.map(x => `<tr class="${x.picked ? "picked" : ""}"><td><div class="row click" style="gap:8px;flex-wrap:nowrap" data-card="${x.p.id}" title="Ball kartasini ochish">${avatar(x.p.full_name, photoOf(x.p))}<div><b>${esc(x.p.full_name)}</b>${x.picked ? " ⭐" : ""}<div class="small kpi-open">Ball kartasi ›</div></div></div></td>
+          ${rows.map(x => `<tr class="${x.picked ? "picked" : ""}"><td><div class="row click" style="gap:8px;flex-wrap:nowrap" data-card="${x.p.id}" title="Ball kartasini ochish">${avatar(x.p.full_name, photoOf(x.p))}<div><b>${esc(x.p.full_name)}</b>${x.picked ? " ⭐" : ""}${stableOf(x.p.id) ? ` <span class="kpi-badge ok" title="Ketma-ket 3 bosqich 90% va undan yuqori">🏅 barqaror</span>` : ""}${softOf[x.p.id] ? ` <span class="kpi-badge warn" title="${esc(softOf[x.p.id])}">⚠ yumshoq baholash</span>` : ""}${inelOf[x.p.id] ? ` <span class="kpi-badge bad" title="1- va 2-o'rin uchun g'oliblik sharti bajarilmagan">✕ ${esc(inelOf[x.p.id])}</span>` : ""}<div class="small kpi-open">Ball kartasi ›</div></div></div></td>
             ${x.cells.map(c => { const ed = !x.picked && canRate(x.p) && (!c.it.ceoOnly || isA);
               const note = c.man && c.man.note ? c.man.note : "";
               const nb = (ed || note) ? `<button type="button" class="kpi-nb ${note ? "has" : ""}" data-nu="${x.p.id}" data-nc="${c.it.k}" title="${note ? esc(note) : "Izoh yozish"}">${note ? "💬" : "+"}</button>` : "";
-              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? (c.it.auto === "keldi" ? "qo'ying" : "—")}" title="${esc(c.au.why || "")}">`
+              if (lvl === "kun" && c.it.k === "davomat" && ed) return `<td><div class="kpi-cell">${attCtl(x.p, d)}</div>${barMini(c.val, c.it.max)}</td>`;
+              const ph = c.au.v ?? (c.sug && c.sug.v !== null && c.sug.v !== undefined ? "≈" + c.sug.v : c.it.auto === "keldi" ? "qo'ying" : "—");
+              return `<td><div class="kpi-cell">${ed ? `<input class="kpi-in ${scoreOf(c.man) !== null ? "set" : ""}" type="number" min="0" max="${c.it.max}" step="0.5" data-u="${x.p.id}" data-c="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${ph}" title="${esc(c.au.why || "")}">`
                 : `<span class="${scoreOf(c.man) === null && !x.picked ? "kpi-auto" : ""}">${c.val ?? "—"}</span>`}${nb}</div>${barMini(c.val, c.it.max)}</td>`; }).join("")}
             <td><b>${x.sum}</b><span class="small muted">/${x.maxT}</span></td>
             <td>${lvl === "bosqich" && canRate(x.p) && !x.picked && !(isA && byFounder(x.p)) ? `<input class="kpi-in kpi-final ${x.overridden ? "set" : ""}" type="number" min="0" max="100" step="0.5" data-fu="${x.p.id}" value="${x.overridden ? x.final : ""}" placeholder="${x.pct}">%` : `<b>${x.final}%</b>`}
@@ -6623,7 +6824,7 @@ window.METODISTLAR = [
       ${tab.id === "me" && rows[0] ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Ball kartam — ${esc(label)}</h2></div><div id="my-card"></div></div>` : ""}
       <div class="card" style="margin-top:16px"><div class="card-head"><h2>Mezonlar</h2></div>
         <table class="small"><thead><tr><th>Mezon</th><th>Ball</th><th>Kim qo'yadi</th><th class="hide-sm">Nimani o'lchaydi</th></tr></thead><tbody>
-        ${items.map(it => `<tr><td>${esc(it.l)}</td><td>${it.max}</td><td>${it.k === "umumiy" ? pill("tasdiqlandi", "Monitoring bo'limi rahbari") : it.auto ? pill("tasdiqlandi", "Avtomatik + CEO") : it.ceoOnly ? pill("", "Asoschi") : pill("jarayonda", "CEO, har kuni")}</td><td class="hide-sm muted">${esc(it.d)}</td></tr>`).join("")}
+        ${items.map(it => `<tr><td>${esc(it.l)}</td><td>${it.max}</td><td>${it.k === "umumiy" ? pill("tasdiqlandi", "Monitoring bo'limi rahbari") : it.per === "hafta" ? pill("jarayonda", "CEO, haftada bir marta") : it.auto === "davomat" ? pill("jarayonda", "CEO kiritadi, ball avtomatik") : it.auto ? pill("tasdiqlandi", "Avtomatik + CEO") : it.ceoOnly ? pill("", "Asoschi") : pill("jarayonda", "CEO, har kuni")}</td><td class="hide-sm muted">${esc(it.d)}</td></tr>`).join("")}
         </tbody></table></div>`;
     const rerun = () => kpiTable(body, lvl);
     $("#kpi-d", body).onchange = e => { S.ui[lvl === "kun" ? "kpiDay" : lvl === "hafta" ? "kpiWeek" : "kpiP"] = e.target.value; rerun(); };
@@ -6634,7 +6835,7 @@ window.METODISTLAR = [
       const v = inp.value === "" ? null : Math.max(0, Math.min(+inp.dataset.max, +inp.value));
       await act(() => db.setKpiAt(lvl, d, inp.dataset.u, inp.dataset.c, v, manAt(K, lvl, d, inp.dataset.u, inp.dataset.c)?.note || ""), "Saqlandi"); rerun();
     });
-    const setMax = async ids => { for (const id of ids) { const p = person(id); for (const it of itemsFor(p)) await db.setKpiAt(lvl, d, id, it.k, it.max, manAt(K, lvl, d, id, it.k)?.note || ""); } };
+    const setMax = async ids => { for (const id of ids) { const p = person(id); for (const it of itemsFor(p, d, lvl)) await db.setKpiAt(lvl, d, id, it.k, it.max, manAt(K, lvl, d, id, it.k)?.note || ""); } };
     $$("[data-max1]", body).forEach(b => b.onclick = async () => { b.disabled = true; await act(() => setMax([b.dataset.max1]), "Maksimal ball (100) qo'yildi").catch(() => {}); rerun(); });
     const ma = $("#kpi-maxall", body); if (ma) ma.onclick = async () => { ma.disabled = true; await act(() => setMax(rows.filter(x => byFounder(x.p) && !x.picked && !isMax(x)).map(x => x.p.id)), "Hammasiga maksimal ball qo'yildi").catch(() => {}); rerun(); };
     $$("[data-fu]", body).forEach(inp => inp.onchange = async () => {
@@ -6643,21 +6844,24 @@ window.METODISTLAR = [
     });
     $$("[data-nu]", body).forEach(b => b.onclick = e => { e.stopPropagation(); scoreNote(person(b.dataset.nu), lvl, d, b.dataset.nc, K, awardId, rerun); });
     $$("[data-card]", body).forEach(el => el.onclick = () => scoreCard(person(el.dataset.card), lvl, d, label, K, awardId, rerun));
-    const mc = $("#my-card", body); if (mc) mc.innerHTML = scoreCardHtml(rows[0], false, lvl);
+    bindAtt(body, rerun); bindAppeals(body, rerun);
+    const mc = $("#my-card", body); if (mc) { mc.innerHTML = scoreCardHtml(rows[0], false, lvl) + myAppealsHtml(); bindAppealBtns(mc, lvl, d, rerun); }
   }
 
   const barMini = (v, max) => v === null || v === undefined ? "" : `<div class="kpi-bar"><i style="width:${Math.max(0, Math.min(100, v / max * 100))}%"></i></div>`;
   // Ball kartasi: mezonlar bo'yicha ball taqsimoti va izohlar
   function scoreCardHtml(x, edit, lvl) {
-    const isA = S.me.role === "asoschi";
+    const isA = S.me.role === "asoschi", own = !edit && x.p.id === S.me.id;
     const autoL = lvl === "kun" ? "Hisobot bahosidan" : lvl === "hafta" ? "Kunlik o'rtacha" : "Haftalik o'rtacha";
     return `<div class="table-wrap"><table class="score-card"><thead><tr><th>Mezon</th><th>Ball</th><th style="min-width:140px">Taqsimot</th><th>Izoh</th></tr></thead><tbody>
       ${x.cells.map(c => { const ed = edit && (!c.it.ceoOnly || isA); const note = c.man?.note || "";
         const src = x.picked ? "Asoschi tanlovi" : scoreOf(c.man) !== null ? "Rahbar qo'ygan" : c.au.v !== null ? autoL : "Qo'yilmagan";
         return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(c.it.d)}</div></td>
-          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? (c.it.auto === "keldi" ? "qo'ying" : "—")}" title="${esc(c.au.why || "")}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div></td>
+          <td style="white-space:nowrap">${ed ? `<input class="kpi-in" type="number" min="0" max="${c.it.max}" step="0.5" data-sc="${c.it.k}" data-max="${c.it.max}" value="${scoreOf(c.man) ?? ""}" placeholder="${c.au.v ?? (c.sug && c.sug.v !== null && c.sug.v !== undefined ? "≈" + c.sug.v : c.it.auto === "keldi" ? "qo'ying" : "—")}" title="${esc(c.au.why || "")}">` : `<b>${c.val ?? "—"}</b>`}<span class="small muted"> / ${c.it.max}</span><div class="small muted">${src}</div>
+            ${own && !x.picked ? `<button type="button" class="btn sm ghost sc-apl" data-apl="${c.it.k}" data-apll="${esc(c.it.l)}">✋ E'tiroz</button>` : ""}</td>
           <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
-          <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}
+          <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : ""}
+            ${c.au.why && scoreOf(c.man) === null && !x.picked ? `<div class="small muted sc-why">ℹ ${esc(c.au.why)}</div>` : !note && !ed ? `<span class="muted small">—</span>` : ""}</td></tr>`; }).join("")}
       <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b></td></tr>
       </tbody></table></div>`;
   }
@@ -6668,12 +6872,58 @@ window.METODISTLAR = [
       if (v !== scoreOf(c.man) || n !== (c.man?.note || "")) await db.setKpiAt(lvl, d, p.id, c.it.k, v, n);
     }
   }
+  // ---- 53: KPI e'tirozlari
+  const canRateAny = () => S.me.role === "asoschi" || S.me.role === "ceo";
+  const APL = { at: 0, list: [] };
+  async function appealsLoad(force) { if (!db.listAppeals) return []; if (!force && Date.now() - APL.at < 30e3) return APL.list;
+    try { APL.list = await db.listAppeals() || []; APL.at = Date.now(); } catch (e) {} return APL.list; }
+  const lvlRange = (lv, d) => lv === "kun" ? fmtDate(d) : lv === "hafta" ? `${fmtDate(d)} – ${fmtDate(addD(d, 6))}` : `${bosqichNo(d)}-bosqich (${periodLabel(d)})`;
+  const APL_ST = { kutilmoqda: ["yangi", "Ko'rib chiqilmoqda"], qabul: ["tasdiqlandi", "Qabul qilindi"], rad: ["qaytarildi", "Rad etildi"] };
+  function appealsCard(list) {
+    return `<div class="card apl-card" style="margin:0 0 16px"><div class="card-head"><h2>✋ KPI e'tirozlari</h2><span class="badge">${list.length}</span><span class="spacer"></span><span class="small muted">Qabul qilsangiz, ballni o'zingiz o'zgartirasiz</span></div>
+      ${list.map(a => `<div class="list-item" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="t">${esc(nameOf(a.user_id))} — «${esc(a.crit_label || a.criterion)}»</div>
+        <div class="small muted">${esc(lvlRange(a.lvl, String(a.ref_date).slice(0, 10)))} · ${fmtDate(String(a.created_at).slice(0, 10))} ${tmOf(a.created_at)}</div><div class="score-note" style="margin-top:4px">${esc(a.msg)}</div></div>
+        <button type="button" class="btn sm primary" data-apok="${a.id}">✓ Qabul</button><button type="button" class="btn sm ghost" data-apno="${a.id}">✕ Rad etish</button></div>`).join("")}</div>`;
+  }
+  function bindAppeals(root, rerun) {
+    const go = (id, ok) => { const a = APL.list.find(x => String(x.id) === String(id)); if (!a) return;
+      const m = openModal(ok ? "✓ E'tirozni qabul qilish" : "✕ E'tirozni rad etish", `<p class="small muted" style="margin-top:0"><b>${esc(nameOf(a.user_id))}</b> — «${esc(a.crit_label || a.criterion)}», ${esc(lvlRange(a.lvl, String(a.ref_date).slice(0, 10)))}</p><div class="score-note">${esc(a.msg)}</div>
+        <div class="field" style="margin-top:12px"><label>${ok ? "Izoh (ixtiyoriy)" : "Rad etish sababi *"}</label><textarea id="ap-a" rows="3" placeholder="${ok ? "Masalan: ball 8 ga o'zgartirildi" : "Masalan: hisobot 19:40 da yuborilgan, qoida bo'yicha 75%"}"></textarea></div>
+        ${ok ? `<p class="small muted">Qabul qilgach, ballni KPI jadvalida o'zingiz o'zgartiring. Xodimga botdan xabar boradi.</p>` : ""}<div class="err-text" id="ap-e"></div>`,
+        `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="ap-go">${ok ? "Qabul qilish" : "Rad etish"}</button>`);
+      $("#ap-go", m).onclick = async e => { e.target.disabled = true; try { await db.answerAppeal(a.id, ok, $("#ap-a", m).value.trim()); closeModal(); toast(ok ? "Qabul qilindi — xodimga xabar yuborildi" : "Rad etildi — xodimga xabar yuborildi"); await appealsLoad(true); rerun && rerun(); }
+        catch (x) { $("#ap-e", m).textContent = x.message; e.target.disabled = false; } }; };
+    $$("[data-apok]", root).forEach(b => b.onclick = () => go(b.dataset.apok, true));
+    $$("[data-apno]", root).forEach(b => b.onclick = () => go(b.dataset.apno, false));
+  }
+  function myAppealsHtml() {
+    const mine = (APL.list || []).filter(a => a.user_id === S.me.id).slice(-8).reverse();
+    return mine.length ? `<h3 style="margin:16px 0 8px">E'tirozlarim</h3>${mine.map(a => `<div class="list-item" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="t">«${esc(a.crit_label || a.criterion)}» — ${esc(lvlRange(a.lvl, String(a.ref_date).slice(0, 10)))}</div>
+      <div class="small muted">${esc(a.msg)}</div>${a.answer ? `<div class="small" style="margin-top:4px">💬 <b>Javob:</b> ${esc(a.answer)}</div>` : ""}</div>${pill(APL_ST[a.status][0], APL_ST[a.status][1])}</div>`).join("")}` : "";
+  }
+  function bindAppealBtns(root, lvl, d, rerun) {
+    $$("[data-apl]", root).forEach(b => b.onclick = () => {
+      const m = openModal("✋ Ball bo'yicha e'tiroz", `<p class="small muted" style="margin-top:0">«${esc(b.dataset.apll)}» · ${esc(lvlRange(lvl, d))}. E'tirozingiz rahbaringizga va Monitoring bo'limi rahbariga botdan boradi, javobi shu yerda va botda ko'rinadi.</p>
+        <div class="field"><label>Nima uchun rozi emassiz? *</label><textarea id="apl-m" rows="4" placeholder="Masalan: 12-noyabr kuni hisobotni 16:50 da yuborganman, ish vaqtim 16:30 gacha — 30 daqiqa ichida"></textarea></div><div class="err-text" id="apl-e"></div>`,
+        `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="apl-go">Yuborish</button>`);
+      $("#apl-go", m).onclick = async e => { const t0 = $("#apl-m", m).value.trim(); if (t0.length < 5) return $("#apl-e", m).textContent = "E'tirozingizni batafsilroq yozing";
+        e.target.disabled = true; try { await db.addAppeal(lvl, d, b.dataset.apl, b.dataset.apll, t0); closeModal(); toast("E'tiroz yuborildi"); await appealsLoad(true); rerun && rerun(); }
+        catch (x) { $("#apl-e", m).textContent = x.message; e.target.disabled = false; } }; });
+  }
+  // ---- 53: Barqarorlik — ketma-ket 3 ta yakunlangan bosqichda 90% va undan yuqori
+  function stableOf(uid) {
+    const L = STG.list; if (!L) return false;
+    const st = (L.stages || []).map(z => z.period_start).sort().reverse(); if (st.length < 3) return false;
+    const last3 = st.slice(0, 3); if (dayDiff(last3[2], last3[0]) !== 28) return false;
+    return last3.every(ps => { const r = (L.ranks || []).find(x => x.period_start === ps && x.user_id === uid); return r && r.final !== null && +r.final >= 90; });
+  }
   function scoreCard(p, lvl, d, label, K, awardId, rerun) {
     if (!p) return;
     const x = kpiRow(p, lvl, d, K, awardId); const edit = canRate(p) && !x.picked;
     const m = openModal(`${esc(p.full_name)} — ${LVL[lvl].toLowerCase()} ball kartasi`, `<p class="small muted" style="margin-top:0">${esc(label)} · ${esc(DEPTS[deptOf(p)].l)}. Bu kartani faqat ${edit ? "siz va xodimning o'zi" : "xodim va uning rahbari"} ko'radi.</p>${scoreCardHtml(x, edit, lvl)}`,
       edit ? `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="sc-save">Saqlash</button>` : "");
     $(".modal", $("#modal-root")).style.maxWidth = "900px";
+    if (p.id === S.me.id) bindAppealBtns(m, lvl, d, rerun);
     const sv = $("#sc-save", m); if (!sv) return;
     sv.onclick = async () => {
       sv.disabled = true;
@@ -6693,25 +6943,25 @@ window.METODISTLAR = [
   }
 
   async function kpiYear(body) {
-    const y = S.ui.kpiYear || today().slice(0, 4);
+    const y = S.ui.kpiYear || today().slice(0, 4); await stagesLoad();
     const from = `${y}-01-01`, to = `${y}-12-31`, cur = periodOf(today());
     const periods = []; for (let ps = periodOf(from < KPI_ANCHOR ? KPI_ANCHOR : from); ps <= cur && ps <= to; ps = addD(ps, 14)) if (ps >= KPI_ANCHOR) periods.push(ps);
     const [K, aw, reps] = await Promise.all([db.listKpiRange(from, to), db.listAwards(from, to), db.listReports({ from, to })]);
     const tabs = kpiTabs(); const tab = tabs.find(x => x.id === S.ui.kpiTab) || tabs[0];
     const wins = {};
     periods.forEach(ps => { const awardId = aw.find(a => a.period_start === ps)?.user_id;
-      Object.values(deptRanks(rankPool().map(p => kpiRow(p, "bosqich", ps, K, awardId, reps)))).flat().filter(w => w.rank === 1 || w.rank === 0).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
+      Object.values(deptRanks(rankPool().map(p => kpiRow(p, "bosqich", ps, K, awardId, reps)), ps)).flat().filter(w => w.rank === 1 || w.rank === 0).forEach(w => wins[w.p.id] = (wins[w.p.id] || 0) + 1); });
     const rows = tab.rows.map(p => {
       const per = periods.map(ps => kpiRow(p, "bosqich", ps, K, aw.find(a => a.period_start === ps)?.user_id, reps));
       const has = per.filter(x => x.has);
       return { p, per, avg: has.length ? Math.round(has.reduce((a, x) => a + x.final, 0) / has.length * 10) / 10 : null };
-    }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+    }).sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1) || (stableOf(b.p.id) - stableOf(a.p.id)));
     const years = []; for (let yy = 2026; yy <= +today().slice(0, 4); yy++) years.push(String(yy));
     body.innerHTML = `<div class="row" style="margin:14px 0"><select id="kpi-y" style="width:auto">${years.map(x => `<option ${x === y ? "selected" : ""}>${x}</option>`).join("")}</select>
       <span class="small muted">${periods.length} ta bosqich. O'rtacha — natijasi bor bosqichlar bo'yicha.</span></div>
       ${tabBar(tabs, tab)}
       <div class="card"><div class="table-wrap">${rows.length && periods.length ? `<table class="kpi-table"><thead><tr><th>Xodim</th>${periods.map(ps => `<th title="${periodLabel(ps)}">${bosqichNo(ps)}-b.</th>`).join("")}<th>O'rtacha</th><th>🏆</th></tr></thead><tbody>
-        ${rows.map(x => `<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(x.p.full_name, photoOf(x.p))}<b>${esc(x.p.full_name)}</b></div></td>
+        ${rows.map(x => `<tr><td><div class="row" style="gap:8px;flex-wrap:nowrap">${avatar(x.p.full_name, photoOf(x.p))}<b>${esc(x.p.full_name)}</b>${stableOf(x.p.id) ? ` <span class="kpi-badge ok" title="Ketma-ket 3 bosqich 90% va undan yuqori">🏅 barqaror</span>` : ""}</div></td>
           ${x.per.map(c => `<td>${c.has ? `${c.final}${c.picked ? "⭐" : ""}` : `<span class="muted">—</span>`}</td>`).join("")}
           <td><b>${x.avg ?? "—"}${x.avg !== null ? "%" : ""}</b></td><td>${wins[x.p.id] || ""}</td></tr>`).join("")}
         </tbody></table>` : `<div class="empty">Hali natija yo'q</div>`}</div></div>`;
@@ -8171,8 +8421,8 @@ window.METODISTLAR = [
     const sp = $("#kh-p", m); if (sp) sp.onchange = () => kpiHistory(person(sp.value));
     $("#kh-r", m).onchange = e => { S.ui.khFrom = addD(to, -(+e.target.value)); kpiHistory(p); };
     let K, reps; try { [K, reps] = await Promise.all([db.listKpiRange(from, to), db.listReports({ from, to }).catch(() => S.reports)]); await kpiPrep(from, to); } catch (e) { $("#kh-body", m).innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-    const items = itemsFor(p); const rows = [];
-    for (let d = to; d >= from; d = addD(d, -1)) {
+    const rows = [];
+    for (let d = to; d >= from; d = addD(d, -1)) { const items = itemsFor(p, d, "kun");
       if (!isWorkdayOn(p, d) && !K.daily.some(x => x.day === d && x.user_id === p.id)) continue;
       items.forEach(it => { const man = manAt(K, "kun", d, p.id, it.k); const mv = scoreOf(man); const au = dayAuto(p, it, d, reps);
         if (mv === null && (au === null || au === undefined)) return;
@@ -9224,8 +9474,8 @@ window.METODISTLAR = [
     try { reps = (await db.listReports({ from, to })).filter(r => r.author_id === p.id); }
     catch (e) { reps = (S.reports || []).filter(r => r.author_id === p.id && r.report_date >= from && r.report_date <= to); }
     let KD = { daily: [] }; try { KD = await db.listKpiRange(from, to); } catch (e) {}
-    const items = itemsFor(p);
-    const kpiDay = (d, r) => { if (!items.length) return null; const g = r && isGraded(r) ? +r.grade : null; let sum = 0, mx = 0, any = false;
+    const items = itemsFor(p, from, "kun");
+    const kpiDay = (d, r) => { const items = itemsFor(p, d, "kun"); if (!items.length) return null; const g = r && isGraded(r) ? +r.grade : null; let sum = 0, mx = 0, any = false;
       items.forEach(it => { const mv = (KD.daily || []).find(x => x.day === d && x.user_id === p.id && x.criterion === it.k); let v = scoreOf(mv);
         if (v === null && it.auto === "reja" && g !== null) v = Math.round(g / 10 * it.max * 10) / 10;
         mx += +it.max || 0; if (v !== null) { sum += v; any = true; } });
