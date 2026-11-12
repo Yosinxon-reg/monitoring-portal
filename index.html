@@ -935,6 +935,14 @@ tr.unseen td { background: var(--brand-soft); }
 .pl-top .stats.st5 > :nth-child(n+4) { grid-column: span 3; }
 .pl-main .pl-big { font-size: 42px; font-weight: 800; line-height: 1.1; margin: 6px 0 8px; color: var(--brand); }
 .pl-main .pl-big span { font-size: 20px; font-weight: 700; margin-left: 2px; }
+.pl-sbtn { cursor: pointer; transition: transform .12s, box-shadow .12s, border-color .12s; display: flex; flex-direction: column; }
+.pl-sbtn:hover, .pl-sbtn:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(20,40,80,.12); outline: none; }
+.pl-sbtn.on { box-shadow: 0 0 0 2px var(--brand) inset; }
+.pl-sgo { margin-top: auto; padding-top: 6px; font-size: 12px; color: var(--brand); font-weight: 600; opacity: .75; }
+.pl-sbtn:hover .pl-sgo, .pl-sbtn.on .pl-sgo { opacity: 1; }
+.pl-main .pl-rec-line.click { cursor: pointer; border-radius: 6px; }
+.pl-main .pl-rec-line.click:hover { color: var(--text, inherit); }
+.pl-main .pl-rec-line .pl-sgo { display: inline; padding: 0; margin-left: 4px; }
 .pl-main .pl-rec-line { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
 .pl-bar { position: relative; height: 10px; border-radius: 99px; background: var(--surface-2); overflow: visible; margin-bottom: 8px; }
 .pl-bar i { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
@@ -5121,7 +5129,20 @@ window.METODISTLAR = [
     const ch = rt.filter(o => o.status === "tanlandi"), wait = rt.filter(o => o.status === "taklif").length;
     const seen = ch.filter(recSeen).length, who = new Set(ch.map(o => o.user_id)).size;
     if (!ch.length && !wait) return `<div class="small muted pl-rec-line">📌 Bugungi tavsiyalardan hali hech kim reja qilmagan</div>`;
-    return `<div class="small muted pl-rec-line">📌 Bugun tavsiyalardan reja qilingan: <b>${ch.length}</b> ta ustoz${who ? ` (${who} ta xodim)` : ""} · shundan ko'rildi: <b>${seen}</b> ta${ch.length - seen ? ` · ko'rilishi kerak: <b>${ch.length - seen}</b> ta` : ""}${wait ? ` · javob kutilmoqda: ${wait} ta` : ""}</div>`;
+    return `<div class="small muted pl-rec-line click" data-plr="1" role="button" tabindex="0" title="Ro'yxatni ko'rish">📌 Bugun tavsiyalardan reja qilingan: <b>${ch.length}</b> ta ustoz${who ? ` (${who} ta xodim)` : ""} · shundan ko'rildi: <b>${seen}</b> ta${ch.length - seen ? ` · ko'rilishi kerak: <b>${ch.length - seen}</b> ta` : ""}${wait ? ` · javob kutilmoqda: ${wait} ta` : ""} <span class="pl-sgo">ro'yxat →</span></div>`;
+  }
+  function planRecModal(P, t) {
+    const ids = new Set(P.rows.map(r => r.t.id));
+    const rt = (S.recs || []).filter(o => o.day === t && ids.has(o.teacher_id) && (o.status === "tanlandi" || o.status === "taklif"));
+    const st = o => o.status === "taklif" ? 2 : recSeen(o) ? 0 : 1;
+    const lbl = ["✓ ko'rildi", "ko'rilishi kerak", "javob kutilmoqda"], cls = ["ok", "mid", ""];
+    const by = {}; rt.forEach(o => (by[o.user_id] = by[o.user_id] || []).push(o));
+    const groups = Object.entries(by).sort((a, b) => nameOf(a[0]).localeCompare(nameOf(b[0])));
+    openModal(`📌 Bugungi tavsiyalar — ${fmtDate(t)}`, groups.length ? groups.map(([uid, L]) => { const ch = L.filter(o => o.status === "tanlandi");
+      return `<div class="card" style="margin:0 0 12px;padding:12px 14px"><div class="row"><b>${esc(nameOf(uid))}</b><span class="spacer"></span><span class="small muted">reja qilgan: <b>${ch.length}</b> · ko'rildi: <b>${ch.filter(recSeen).length}</b></span></div>
+        ${L.sort((a, b) => st(a) - st(b) || String((hrTeacher(a.teacher_id) || {}).full_name || "").localeCompare(String((hrTeacher(b.teacher_id) || {}).full_name || ""))).map(o => { const tt = hrTeacher(o.teacher_id) || { full_name: "—" };
+          return `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(tt.full_name)}</div><div class="small muted">${esc([canonSubj(tt.subject), tt.filial].filter(Boolean).join(" · "))}</div></div><span class="pl-c ${cls[st(o)]} small" style="font-weight:600">${lbl[st(o)]}</span></div>`; }).join("")}</div>`; }).join("")
+      : `<div class="empty">Bugun tavsiyalardan hali hech kim reja qilmagan</div>`, `<button class="btn" data-close>Yopish</button>`);
   }
 
   function planView(root) {
@@ -5138,6 +5159,8 @@ window.METODISTLAR = [
     const ord = { zero: 0, part: 1, done: 2 };
     const list = P.rows.filter(flt[q] || flt.all).sort((a, b) => (b.risk - a.risk) || (ord[a.st] - ord[b.st]) || (a.n - b.n) || a.t.full_name.localeCompare(b.t.full_name));
     const scopeTxt = subs.length ? `Siz kuzatadigan fan: <b>${subs.map(esc).join(", ")}</b> · ` : "";
+    // Ko'rsatkich kartalari — tugma: bosilganda pastdagi «Ustozlar» ro'yxati shu holat bo'yicha ochiladi
+    const sBtn = (k, l, v) => `<div class="stat pl-sbtn ${q === k ? "on" : ""}" role="button" tabindex="0" data-pls="${k}" title="Ro'yxatni ko'rish"><div class="l">${l}</div><div class="v">${v}</div><div class="pl-sgo">${q === k ? "✓ ro'yxat pastda" : "ro'yxatni ko'rish →"}</div></div>`;
     const chip = (k, l, n) => `<button type="button" class="chip-btn sm ${q === k ? "on" : ""}" data-plq="${k}">${l}${n !== undefined ? ` <b>${n}</b>` : ""}</button>`;
     const authRow = b => { const p = person(b.id); return `<tr><td><b>${esc(nameOf(b.id))}</b><div class="small muted">${esc(p ? (subsOf(p).join(", ") || titleOf(p)) : "")}</div></td><td>${b.n}</td><td>${b.tn}</td></tr>`; };
     const akMembers = S.profiles.filter(p => p.active && p.role === "xodim" && deptOf(p) === "akademik").sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -5155,8 +5178,8 @@ window.METODISTLAR = [
           <div class="pl-bar"><i style="width:${Math.min(100, P.pct || 0)}%"></i>${P.cur ? `<u style="left:${exp}%" title="Bugungacha kutilgan: ${exp}%"></u>` : ""}</div>
           <div class="small muted"><b>${P.got}</b> ta kuzatuv bajarildi, oylik rejada <b>${P.sumPlan}</b> ta (${P.rows.length} ta ustoz, har biri oyiga ${PLAN_BASE} martadan${P.rows.some(r => isBogT(r.t)) ? `, bog'cha ${PLAN_BOG}` : ""})${P.cur ? `. Bugungacha <b>${exp}%</b> bajarilgan bo'lishi kerak edi — ${(P.pct ?? 0) >= exp ? "reja bo'yicha ketyapmiz ✅" : `<b style="color:var(--bad)">${Math.max(0, Math.round(P.sumPlan * P.pace) - P.got)} ta kuzatuv orqadamiz</b>`}. Oy oxirigacha <b>${P.left}</b> ish kuni.` : ". Oy yakunlangan."}</div>${P.cur ? planRecLine(P, t) : ""}</div>
         <div class="stats st5 pl-stats">
-          ${stat("Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${stat("Qisman", `<span class="pl-c mid">${P.part}</span>`)}${stat("Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
-          ${stat("Xavf ostida", `<span class="pl-c no">${P.cur ? P.risk.length : "—"}</span>`)}${stat("Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
+          ${sBtn("done", "Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${sBtn("part", "Qisman", `<span class="pl-c mid">${P.part}</span>`)}${sBtn("zero", "Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
+          ${P.cur ? sBtn("risk", "Xavf ostida", `<span class="pl-c no">${P.risk.length}</span>`) : stat("Xavf ostida", `<span class="pl-c no">—</span>`)}${sBtn("over", "Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
       ${P.cur && P.risk.length ? `<div class="card pl-risk"><div class="card-head"><h2>⏳ Rejaga ulgurmasligi mumkin</h2><span class="spacer"></span><span class="small muted">Oy oxirigacha ${P.left} ish kuni qoldi · oraliq ${GAP_DAYS} ish kuni hisobida</span></div>
         ${canPlanAdmin() ? `<div class="row" style="gap:8px;margin:0 0 8px;flex-wrap:wrap"><label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="as-all" style="width:auto"> Hammasini belgilash (${P.risk.length})</label><span class="spacer"></span><button type="button" class="btn sm primary" id="as-go2">🧭 Intizomiy bo'limga yordamga berish</button></div>` : ""}
         ${(canPlanAdmin() ? P.risk : P.risk.slice(0, 30)).map(r => `<div class="list-item">${canPlanAdmin() ? `<input type="checkbox" data-asc="${r.t.id}" style="width:auto">` : ""}<div style="flex:1;min-width:0"><div class="t">${esc(r.t.full_name)}${directedFor(r.t.id).length ? ` <span class="pl-tag2">🧭 ${esc(directedFor(r.t.id).map(h => shortName(h.to_id)).join(", "))}</span>` : ""}</div><div class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}${r.last ? ` · oxirgi: ${fmtDate(r.last.day)}` : " · hali kuzatilmagan"}</div></div>${plCount(r)}<span class="small muted" style="white-space:nowrap">yana ${r.need} marta</span>${canPlanAdmin() ? `<button type="button" class="btn sm" data-tst="${r.t.id}">⚙ Holati / reja</button>` : ""}</div>`).join("")}
@@ -5165,7 +5188,7 @@ window.METODISTLAR = [
       ${P.over.length ? `<div class="card pl-over"><div class="card-head"><h2>⚖ Muvozanat</h2><span class="spacer"></span><span class="small muted">${OVER_N} martadan ko'p ko'rilganlar</span></div>
         <p class="small" style="margin:0 0 8px">Bu ustozlar oyida ${OVER_N} martadan ko'p ko'rilgan${P.zero ? `, shu paytda <b>${P.zero} ta</b> ustoz hali umuman ko'rilmagan` : ""}.</p>
         ${P.over.map(r => `<div class="list-item"><div style="flex:1"><b>${esc(r.t.full_name)}</b> <span class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}</span></div>${plCount(r)}</div>`).join("")}</div>` : ""}
-      <div class="card"><div class="card-head"><h2>Ustozlar</h2><span class="spacer"></span>
+      <div class="card" id="pl-list"><div class="card-head"><h2>Ustozlar</h2><span class="spacer"></span>
         <div class="chips">${chip("all", "Hammasi", P.rows.length)}${chip("zero", "Ko'rilmagan", P.zero)}${chip("part", "Qisman", P.part)}${chip("done", "Bajarilgan", P.done)}${P.cur ? chip("risk", "Xavf", P.risk.length) : ""}${P.over.length ? chip("over", "Ortiqcha", P.over.length) : ""}</div></div>
         <div class="table-wrap"><table class="pl-tbl"><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Bu oy</th><th class="hide-sm">Holat</th><th>Oxirgi kuzatuv</th><th class="hide-sm">Kim ko'rgan</th></tr></thead><tbody>
         ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2">reja: ${r.plan}</span>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
@@ -5179,6 +5202,10 @@ window.METODISTLAR = [
     const sel = (id, k) => { const el = $(id, root); if (el) el.onchange = e => { S.ui[k] = e.target.value; rerun(); }; };
     sel("#pl-m", "plM"); sel("#pl-f", "plF"); sel("#pl-s", "plS");
     $$("[data-plq]", root).forEach(b => b.onclick = () => { S.ui.plQ = b.dataset.plq; rerun(); });
+    $$("[data-pls]", root).forEach(b => { const go = () => { const k = b.dataset.pls; S.ui.plQ = S.ui.plQ === k ? "all" : k; rerun();
+        if (S.ui.plQ !== "all") { const L = $("#pl-list", root); if (L) L.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+      b.onclick = go; b.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }; });
+    const rl = $(".pl-rec-line[data-plr]", root); if (rl) { rl.onclick = () => planRecModal(P, t); rl.onkeydown = e => { if (e.key === "Enter") planRecModal(P, t); }; }
     $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, rerun); });
     const pdf = $("#pl-pdf", root); if (pdf) pdf.onclick = () => planWordModal(ms, fil, subj);
     const asA = $("#as-all", root); if (asA) asA.onchange = () => $$("[data-asc]", root).forEach(x => { x.checked = asA.checked; });
