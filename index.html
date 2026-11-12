@@ -929,6 +929,10 @@ tr.unseen td { background: var(--brand-soft); }
 /* ===== 30: Oylik reja, rahbarlar reytingi, tahrir belgisi ===== */
 .pl-top { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 14px; margin-bottom: 16px; align-items: stretch; }
 .pl-top .stats { margin: 0; }
+/* 5 ta ko'rsatkich o'ng tomonda 2 qator bo'lib joylashadi (3 + 2) — asosiy karta bilan bir xil balandlikda, ingichka-uzun bo'lib qolmaydi */
+.pl-top .stats.st5 { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 1fr; }
+.pl-top .stats.st5 > :nth-child(-n+3) { grid-column: span 2; }
+.pl-top .stats.st5 > :nth-child(n+4) { grid-column: span 3; }
 .pl-main .pl-big { font-size: 42px; font-weight: 800; line-height: 1.1; margin: 6px 0 8px; color: var(--brand); }
 .pl-main .pl-big span { font-size: 20px; font-weight: 700; margin-left: 2px; }
 .pl-main .pl-rec-line { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
@@ -973,8 +977,8 @@ tr.unseen td { background: var(--brand-soft); }
 .cr-d { font-size: 12px; font-weight: 700; color: var(--muted); }
 .cr-d.up { color: var(--ok); } .cr-d.down { color: var(--bad); }
 .cr-rate { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-@media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .pl-top .stats.st5 { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 560px) { .pl-top .stats.st5 { grid-template-columns: repeat(2, 1fr); } .cr-score > b { font-size: 28px; } }
+@media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .pl-top .stats.st5 { grid-template-columns: repeat(2, 1fr); grid-auto-rows: auto; } .pl-top .stats.st5 > * { grid-column: auto !important; } .cr-score > b { font-size: 28px; } }
 
 /* ===== 31: reja mosligi, jiddiy holat tasdig'i, o'qituvchi holati ===== */
 .pm-box { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
