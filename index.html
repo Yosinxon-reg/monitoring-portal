@@ -1194,6 +1194,8 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .oy-w.click:hover { box-shadow: 0 6px 18px rgba(20,40,80,.12); transform: translateY(-1px); }
 .oy-prev { max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
 .oy-prev img { display: block; width: 100%; }
+.ar-fn { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(245, 179, 1, .12); border: 1px solid rgba(245, 179, 1, .45); }
+.ar-fn input { margin-top: 4px; }
 
 </style>
 </head>
@@ -1850,8 +1852,12 @@ window.LESSONS = [
       async listTeacherReqs() { return ok(load().treq || []); },
       async sendTeacherReq(kind, tid, left_on, nm, fil, subj, kl, note) { const d = load(); d.treq = d.treq || []; const t = (d.teachers || []).find(x => x.id === tid);
         d.treq.unshift({ id: Date.now(), kind, author_id: me().id, teacher_id: tid, old_name: t ? t.full_name : "", left_on, new_name: nm, new_filial: t ? t.filial : fil, new_subject: t ? t.subject : subj, new_class: kl, note, status: "kutilmoqda", reply: "", created_at: new Date().toISOString() }); save(); return ok(1); },
+      async sendNameReq(tid, nm) { const d = load(); d.treq = d.treq || []; const t = (d.teachers || []).find(x => x.id === tid); if (!t) return fail("Ustoz topilmadi");
+        if (d.treq.some(r => r.kind === "ism" && r.teacher_id === tid && r.status === "kutilmoqda")) return ok(null); const id = Date.now();
+        d.treq.push({ id, kind: "ism", teacher_id: tid, old_name: t.full_name, new_name: nm, new_filial: t.filial || "", new_subject: t.subject || "", author_id: me().id, status: "kutilmoqda", created_at: new Date().toISOString(), note: "", reply: "" }); save(); return ok(id); },
       async decideTeacherReq(rid, okk, msg, nm, fil, subj) { const d = load(); const r = (d.treq || []).find(x => x.id === rid); if (!r) return ok(true);
         r.status = okk ? "tasdiq" : "rad"; r.reply = msg; r.reviewer_id = me().id;
+        if (okk && r.kind === "ism") { const t = (d.teachers || []).find(x => x.id === r.teacher_id); if (t) { t.full_name = nm || r.new_name; t.name_key = t.full_name.toLowerCase(); } r.new_name = nm || r.new_name; save(); return ok(true); }
         if (okk) { if (r.kind === "ketdi") { const t = (d.teachers || []).find(x => x.id === r.teacher_id); if (t) { t.status = "arxiv"; t.left_at = r.left_on; } }
           const n = nm || r.new_name; if (n) { d.teachers = d.teachers || []; d.teachers.push({ id: "t" + Date.now(), full_name: n, name_key: n.toLowerCase(), filial: fil || r.new_filial, subject: subj || r.new_subject, classes: [], lead_class: r.new_class, claimed_by: r.author_id, status: "faol" }); } }
         save(); return ok(true); },
@@ -2192,6 +2198,7 @@ window.LESSONS = [
       async listObsOfTeachers(ids, from) { if (!ids.length) return []; return (await pageAll(() => sb.from("teacher_obs").select("*").in("teacher_id", ids).gte("day", from).order("day").order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
       async listTeacherReqs() { const r = await sb.from("teacher_requests").select("*").gte("created_at", new Date(Date.now() - 120 * 864e5).toISOString()).order("created_at", { ascending: false }); if (r.error) throw new Error(trErr(r.error.message)); return r.data; },
       async sendTeacherReq(k, tid, left_day, nm, fil, subj, kl, msg) { return chk(await sb.rpc("send_teacher_request", { k, tid, left_day: left_day || null, nm: nm || "", fil: fil || "", subj: subj || "", kl: kl || "", msg: msg || "" })); },
+      async sendNameReq(tid, nm) { return chk(await sb.rpc("send_name_request", { tid, nm })); },
       async decideTeacherReq(rid, okk, msg, nm, fil, subj) { chk(await sb.rpc("decide_teacher_request", { rid, ok: okk, msg: msg || "", nm: nm || "", fil: fil || "", subj: subj || "" })); return true; },
       async cancelTeacherReq(rid) { chk(await sb.rpc("cancel_teacher_request", { rid })); return true; },
       async teachersByIds(ids) { const r = await sb.from("teachers").select("id,full_name,filial,subject").in("id", ids); return r.error ? [] : r.data.map(t => ({ ...t, filial: E(t.filial) })); },
@@ -3985,6 +3992,9 @@ window.METODISTLAR = [
           : `<span class="small muted">🏫 Sinf rahbarligi hali kiritilmagan (Munisa yoki Dilshoda kiritadi)</span>`}</div>` : ""}
         ${boshl ? `<div class="ar-kl ar-ls"><span class="small muted">📘 Qaysi dars ko'rildi *:</span>${BOSHL_DARS.map(v => `<button type="button" class="chip-btn sm ${x.lesson === v ? "on" : ""}" data-ls="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""}
         ${tt && (tt.classes || []).length ? `<div class="ar-kl"><span class="small muted">Sinflari (taxminiy):</span>${tt.classes.map(c => `<button type="button" class="chip-btn sm ${x.klass === c ? "on" : ""}" data-kl="${i}" data-v="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
+        ${tt && tnShort(tt.full_name) ? (() => { const pq = ismPending(tt.id);
+          return pq ? `<div class="ar-fn small">✏️ To'liq ism so'rovi yuborilgan: <b>${esc(pq.new_name)}</b> — CEO tasdig'ini kutmoqda</div>`
+            : `<div class="ar-fn"><label class="small"><b>✏️ Bu ustozning ismi qisqa yozilgan («${esc(tt.full_name)}»).</b> To'liq familiya, ism va otasining ismini yozing *</label><input data-r="${i}" data-f="fullname" value="${esc(x.fullname || "")}" placeholder="Masalan: ${esc(String(tt.full_name).split(" ")[0])} Nodira Ravshanovna"><div class="small muted">CEO tasdiqlagach, ustozning ismi hamma joyda to'liq ko'rinadi. Eski kuzatuvlari saqlanadi.</div></div>`; })() : ""}
         ${kind === "akademik" ? (() => { const pv = tt ? prevAdvice(tt.id, x.date || date, date) : null;
           return `<div class="ar-adv">${pv ? `<div class="ar-prev small">💡 <b>Avvalgi tavsiya</b> (${fmtDate(pv.day)}, ${esc(shortName(pv.author_id))}): «${esc(pv.advice)}» <span class="muted">— bajarildimi?</span> ${[["ha", "Ha"], ["qisman", "Qisman"], ["yoq", "Yo'q"]].map(([k, l]) => `<button type="button" class="chip-btn sm ${x.prev_ok === k ? "on" : ""}" data-pok="${i}" data-v="${k}">${l}</button>`).join("")}</div>` : ""}
             <div class="field" style="margin:6px 0 0"><label class="small">Ustozga tavsiya <span class="muted">(ixtiyoriy · keyingi kuzatuvda tekshiriladi · KPI «Tahlil»ga ta'sir qiladi)</span></label><textarea data-r="${i}" data-f="advice" rows="2" placeholder="Masalan: dars boshida maqsadni aniq ayting, o'quvchilarni juftlikda ishlating">${esc(x.advice || "")}</textarea></div></div>`; })() : ""}
@@ -4123,7 +4133,7 @@ window.METODISTLAR = [
           const subj = gr ? canonSubj(tt.subject) : bOnly ? kidSubj(x.subject) : scSubs.length === 1 ? scSubs[0] : canonSubj(x.subject);
           return { known: !!same, teacher: (same ? tt.full_name : x.teacher).trim(), teacher_id: same ? tt.id : (x.teacher_id || ""), subject: subj, filial: (x.filial || "").trim(),
             klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib: subj === BOG ? null : fnum(x.ib), ab: isAkadSubj(subj) ? fnum(x.ab) : null,
-            gr, advice: String(x.advice || "").trim().slice(0, 1000), prev_ok: x.prev_ok || "", lesson: subj === BOSHL ? (x.lesson || "") : "", lead: ((x.lead || "").trim() || (bOnly ? x.klass || "" : "")).toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
+            gr, fullname: String(x.fullname || ""), advice: String(x.advice || "").trim().slice(0, 1000), prev_ok: x.prev_ok || "", lesson: subj === BOSHL ? (x.lesson || "") : "", lead: ((x.lead || "").trim() || (bOnly ? x.klass || "" : "")).toUpperCase().replace(/\s+/g, ""), date: x.date || date }; })
         .filter(x => x.teacher || x.ib !== null || x.ab !== null);
       for (let i = 0; i < rows.length; i++) { const x = rows[i], n = i + 1;
         if (!x.teacher) return fail(`${n}-qatorda ustozning ism-familiyasini yozing`, `[data-r="${i}"][data-f=teacher]`);
@@ -4140,6 +4150,14 @@ window.METODISTLAR = [
         if (x.subject === BOSHL && editor && !x.gr && !(tt && tt.lead_class) && !x.lead && bOnly) return fail(`${n}-qatorda sinfni kiriting — ustoz shu sinf rahbari sifatida belgilanadi`, `[data-r="${i}"][data-f=klass]`);
         if (x.subject === BOSHL && editor && !x.gr && !(tt && tt.lead_class) && !x.lead) return fail(`${n}-qator: ustoz qaysi sinf rahbari ekanini kiriting`, `[data-r="${i}"][data-f=lead]`);
       }
+      for (let i = 0; i < rows.length; i++) { const x = rows[i], tt = x.teacher_id && teacherById(x.teacher_id);
+        if (!tt || !tnShort(tt.full_name) || ismPending(tt.id)) continue;
+        const fn = String(x.fullname || "").trim().replace(/\s+/g, " ");
+        if (!fn) return fail(`${i + 1}-qator: «${tt.full_name}» ismi qisqa yozilgan — to'liq familiya va ismini yozing`, `[data-r="${i}"][data-f=fullname]`);
+        if (tnShort(fn) || fn.split(" ")[1].length < 3) return fail(`${i + 1}-qator: familiya va ismni bosh harf bilan emas, to'liq yozing`, `[data-r="${i}"][data-f=fullname]`);
+        const sur = subjKey(String(tt.full_name).split(" ")[0]).slice(0, 4);
+        if (sur && !subjKey(fn).startsWith(sur)) return fail(`${i + 1}-qator: familiya «${String(tt.full_name).split(" ")[0]}» bilan boshlanishi kerak`, `[data-r="${i}"][data-f=fullname]`);
+        x.fullname = fn; }
       return rows.map(({ gr, known, ...x }) => x);
     };
     async function save(e) {
@@ -4166,6 +4184,8 @@ window.METODISTLAR = [
       try { await db.saveMyReport({ report_date: date, done: reportSummary(kind, data), problems: "", plan: "", hours: 0, data });
         if (db.saveAkademikObs && (kind === "akademik" || (data.rows || []).length || (d0.rows || []).length)) {
           try { const sv = await db.saveAkademikObs(date, data.rows || []); obsMissWarn(sv); } catch (x) { toast("Hisobot yuborildi, lekin ustozlar bazasi yangilanmadi: " + x.message, true); } }
+        if (db.sendNameReq) { let nq = 0; for (const x of (data.rows || []).filter(x => x.fullname && x.teacher_id)) { try { if (await db.sendNameReq(x.teacher_id, x.fullname)) nq++; } catch (er) { toast(er.message, true); } }
+          if (nq) { toast(`To'liq ism so'rovi CEOga yuborildi (${nq} ta)`); await tqLoad(); } }
         clearTimeout(saveDraft._t); try { localStorage.removeItem(DKEY); } catch (x) {}
         const wasW = isWritten(r); if (S.ui.mrEdit) delete S.ui.mrEdit[date];
         toast(wasW ? "Hisobot yangilandi" : "Hisobot yuborildi — rahbaringiz baholaydi"); await refresh(); render(); }
@@ -8780,6 +8800,9 @@ window.METODISTLAR = [
   const tqAnswered = () => { const s0 = tqSeen(); return (S.treq || []).filter(r => r.author_id === S.me?.id && ["tasdiq", "rad"].includes(r.status) && !s0[r.id]); };
   async function tqLoad() { if (!db.listTeacherReqs) return; try { S.treq = await db.listTeacherReqs(); } catch (e) { S.treq = S.treq || []; } }
   const tqPendingFor = tid => tqPending().find(r => r.kind === "ketdi" && r.teacher_id === tid);
+  // 54: ism faqat bosh harf bilan («Achilova N.») — to'liq ism so'rovi
+  const tnShort = nm => /(^|\s)[^\s]{1,2}\.(\s|$)/.test(String(nm || "")) || String(nm || "").trim().split(/\s+/).length < 2;
+  const ismPending = tid => (S.treq || []).find(r => r.kind === "ism" && r.teacher_id === tid && r.status === "kutilmoqda");
   const ORAL = `<div class="due-banner plan" style="margin:10px 0 0">🗣 <span><b>Eslatma:</b> so'rov yuborgach, bu haqda <b>CEOga og'zaki ham ayting</b> — tasdiq tezroq bo'ladi.</span></div>`;
 
   // Xodimning «o'z» ustozlari: biriktirilgan fan(lar)i bo'yicha; fani belgilanmagan bo'lsa — o'zi kuzatgan yoki tanlab olganlari
@@ -9053,7 +9076,8 @@ window.METODISTLAR = [
     const mine = all.filter(r => r.author_id === me && !(adm && r.status === "kutilmoqda"));
     const done = adm ? all.filter(r => r.status !== "kutilmoqda" && r.author_id !== me).slice(0, 40) : [];
     const [c0, l0] = ["", ""];
-    const what = r => r.kind === "ketdi"
+    const what = r => r.kind === "ism" ? `✏️ To'liq ism: <b>${esc(r.old_name)}</b> → <b>${esc(r.new_name)}</b> <span class="small muted">(${esc([r.new_filial, r.new_subject].filter(Boolean).join(", "))})</span>`
+      : r.kind === "ketdi"
       ? `🚪 <b>${esc(r.old_name)}</b> ishdan ketdi <span class="small muted">(${esc([r.new_filial, r.new_subject].filter(Boolean).join(", "))}${r.left_on ? ", " + fmtDate(r.left_on) + " dan" : ""})</span><div style="margin-top:4px">${r.new_name ? `➡️ O'rniga: <b>${esc(r.new_name)}</b>${r.new_class ? ` · ${esc(r.new_class)} sinf` : ""}` : `<span class="muted">O'rniga hech kim kelmagan</span>`}</div>`
       : `🆕 Yangi ustoz: <b>${esc(r.new_name)}</b> <span class="small muted">(${esc([r.new_filial, r.new_subject, r.new_class ? r.new_class + " sinf" : ""].filter(Boolean).join(", "))})</span>`;
     const card = (r, mode) => { const [c, l] = TQ_ST[r.status] || [c0, l0];
@@ -9062,10 +9086,10 @@ window.METODISTLAR = [
         <div class="small muted" style="margin-top:6px">${mode === "adm" || mode === "all" ? `Yubordi: <b>${esc(nameOf(r.author_id))}</b> · ` : ""}${fmtDate(r.created_at)} ${tmOf(r.created_at)}${r.reviewer_id && r.status !== "kutilmoqda" ? ` · ${r.status === "tasdiq" ? "tasdiqladi" : "ko'rib chiqdi"}: ${esc(nameOf(r.reviewer_id))}` : ""}</div>
         ${r.note ? `<div class="rc-note">💬 ${esc(r.note)}</div>` : ""}
         ${r.reply ? `<div class="rc-note ${r.status === "rad" ? "bad" : ""}">${r.status === "rad" ? "↩️ Rad etish sababi" : "✅ Izoh"}: ${esc(r.reply)}</div>` : ""}
-        ${mode === "adm" ? `<details style="margin-top:8px"${r.new_name ? "" : ""}><summary class="small">Tasdiqlashdan oldin ism / filial / fanni tuzatish</summary>
+        ${mode === "adm" ? `<details style="margin-top:8px"${r.new_name ? "" : ""}><summary class="small">${r.kind === "ism" ? "Tasdiqlashdan oldin ismni tuzatish" : "Tasdiqlashdan oldin ism / filial / fanni tuzatish"}</summary>
             <div class="grid2" style="margin-top:6px"><div class="field"><label>Ism</label><input data-tqn="${r.id}" value="${esc(r.new_name)}" placeholder="${r.kind === "ketdi" ? "o'rniga kelgan ustoz (bo'lmasa bo'sh)" : ""}"></div>
-            <div class="field"><label>Filial</label><select data-tqf="${r.id}">${FILIALLAR.map(f => `<option value="${esc(f)}" ${f === r.new_filial ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></div></div>
-            <div class="field"><label>Fan</label><select data-tqs="${r.id}">${SCOPE_SUBJ.map(s => `<option value="${esc(s)}" ${s === r.new_subject ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div></details>
+            ${r.kind === "ism" ? "</div>" : `<div class="field"><label>Filial</label><select data-tqf="${r.id}">${FILIALLAR.map(f => `<option value="${esc(f)}" ${f === r.new_filial ? "selected" : ""}>${esc(f)}</option>`).join("")}</select></div></div>
+            <div class="field"><label>Fan</label><select data-tqs="${r.id}">${SCOPE_SUBJ.map(s => `<option value="${esc(s)}" ${s === r.new_subject ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>`}</details>
           <div class="field" style="margin-top:8px"><textarea rows="2" data-tqm="${r.id}" placeholder="Izoh (rad etsangiz — majburiy)"></textarea></div>
           <div class="row"><button class="btn primary sm" data-tqok="${r.id}">✅ Tasdiqlash</button><button class="btn sm" data-tqno="${r.id}">↩️ Rad etish</button></div>` : ""}
         ${mode === "mine" && r.status === "kutilmoqda" ? `<div class="row" style="margin-top:8px"><button class="btn sm ghost" data-tqx="${r.id}">Bekor qilish</button></div>` : ""}
