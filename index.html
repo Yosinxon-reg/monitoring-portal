@@ -6039,9 +6039,10 @@ window.METODISTLAR = [
     const N = pages.length, kids = pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ");
     obj(1, () => add("<< /Type /Catalog /Pages 2 0 R >>")); obj(2, () => add(`<< /Type /Pages /Kids [${kids}] /Count ${N} >>`));
     pages.forEach((c, i) => { const p = 3 + i * 3, im = p + 1, ct = p + 2, jpg = b64u8(c.toDataURL("image/jpeg", 0.9));
-      obj(p, () => add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /I${i} ${im} 0 R >> >> /Contents ${ct} 0 R >>`));
+      const [pw, ph] = c.width > c.height ? [842, 595] : [595, 842];
+      obj(p, () => add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /I${i} ${im} 0 R >> >> /Contents ${ct} 0 R >>`));
       obj(im, () => { add(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); add(jpg); add("\nendstream"); });
-      const cs = `q 595 0 0 842 0 0 cm /I${i} Do Q`; obj(ct, () => add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`)); });
+      const cs = `q ${pw} 0 0 ${ph} 0 0 cm /I${i} Do Q`; obj(ct, () => add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`)); });
     const xref = len, total = 3 + N * 3;
     add(`xref\n0 ${total}\n0000000000 65535 f \n` + Array.from({ length: total - 1 }, (_, i) => String(offs[i + 1]).padStart(10, "0") + " 00000 n \n").join(""));
     add(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
@@ -6052,21 +6053,89 @@ window.METODISTLAR = [
     const ctx = c.getContext("2d"); let y = 0; pages.forEach(p => { ctx.drawImage(p, 0, y); y += p.height; }); return c;
   }
   const dlBlob = (blob, name) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
-  function oyExport(winners, m, cur, fil) {
-    const pages = oyPages(winners, m, cur, fil), big = pagesPng(pages), text = oyAnnounce(winners, m, cur, fil);
-    const base = `${cur ? "Oy-oqituvchisi-nomzodlari" : "Oy-oqituvchilari"}_${m}${fil ? "_" + fil.replace(/\s+/g, "-") : ""}`;
-    const md = openModal(`🖼 ${cur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} — e'lon uchun`, `<div class="oy-prev"><img src="${pages[0].toDataURL("image/jpeg", 0.85)}" alt=""></div>
-      <div class="small muted" style="margin:8px 0">${pages.length} sahifa · ${winners.reduce((a, w) => a + w.xs.length, 0)} nafar ustoz</div>
-      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="ox-png">⬇ Rasm (PNG)</button><button class="btn" id="ox-pdf">⬇ PDF</button><button class="btn" id="ox-cimg">📋 Rasmni nusxalash</button>${navigator.share ? `<button class="btn" id="ox-sh">📤 Uzatish</button>` : ""}</div>
-      <div class="field"><label>E'lon matni <span class="muted">(guruhga yuborish uchun)</span></label><textarea id="ox-t" rows="10">${esc(text)}</textarea></div>`,
-      `<button class="btn" data-close>Yopish</button><button class="btn primary" id="ox-ct">📝 Matnni nusxalash</button>`);
-    $(".modal", $("#modal-root")).style.maxWidth = "760px";
-    const pngBlob = () => new Promise(r => big.toBlob(r, "image/png"));
-    $("#ox-png", md).onclick = async () => dlBlob(await pngBlob(), base + ".png");
-    $("#ox-pdf", md).onclick = () => dlBlob(pagesPdf(pages), base + ".pdf");
-    $("#ox-cimg", md).onclick = async () => { try { await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob() })]); toast("Rasm nusxalandi — Telegramga Ctrl+V bilan qo'ying"); } catch (e) { toast("Brauzer rasm nusxalashga ruxsat bermadi — «Rasm (PNG)» bilan yuklab oling", true); } };
+  // Bitta gorizontal A4 (2339×1654) rasm: barcha nomzodlar sig'adigan qilib avtomatik joylashtiriladi
+  function oyLand(winners, m, cur, label) {
+    const W = 2339, H = 1654, PAD = 80, c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
+    const font = (sz, b) => `${b ? "800" : "500"} ${Math.round(sz)}px Inter, "Segoe UI", Arial, sans-serif`;
+    const txt = (s0, x, y, sz, col, b, al) => { ctx.font = font(sz, b); ctx.fillStyle = col; ctx.textAlign = al || "left"; ctx.fillText(YA(s0), x, y); };
+    const fit = (s0, maxW, sz, b) => { let s1 = YA(s0); ctx.font = font(sz, b); if (ctx.measureText(s1).width <= maxW) return s1; while (ctx.measureText(s1 + "…").width > maxW && s1.length > 3) s1 = s1.slice(0, -1); return s1 + "…"; };
+    const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    ctx.fillStyle = "#f5f8fc"; ctx.fillRect(0, 0, W, H);
+    const HB = 300, g0 = ctx.createLinearGradient(0, 0, W, HB); g0.addColorStop(0, "#0b1f3f"); g0.addColorStop(0.6, "#123a73"); g0.addColorStop(1, "#1565d8"); ctx.fillStyle = g0; ctx.fillRect(0, 0, W, HB);
+    const total = winners.reduce((a, w) => a + w.xs.length, 0);
+    txt("REGISTON MAKTABI · MONITORING BO'LIMI", PAD, 78, 28, "rgba(255,255,255,.85)", 1);
+    txt(cur ? "🏅 OY O'QITUVCHISI NOMZODLARI" : "🏆 OY O'QITUVCHILARI", PAD, 165, 76, "#ffffff", 1);
+    txt(`${monthLabel(m)} · ${total} nafar`, W - PAD, 165, 54, "#ffd772", 1, "right");
+    txt(fit(label, W - 2 * PAD, 30), PAD, 218, 30, "rgba(255,255,255,.9)");
+    txt(cur ? `💪 ${OY_MIN}–100% natija. Oy oxirigacha shu natijani saqlaganlar «Oy o'qituvchisi» bo'ladi — qolganlar ham harakat qiling!` : "👏 Tabriklaymiz! Mehnatingiz uchun rahmat!", PAD, 270, 30, "#ffffff", 1);
+    // joylashuv: guruh sarlavhasi (0.7 qator) + ustozlar
+    const rows = []; winners.forEach(w => { rows.push({ g: w.g, n: w.xs.length }); w.xs.forEach((x, k) => rows.push({ x, k, g: w.g })); });
+    const top = HB + 40, bottom = H - 70, CW = W - 2 * PAD, CH = bottom - top, GAP = 26;
+    const place = (cols, rh) => { const cw = (CW - (cols - 1) * GAP) / cols; let col = 0, y = 0; const out = [];
+      for (let i = 0; i < rows.length; i++) { const r = rows[i], h = r.x ? rh : rh * 0.62;
+        const need = r.x ? h : h + rh; // sarlavha ustun oxirida qolib ketmasin
+        if (y + need > CH + 1) { col++; y = 0; if (col >= cols) return null; }
+        out.push({ r, x: PAD + col * (cw + GAP), y: top + y, w: cw, h: r.x ? rh - 12 : h }); y += h; }
+      return out; };
+    let best = null;
+    for (let cols = 1; cols <= 6; cols++) { const cw = (CW - (cols - 1) * GAP) / cols;
+      for (let rh = 132; rh >= 34; rh -= 2) { if (cw < rh * 5.2) break; const pl = place(cols, rh); if (pl) { if (!best || rh > best.rh) best = { cols, rh, pl }; break; } } }
+    if (!best) { const pl = place(6, 34) || []; best = { cols: 6, rh: 34, pl }; }
+    const rh = best.rh, s = rh / 100;
+    best.pl.forEach(({ r, x, y, w, h }) => {
+      if (!r.x) { txt(`📚 ${r.g}`, x + 4, y + h * 0.78, Math.max(18, 34 * s), "#1565d8", 1); txt(`${r.n} nafar`, x + w - 4, y + h * 0.78, Math.max(14, 24 * s), "#5d6f88", 0, "right"); return; }
+      const X = r.x;
+      ctx.save(); ctx.shadowColor = "rgba(17,43,82,.10)"; ctx.shadowBlur = 14 * s; ctx.shadowOffsetY = 4 * s; rr(x, y, w, h, 16 * s); ctx.fillStyle = X.best ? "#fff8e6" : "#ffffff"; ctx.fill(); ctx.restore();
+      const cx = x + 46 * s, cy = y + h / 2, rad = Math.min(30 * s, h * 0.34);
+      ctx.fillStyle = X.best ? "#c9a227" : r.k < 3 ? ["#c9a227", "#9aa7b8", "#c27c3a"][r.k] : "#e9f1fc"; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+      txt(X.best ? "1" : String(r.k + 1), cx, cy + rad * 0.36, rad * 0.95, X.best || r.k < 3 ? "#ffffff" : "#1565d8", 1, "center");
+      const nx = x + 92 * s, pw = 150 * s, nw = w - (nx - x) - pw - 16 * s;
+      txt(fit(X.t.full_name, nw, 30 * s, 1), nx, y + h * 0.45, 30 * s, "#0b1f3f", 1);
+      txt(fit(`${canonSubj(X.t.subject) || r.g} · ${X.t.filial || "—"} · ${X.n} ta kuzatuv${X.best ? " · fan bo'yicha eng yuqori" : ""}`, nw, 21 * s), nx, y + h * 0.8, 21 * s, X.best ? "#9a6b00" : "#5d6f88");
+      txt(`${X.total}%`, x + w - 18 * s, y + h * 0.64, 40 * s, "#1f9d55", 1, "right");
+    });
+    txt(`Registon maktabi · Monitoring bo'limi · ${fmtDate(today())}`, PAD, H - 28, 22, "#8a9ab0");
+    return c;
+  }
+  // Oy o'qituvchisi: fan va filial kesimida tanlab — rasm (1 ta gorizontal A4), PDF, nusxalash, Telegramga yuborish
+  function oyExport(o) {
+    const full = buildRating(o.from, o.to, "").out;
+    const allG = RK_GROUPS.filter(g => (full[g] || []).length), allF = FILIALLAR.slice();
+    const st = { g: new Set(o.fil ? allG : allG), f: new Set(o.fil ? [o.fil] : allF) };
+    const lbl = (set, all, word) => set.size === all.length ? `barcha ${word}` : [...set].join(", ");
+    const build = () => { const out = {}; [...st.g].forEach(g => out[g] = (full[g] || []).filter(x => st.f.has(x.t.filial)));
+      const ws = oyWinners(out).filter(w => st.g.has(w.g)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
+      return { ws, label, c: oyLand(ws, o.m, o.cur, label), text: oyAnnounce(ws, o.m, o.cur, st.f.size === allF.length ? "" : [...st.f].join(", ")) }; };
+    const chips = (k, all) => `<div class="chips ox-ch" data-k="${k}"><button type="button" class="chip-btn sm ${st[k].size === all.length ? "on" : ""}" data-all="1">Hammasi</button>${all.map(v => `<button type="button" class="chip-btn sm ${st[k].has(v) && st[k].size !== all.length ? "on" : ""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+    const md = openModal(`🖼 ${o.cur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} — ${esc(monthLabel(o.m))}`, `<div id="ox-f"></div><div class="oy-prev" style="margin-top:10px"><img id="ox-img" alt=""></div>
+      <div class="small muted" id="ox-n" style="margin:8px 0"></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="ox-png">⬇ Rasm</button><button class="btn" id="ox-pdf">⬇ PDF</button><button class="btn" id="ox-cimg">📋 Rasmni nusxalash</button>
+        <button class="btn primary" id="ox-tgi">📤 Rasmni Telegramga</button><button class="btn primary" id="ox-tgp">📤 PDFni Telegramga</button></div>
+      <div class="ok-text" id="ox-ok"></div><div class="err-text" id="ox-e"></div>
+      <div class="field"><label>E'lon matni <span class="muted">(guruhga yuborish uchun)</span></label><textarea id="ox-t" rows="8"></textarea></div>`,
+      `<button class="btn" data-close>Yopish</button><button class="btn" id="ox-ct">📝 Matnni nusxalash</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "980px";
+    let R = null;
+    const base = () => `${o.cur ? "Oy-oqituvchisi-nomzodlari" : "Oy-oqituvchilari"}_${o.m}${st.f.size === allF.length ? "" : "_" + [...st.f].join("-").replace(/[\s']+/g, "")}${st.g.size === allG.length ? "" : "_" + [...st.g].join("-").replace(/[\s']+/g, "")}`.slice(0, 120);
+    const draw = () => { $("#ox-f", md).innerHTML = `<div class="small muted" style="margin:0 0 4px">Fanlar (bir yoki bir nechtasini tanlang):</div>${chips("g", allG)}<div class="small muted" style="margin:10px 0 4px">Filiallar:</div>${chips("f", allF)}`;
+      R = build(); $("#ox-img", md).src = R.c.toDataURL("image/jpeg", 0.85); $("#ox-t", md).value = R.text;
+      const n = R.ws.reduce((a, w) => a + w.xs.length, 0); $("#ox-n", md).textContent = YA(`${n} nafar ustoz · 1 ta gorizontal A4 · ${R.label}`);
+      $$(".ox-ch", md).forEach(box => { const k = box.dataset.k, all = k === "g" ? allG : allF;
+        $$("button", box).forEach(b => b.onclick = () => { if (b.dataset.all) { st[k] = new Set(all); }
+          else { const v = b.dataset.v; if (st[k].size === all.length) st[k] = new Set([v]); else if (st[k].has(v)) { st[k].delete(v); if (!st[k].size) st[k] = new Set(all); } else st[k].add(v); }
+          draw(); }); }); };
+    draw();
+    const pngBlob = () => new Promise(r => R.c.toBlob(r, "image/png"));
+    const msg = (ok, e) => { $("#ox-ok", md).textContent = ok || ""; $("#ox-e", md).textContent = e || ""; };
+    const cap = () => YA(`${o.cur ? "🏅 Oy o'qituvchisi nomzodlari" : "🏆 Oy o'qituvchilari"} — ${monthLabel(o.m)}\n${R.label}`);
+    $("#ox-png", md).onclick = async () => dlBlob(await pngBlob(), base() + ".png");
+    $("#ox-pdf", md).onclick = () => dlBlob(pagesPdf([R.c]), base() + ".pdf");
+    $("#ox-cimg", md).onclick = async () => { try { await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob() })]); toast("Rasm nusxalandi — Telegramga Ctrl+V bilan qo'ying"); } catch (e) { toast("Brauzer rasmni nusxalashga ruxsat bermadi — «⬇ Rasm»dan foydalaning", true); } };
+    const tg = async (b, blob, name) => { msg(); b.disabled = true; const t0 = b.textContent; b.textContent = "Yuborilmoqda…";
+      try { await db.sendDoc(blob, name, cap()); msg("✓ Telegramingizga yuborildi — u yerdan «Uzatish» bilan guruhga yuborasiz"); } catch (e) { msg("", e.message || "Yuborilmadi"); } finally { b.disabled = false; b.textContent = t0; } };
+    $("#ox-tgi", md).onclick = async e => tg(e.currentTarget, await new Promise(r => R.c.toBlob(r, "image/jpeg", 0.92)), base() + ".jpg");
+    $("#ox-tgp", md).onclick = e => tg(e.currentTarget, pagesPdf([R.c]), base() + ".pdf");
     $("#ox-ct", md).onclick = async () => { try { await navigator.clipboard.writeText(YA($("#ox-t", md).value)); toast("E'lon matni nusxalandi"); } catch (e) { $("#ox-t", md).select(); document.execCommand("copy"); toast("E'lon matni nusxalandi"); } };
-    const sh = $("#ox-sh", md); if (sh) sh.onclick = async () => { try { const f = new File([await pngBlob()], base + ".png", { type: "image/png" }); await navigator.share({ files: [f], text: YA($("#ox-t", md).value) }); } catch (e) {} };
   }
   function teachRating(root) {
     const P = ratingPeriod(); const fil = S.ui.tfil || "";
@@ -6144,7 +6213,7 @@ window.METODISTLAR = [
     const rt = $("#rk-t", root); if (rt) rt.onchange = e => { S.ui.rto = e.target.value; teachRating(root); };
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachRating(root); };
     $$("[data-rg]", root).forEach(b => b.onclick = () => { S.ui.rgrp = b.dataset.rg; teachRating(root); });
-    const oyx = $("#oy-exp", root); if (oyx) oyx.onclick = () => oyExport(winners, P.m, isCur, fil);
+    const oyx = $("#oy-exp", root); if (oyx) oyx.onclick = () => oyExport({ from: P.from, to: P.to, m: P.m, cur: isCur, fil });
     $$("[data-oyp]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const w = winners.find(z => z.g === b.dataset.oyp); const x = w && w.xs.find(z => z.t.id === b.dataset.oyt); if (!x) return; const r = oyWord(x, w.g, P.m); wDeliver(r.blob, r.name, r.cap); });
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
   }
