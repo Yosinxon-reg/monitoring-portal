@@ -1197,6 +1197,27 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .ar-fn { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(245, 179, 1, .12); border: 1px solid rgba(245, 179, 1, .45); }
 .ar-fn input { margin-top: 4px; }
 
+/* 55: Masalalar — muammo va takliflar */
+.mz-late { color: var(--bad); font-weight: 600; }
+.mz-soon { color: var(--warn); font-weight: 600; }
+.list-item.mz-od { box-shadow: inset 3px 0 0 var(--bad); }
+.cat-row.mz-sub { padding-left: 26px; font-size: .94em; }
+.mz-kind { margin-bottom: 14px; }
+.mz-types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mz-type { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-weight: 400; margin: 0; }
+.mz-type input { display: none; }
+.mz-type.on { background: var(--brand-soft); border-color: var(--brand); border-left-color: var(--c); }
+.mz-sim { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; margin: -4px 0 14px; }
+.mz-sim-i { display: flex; gap: 10px; align-items: center; padding: 8px 0 0; margin-top: 8px; border-top: 1px dashed var(--border); }
+.mz-meta { display: grid; gap: 4px; font-size: .93em; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.mz-mini { width: auto; padding: 3px 6px; font-size: .92em; margin-left: 4px; }
+.mz-res { margin-top: 12px; border-left: 4px solid var(--ok); background: var(--ok-soft); border-radius: 8px; padding: 8px 12px; white-space: pre-wrap; }
+.mz-acts { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--brand); border-radius: 10px; }
+.mz-hist { display: grid; gap: 2px; }
+.mz-ev { display: flex; justify-content: space-between; gap: 10px; font-size: .9em; color: var(--muted); padding: 4px 2px; border-bottom: 1px solid var(--border); }
+.mz-ev b { color: var(--text, inherit); }
+@media (max-width: 560px) { .mz-types { grid-template-columns: 1fr; } .mz-ev { flex-direction: column; gap: 0; } }
+
 </style>
 </head>
 <body>
@@ -1586,9 +1607,9 @@ window.LESSONS = [
       return {
         profiles, tasks, reports, nextTask: tid, nextReport: rid,
         posts: [
-          { id: 1, category: "ichki_muammo", body: "Samarqanddagi 426-xonada doska ishlamayapti.", link: "", author_id: "u-x1", status: "ochiq", created_at: new Date(Date.now() - 3600e3).toISOString() },
-          { id: 2, category: "taklif", body: "#taklif Kunlik hisobotlarni markazlashtirib, bitta joyda yuritish kerak.", link: "", author_id: "u-ceo2", status: "jarayonda", created_at: new Date(Date.now() - 86400e3 * 2).toISOString() },
-          { id: 3, category: "video_kontent", body: "USTOZLAR FAOLIYATINI BAHOLASH TIZIMI bo'yicha batafsil video.", link: "https://youtube.com", author_id: "u-asoschi", status: "ochiq", created_at: new Date(Date.now() - 86400e3 * 4).toISOString() }
+          { id: 1, kind: "muammo", ptype: "texnik", priority: "oddiy", category: "ichki_muammo", body: "Samarqanddagi 426-xonada doska ishlamayapti.", link: "", author_id: "u-x1", status: "ochiq", assignees: ["u-ceo1"], followers: [], due_at: new Date(Date.now() + 2 * 86400e3).toISOString(), created_at: new Date(Date.now() - 3600e3).toISOString() },
+          { id: 2, kind: "taklif", ptype: null, priority: "past", category: "taklif", body: "Kunlik hisobotlarni markazlashtirib, bitta joyda yuritish kerak.", link: "", author_id: "u-ceo2", status: "jarayonda", assignees: ["u-asoschi"], followers: [], due_at: new Date(Date.now() + 5 * 86400e3).toISOString(), created_at: new Date(Date.now() - 86400e3 * 2).toISOString() },
+          { id: 3, kind: "muammo", ptype: "akademik", priority: "shoshilinch", category: "ichki_muammo", body: "Farg'ona 102-xona kamerasi ishlamayapti, darsni kuzata olmadim.", link: "", author_id: "u-x1", status: "jarayonda", assignees: ["u-ceo2"], followers: [], due_at: new Date(Date.now() - 86400e3 * 3).toISOString(), created_at: new Date(Date.now() - 86400e3 * 4).toISOString() }
         ],
         comments: [{ id: 1, post_id: 1, author_id: "u-ceo1", body: "Xo'jalik bo'limiga aytildi.", created_at: new Date().toISOString() }],
         nextPost: 4, nextComment: 2, videos: [], nextVideo: 1,
@@ -1610,6 +1631,14 @@ window.LESSONS = [
       return m && m.role === "ceo" && p && p.ceo_id === m.id; };
     const ok = v => Promise.resolve(JSON.parse(JSON.stringify(v)));
     const fail = msg => Promise.reject(new Error(msg));
+    // 55: masala mas'ullari (server post_masullar bilan bir xil)
+    const demoMasul = (d, kind, pt, author) => {
+      const ceo = dep => d.profiles.filter(x => x.role === "ceo" && x.active && (x.bolim || "intizomiy") === dep).map(x => x.id);
+      const as = d.profiles.filter(x => x.role === "asoschi").map(x => x.id);
+      let a = kind === "taklif" ? [...as, author && author.ceo_id].filter(Boolean) : pt === "intizomiy" || pt === "texnik" ? ceo("intizomiy") : pt === "akademik" ? ceo("akademik") : [...ceo("intizomiy"), ...ceo("akademik")];
+      a = [...new Set(a)].filter(x => !author || x !== author.id); return a.length ? a : as;
+    };
+    const demoEv = (d, pid, actor, act, note) => { d.post_events = d.post_events || []; d.post_events.push({ id: d.post_events.length + 1, post_id: pid, actor, act, note: note || "", at: new Date().toISOString() }); };
 
     return {
       mode: "demo",
@@ -1740,25 +1769,52 @@ window.LESSONS = [
       async listPosts() {
         const m = me(); if (!m || !["asoschi", "ceo", "xodim"].includes(m.role)) return [];
         const d = load(); d.posts = d.posts || []; d.comments = d.comments || [];
-        const see = p => ["asoschi", "ceo"].includes(m.role) || p.author_id === m.id || (p.recipients || []).includes(m.id);
+        const see = p => m.role === "asoschi" || p.author_id === m.id || (p.assignees || []).includes(m.id) || (p.followers || []).includes(m.id) || (p.recipients || []).includes(m.id);
         return ok(d.posts.filter(see).map(p => ({ ...p, comment_count: d.comments.filter(c => c.post_id === p.id).length }))
           .sort((a, b) => a.created_at < b.created_at ? 1 : -1));
       },
       async createPost(p) {
         const m = me(); const d = load();
         if (!["asoschi", "ceo", "xodim"].includes(m.role)) return fail("Ruxsat yo'q");
-        const row = { id: d.nextPost++, category: p.category, body: p.body, link: p.link || "", images: p.images || [], recipients: p.recipients && p.recipients.length ? p.recipients : null, author_id: m.id, status: "ochiq", created_at: new Date().toISOString() };
-        d.posts.push(row); save(); return ok(row);
+        const kind = p.kind || "muammo", ptype = kind === "muammo" ? (p.ptype || "boshqa") : null, pr = p.priority || "oddiy";
+        const row = { id: d.nextPost++, kind, ptype, priority: pr, category: kind === "taklif" ? "taklif" : "ichki_muammo", body: p.body, link: p.link || "", images: p.images || [],
+          author_id: m.id, status: "ochiq", created_at: new Date().toISOString(), assignees: demoMasul(d, kind, ptype, m), followers: [], resolution: "",
+          due_at: new Date(Date.now() + ({ shoshilinch: 1, past: 7 }[pr] || 3) * 864e5).toISOString() };
+        d.posts.push(row); demoEv(d, row.id, m.id, "yaratildi"); save(); return ok(row);
       },
       async updatePost(id, patch) {
         const m = me(); const p = load().posts.find(x => x.id === id);
         if (!p) return fail("Topilmadi");
-        if (p.author_id !== m.id) {
-          if (!["asoschi", "ceo"].includes(m.role)) return fail("Ruxsat yo'q");
-          patch = { status: patch.status };
-        }
-        Object.assign(p, patch); save(); return ok(p);
+        if (p.author_id !== m.id && m.role !== "asoschi") return fail("Ruxsat yo'q");
+        ["body", "link", "images"].forEach(k => { if (k in patch) p[k] = patch[k]; }); save(); return ok(p);
       },
+      async postAct(pid, a, note, val) {
+        const m = me(); const d = load(); const p = d.posts.find(x => x.id === pid); if (!p) return fail("Masala topilmadi");
+        const isA = m.role === "asoschi", isM = (p.assignees || []).includes(m.id), isAu = p.author_id === m.id, n = (note || "").trim(), now = new Date().toISOString();
+        if (!(isA || isM || isAu)) return fail("Bu masala sizga tegishli emas");
+        const open = ["ochiq", "jarayonda"].includes(p.status); let ev = n;
+        if (a === "boshla") { if (!(isM || isA) || p.status !== "ochiq") return fail("Bu masala allaqachon qabul qilingan"); p.status = "jarayonda"; }
+        else if (a === "hal") { if (!(isM || isA) || !open) return fail("Ruxsat yo'q"); if (n.length < 3) return fail("Nima qilinganini yozing");
+          Object.assign(p, { status: isAu ? "tasdiqlandi" : "hal_qilindi", resolution: n, resolved_at: now, decided_by: m.id, confirmed_at: isAu ? now : null }); }
+        else if (a === "tasdiq") { if (!(isAu || isA) || p.status !== "hal_qilindi") return fail("Ruxsat yo'q"); p.status = "tasdiqlandi"; p.confirmed_at = now; }
+        else if (a === "qaytar") { if (!(isAu || isA) || p.status !== "hal_qilindi") return fail("Ruxsat yo'q"); if (n.length < 3) return fail("Nima hal bo'lmaganini yozing"); Object.assign(p, { status: "jarayonda", resolved_at: null, confirmed_at: null }); }
+        else if (a === "muhimlik") { if (!(isAu || isA) || !open) return fail("Ruxsat yo'q"); p.priority = val; p.due_at = new Date(new Date(p.created_at).getTime() + ({ shoshilinch: 1, past: 7 }[val] || 3) * 864e5).toISOString(); ev = val; }
+        else if (a === "tur") { if (!(isM || isA) || !open) return fail("Ruxsat yo'q"); p.ptype = val; p.assignees = demoMasul(d, "muammo", val, d.profiles.find(x => x.id === p.author_id)); p.status = "ochiq"; ev = val; }
+        else if (a === "tqabul" || a === "trad") { if (!(isM || isA) || !open) return fail("Ruxsat yo'q"); if (a === "trad" && n.length < 3) return fail("Rad etish sababini yozing"); Object.assign(p, { status: a === "tqabul" ? "qabul" : "rad", resolution: n, resolved_at: now, decided_by: m.id }); }
+        else if (a === "joriy") { if (p.status !== "qabul") return fail("Avval qabul qiling"); p.status = "joriy"; }
+        else if (a === "qayta_och") { if (!isA) return fail("Ruxsat yo'q"); Object.assign(p, { status: "jarayonda", resolved_at: null, confirmed_at: null }); }
+        else return fail("Noma'lum amal");
+        demoEv(d, pid, m.id, a, ev); save(); return true;
+      },
+      async postSimilar(pt) {
+        const m = me(); return load().posts.filter(p => p.kind === "muammo" && ["ochiq", "jarayonda", "hal_qilindi"].includes(p.status) && (!pt || p.ptype === pt))
+          .map(p => ({ id: p.id, body: p.body.slice(0, 220), status: p.status, created_at: p.created_at, due_at: p.due_at, n: 1 + (p.followers || []).length, mine: p.author_id === m.id || (p.followers || []).includes(m.id) || (p.assignees || []).includes(m.id) }));
+      },
+      async postJoin(pid, note) {
+        const m = me(); const d = load(); const p = d.posts.find(x => x.id === pid); if (!p) return fail("Topilmadi");
+        p.followers = p.followers || []; if (!p.followers.includes(m.id) && p.author_id !== m.id) { p.followers.push(m.id); demoEv(d, pid, m.id, "qoshildi", note || ""); } save(); return true;
+      },
+      async listPostEvents(id) { return ok((load().post_events || []).filter(e => e.post_id === id)); },
       async deletePost(id) {
         const m = me(); const d = load(); const p = d.posts.find(x => x.id === id);
         if (!p || !(p.author_id === m.id || m.role === "asoschi")) return fail("Ruxsat yo'q");
@@ -2350,7 +2406,11 @@ window.LESSONS = [
         const rows = chk(await sb.from("posts").select("*, post_comments(count)").order("created_at", { ascending: false }).limit(300));
         return rows.map(r => ({ ...r, comment_count: r.post_comments?.[0]?.count || 0 }));
       },
-      async createPost(p) { return chk(await sb.from("posts").insert({ category: p.category, body: p.body, link: p.link || "", images: p.images || [], recipients: p.recipients && p.recipients.length ? p.recipients : null, author_id: meCache.id }).select().single()); },
+      async createPost(p) { return chk(await sb.from("posts").insert({ kind: p.kind || "muammo", ptype: p.ptype || null, priority: p.priority || "oddiy", body: p.body, link: p.link || "", images: p.images || [], author_id: meCache.id }).select().single()); },
+      async postAct(pid, act, note, val) { chk(await sb.rpc("post_act", { pid, act, note: note || "", val: val ?? null })); return true; },
+      async postSimilar(pt) { return chk(await sb.rpc("post_similar", { pt: pt || "" })) || []; },
+      async postJoin(pid, note) { chk(await sb.rpc("post_join", { pid, note: note || "" })); return true; },
+      async listPostEvents(id) { return chk(await sb.from("post_events").select("*").eq("post_id", id).order("at")); },
       async uploadImage(blob) {
         const path = `${meCache.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const up = await sb.storage.from("rasmlar").upload(path, blob, { contentType: "image/jpeg", upsert: false });
@@ -2452,19 +2512,24 @@ window.METODISTLAR = [
   const RSTAT = { yuborildi: "Tekshiruvda", tasdiqlandi: "Tasdiqlandi", qaytarildi: "Qaytarildi" };
   const PRIO = { past: "Past", oddiy: "Oddiy", yuqori: "Yuqori" };
   const ACTIVE_T = ["yangi", "jarayonda", "qaytarildi"];
-  // Masalalar bo'limlari (Telegram guruhidagi mavzular bilan bir xil)
-  const PCATS = {
-    ichki_muammo: ["Ichki muammolar", "I", "#e5484d"],
-    rahbariyatga: ["Rahbariyatga aytilishi kerak", "R", "#30a46c"],
-    topshiriq_eslatma: ["Topshiriqlar va eslatmalar", "T", "#8e4ec6"],
-    video_kontent: ["Video kontentlar", "V", "#6e56cf"],
-    metodistlar: ["Metodistlar vaqti", "M", "#f76b15"],
-    taklif: ["Takliflar", "T", "#f5a524"],
-    tashqi_muammo: ["Tashqi muammolar", "T", "#29a383"],
-    general: ["Umumiy", "#", "#6b7a90"]
+  // 55: Masalalar — ikki tur: Muammo (4 xil, har biriga mas'ul) va Taklif. Eski guruh mavzulari (PCATS) olib tashlandi
+  const PTYPES = {
+    intizomiy: ["Intizomiy", "#e5484d", "Intizomiy bo'lim rahbari"],
+    texnik: ["Texnik", "#0090ff", "Intizomiy bo'lim rahbari"],
+    akademik: ["Akademik", "#30a46c", "Akademik bo'lim rahbari"],
+    boshqa: ["Boshqa", "#6b7a90", "ikkala bo'lim rahbari birga"]
   };
-  const PSTAT = { ochiq: "Ochiq", jarayonda: "Jarayonda", hal_qilindi: "Hal qilindi" };
-  const PSTAT_CLS = { ochiq: "yangi", jarayonda: "jarayonda", hal_qilindi: "tasdiqlandi" };
+  const PRIOS = { shoshilinch: ["🔴 Shoshilinch", "1 kun"], oddiy: ["🟡 Oddiy", "3 kun"], past: ["🟢 Past", "7 kun"] };
+  const PSTAT = { ochiq: "Ochiq", jarayonda: "Jarayonda", hal_qilindi: "Tasdiq kutilmoqda", tasdiqlandi: "Hal qilindi", qabul: "Qabul qilindi", rad: "Rad etildi", joriy: "Joriy etildi" };
+  const PSTAT_CLS = { ochiq: "yangi", jarayonda: "jarayonda", hal_qilindi: "bajarildi", tasdiqlandi: "tasdiqlandi", qabul: "tasdiqlandi", rad: "qaytarildi", joriy: "tasdiqlandi" };
+  const pStat = p => p.kind === "taklif" && p.status === "jarayonda" ? "Ko'rib chiqilmoqda" : (PSTAT[p.status] || p.status);
+  const postOpen = p => ["ochiq", "jarayonda"].includes(p.status);
+  const postLive = p => ["ochiq", "jarayonda", "hal_qilindi"].includes(p.status);
+  const postOverdue = p => postOpen(p) && p.due_at && new Date(p.due_at).getTime() < Date.now();
+  const ptLabel = p => p.kind === "taklif" ? "Taklif" : `${(PTYPES[p.ptype] || PTYPES.boshqa)[0]} muammo`;
+  const isPostMasul = (p, uid = S.me?.id) => (p.assignees || []).includes(uid);
+  // Mendan harakat kutilayotgan masalalar: mas'ul sifatida yangi/muddati o'tgan, yuboruvchi sifatida tasdiqlash
+  const postNeedsMe = p => (isPostMasul(p) && (p.status === "ochiq" || postOverdue(p))) || (p.author_id === S.me?.id && p.status === "hal_qilindi");
   const { phoneDigits, pwFromBirth, LOGIN_DOMAIN } = window.loginUtil;
   const fmtPhone = d => { d = phoneDigits(d); return d.length === 12 ? `+${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5, 8)} ${d.slice(8, 10)} ${d.slice(10)}` : d; };
   const loginOf = p => p?.email?.endsWith("@" + LOGIN_DOMAIN) ? fmtPhone(p.email.split("@")[0]) : (p?.email || "");
@@ -2914,7 +2979,7 @@ window.METODISTLAR = [
     if (staff) {
       const toConf = isManager() ? S.dtasks.reduce((a, t) => a + recipientsOf(t).filter(p => canRate(p) && dtStatus(t, p).status === "kutilmoqda" && dtStatus(t, p).self_done).length, 0) : 0;
       const toAcc = isManager() ? S.tasks.filter(x => x.status === "bajarildi" && canManageTask(x)).length : 0;
-      items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: unseenMine().length || "", badge2: (toConf + toAcc) || "", b2t: "Tasdiqlash / qabul qilish kutilmoqda" });
+      items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: unseenMine().length || "", badge2: (toConf + toAcc + S.posts.filter(postNeedsMe).length) || "", b2t: "Sizdan javob kutilmoqda: tasdiqlash, qabul qilish yoki mas'ul sifatida hal qilish" });
       const myRepDue = isSelfReporter(S.me) && isWorkday(S.me) && ["due", "late"].includes(dueState(S.me)) && !isWritten(repOf(S.me, today()));
       GB.hisobotlar = myRepDue ? "!" : r === "ceo" ? (toGrade().length || "") : (toReview || "");
       if (r === "asoschi" || rhKindOf(S.me)) {
@@ -3395,7 +3460,7 @@ window.METODISTLAR = [
     return why;
   }
   function postAttn(p) {
-    if (!isFounder() || p.status === "hal_qilindi" || ageH(p.created_at) < OLD_H) return null;
+    if (!isFounder() || !postOpen(p) || ageH(p.created_at) < OLD_H) return null;
     const why = [];
     if (p.author_id !== S.me.id && !seenRec("post", p.id, S.me.id)) why.push(["missing", "Siz ko'rmagansiz"]);
     why.push([p.status === "ochiq" ? "overdue" : "jarayonda", `${ageD(p.created_at)} kundan beri ${p.status === "ochiq" ? "ochiq" : "jarayonda"}`]);
@@ -4300,37 +4365,48 @@ window.METODISTLAR = [
     els.forEach(e => { const u = IMGC[e.dataset.ipath]?.url; if (!u) return; if (e.tagName === "IMG") e.src = u; else e.href = u; });
   }
 
-  // ---- Masalalar
-  const catBadge = (c, size = 34) => { const [, l, col] = PCATS[c] || PCATS.general;
+  // ---- Masalalar (55): muammo va takliflar — har kim faqat o'ziga tegishlisini ko'radi
+  const postBadge = (p, size = 34) => { const col = p.kind === "taklif" ? "#f5a524" : (PTYPES[p.ptype] || PTYPES.boshqa)[1];
+    const l = p.kind === "taklif" ? "💡" : (PTYPES[p.ptype] || PTYPES.boshqa)[0][0];
     return `<div class="cat-dot" style="background:${col};width:${size}px;height:${size}px">${esc(l)}</div>`; };
+  const dotOf = (col, l, size = 30) => `<div class="cat-dot" style="background:${col};width:${size}px;height:${size}px">${esc(l)}</div>`;
   const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  const masulNames = p => (p.assignees || []).map(nameOf).join(", ") || "—";
+  function dueTxt(p) {
+    if (!p.due_at) return "";
+    const d = new Date(p.due_at), ms = d.getTime() - Date.now(), lbl = `${fmtDate(localOf(p.due_at))} ${tmOf(p.due_at)}`;
+    if (!postOpen(p)) return "";
+    if (ms < 0) { const h = Math.ceil(-ms / 36e5); return `<span class="mz-late">⏰ muddati ${h < 24 ? h + " soat" : Math.ceil(h / 24) + " kun"} o'tgan</span>`; }
+    return `<span class="${ms < 864e5 ? "mz-soon" : ""}">⏳ ${lbl} gacha</span>`;
+  }
   function postLine(p) {
-    const nw = isNewForMe("post", p); const vN = postViewers(p).length;
-    return `<div class="list-item click ${nw ? "unseen" : ""}" data-post="${p.id}">${catBadge(p.category)}
-      <div style="flex:1;min-width:0"><div class="row" style="gap:8px"><span class="t">${esc(PCATS[p.category]?.[0] || "Umumiy")}</span><span class="small muted">${fmtDate(p.created_at)} ${tmOf(p.created_at)}</span>${nw ? pill("yangi", "Yangi") : ""}</div>
+    const nw = isNewForMe("post", p); const need = postNeedsMe(p);
+    const role = p.author_id === S.me.id ? "Siz yubordingiz" : isPostMasul(p) ? "Siz mas'ulsiz" : (p.followers || []).includes(S.me.id) ? "Siz qo'shilgansiz" : "";
+    return `<div class="list-item click ${nw ? "unseen" : ""} ${postOverdue(p) ? "mz-od" : ""}" data-post="${p.id}">${postBadge(p)}
+      <div style="flex:1;min-width:0"><div class="row" style="gap:8px;flex-wrap:wrap"><span class="t">${esc(ptLabel(p))}</span>${p.priority === "shoshilinch" && postOpen(p) ? `<span class="small">🔴</span>` : ""}<span class="small muted">#${p.id} · ${fmtDate(p.created_at)} ${tmOf(p.created_at)}</span>${nw ? pill("yangi", "Yangi") : ""}${need ? pill("overdue", p.status === "hal_qilindi" ? "Tasdiqlang" : "Sizdan javob kutilmoqda") : ""}</div>
       <div class="small"><b>${esc(nameOf(p.author_id))}:</b> ${esc(p.body.length > 140 ? p.body.slice(0, 140) + "…" : p.body)}</div>
-      <div class="small muted" style="margin-top:4px">${(p.images || []).length ? `📷 ${p.images.length} · ` : ""}${p.comment_count ? `💬 ${p.comment_count} izoh · ` : ""}👁 ${vN} kishi ko'rdi</div></div>
-      ${pill(PSTAT_CLS[p.status], PSTAT[p.status])}</div>`;
+      <div class="small muted" style="margin-top:4px">${role ? `<b>${role}</b> · ` : ""}Mas'ul: ${esc(masulNames(p))}${(p.followers || []).length ? ` · 👥 yana ${p.followers.length} kishi duch kelgan` : ""}${(p.images || []).length ? ` · 📷 ${p.images.length}` : ""}${p.comment_count ? ` · 💬 ${p.comment_count}` : ""}${dueTxt(p) ? " · " + dueTxt(p) : ""}</div></div>
+      ${pill(PSTAT_CLS[p.status], pStat(p))}</div>`;
   }
   const bindPostLines = root => $$("[data-post]", root).forEach(el => el.onclick = () => openPost(+el.dataset.post || el.dataset.post));
   function recentPosts() {
     if (!isStaff()) return "";
-    const list = S.posts.slice().sort(byNew).slice(0, 5);
-    return `<div class="card" style="margin-top:16px"><div class="card-head"><h2>So'nggi masalalar</h2><span class="spacer"></span><a class="btn sm" href="#/masalalar">Barchasi</a></div>
-      ${list.length ? list.map(postLine).join("") : `<div class="empty">Hali masala kiritilmagan</div>`}</div>`;
+    const list = S.posts.filter(postLive).sort((a, b) => postNeedsMe(b) - postNeedsMe(a) || byNew(a, b)).slice(0, 5);
+    return `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Masalalarim</h2><span class="spacer"></span><a class="btn sm" href="#/masalalar">Barchasi</a></div>
+      ${list.length ? list.map(postLine).join("") : `<div class="empty">Sizga tegishli ochiq masala yo'q</div>`}</div>`;
   }
 
-  // ---- Masalalar: topshiriqlar, eslatmalar va masalalar bitta joyda
-  const POST_CATS = Object.entries(PCATS).filter(([k]) => k !== "topshiriq_eslatma");
-  // Kategoriya yonidagi belgi: ko'k doira — faqat O'QILMAGANLAR soni; o'qilgandan keyin yo'qoladi. Kulrang matn — ochiq (hal qilinmagan) masalalar
+  // ---- Masalalar sahifasi: topshiriq/eslatmalar, metodistlar vaqti, muammolar (4 tur) va takliflar
+  const MZ_ROWS = [["", "Barcha masalalar"], ["muammo", "Muammolar"], ...Object.keys(PTYPES).map(k => ["pt_" + k, PTYPES[k][0]]), ["taklif", "Takliflar"]];
+  const mzMatch = (k, p) => !k || (k === "muammo" ? p.kind === "muammo" : k === "taklif" ? p.kind === "taklif" : k.startsWith("pt_") ? p.kind === "muammo" && (p.ptype || "boshqa") === k.slice(3) : true);
   function mzTail(k) {
     if (k === "te") { const n = unseenMine().length; const act = S.tasks.filter(t => (S.me.role !== "xodim" || t.assigned_to === S.me.id) && (ACTIVE_T.includes(t.status) || t.status === "bajarildi")).length;
       return n ? `<span class="badge">${n}</span>` : act ? `<span class="small muted">${act} faol</span>` : ""; }
     if (k === "metodistlar") { const mp = metPending().length, bn = (S.mbook || []).filter(b => b.day === today() && b.status === "faol" && !metEnded(b)).length;
       return mp ? `<span class="badge">${mp}</span>` : bn ? `<span class="small muted">${bn} bron</span>` : ""; }
-    const nw = S.posts.filter(p => (!k || p.category === k) && isNewForMe("post", p)).length;
-    const op = S.posts.filter(p => (!k || p.category === k) && p.status !== "hal_qilindi").length;
-    return nw ? `<span class="new-dot">${nw}</span>` : op ? `<span class="small muted">${op} ochiq</span>` : "";
+    const L = S.posts.filter(p => mzMatch(k, p));
+    const nd = L.filter(postNeedsMe).length, nw = L.filter(p => isNewForMe("post", p)).length, od = L.filter(postOverdue).length, op = L.filter(postLive).length;
+    return nd ? `<span class="badge">${nd}</span>` : nw ? `<span class="new-dot">${nw}</span>` : od ? `<span class="small mz-late">${od} kechikkan</span>` : op ? `<span class="small muted">${op} ochiq</span>` : "";
   }
   // Ro'yxatda ko'rsatilgan (ekranda o'qilgan) yangi masala, topshiriq va eslatmalar 1,5 soniyadan keyin «ko'rildi» bo'ladi
   function mzAutoSeen(page) {
@@ -4342,31 +4418,38 @@ window.METODISTLAR = [
     if (!n) return; S.ui.seenDirty = false;
     $$("[data-tail]", page).forEach(el => { el.innerHTML = mzTail(el.dataset.tail); });
   }
+  const MZ_ST = { faol: "Faol (hal bo'lmaganlar)", kech: "Muddati o'tganlar", tasdiq: "Tasdiq kutilayotganlar", yopiq: "Yopilganlar", all: "Hammasi" };
+  const mzSt = (k, p) => k === "faol" ? postLive(p) : k === "kech" ? postOverdue(p) : k === "tasdiq" ? p.status === "hal_qilindi" : k === "yopiq" ? !postLive(p) : true;
+  const MZ_WHO = { all: "Hammasi", masul: "Zimmamdagi", men: "Men yuborgan", qosh: "Qo'shilganlarim" };
+  const mzWho = (k, p) => k === "masul" ? isPostMasul(p) : k === "men" ? p.author_id === S.me.id : k === "qosh" ? (p.followers || []).includes(S.me.id) : true;
   PAGES.masalalar = page => {
     if (!isStaff()) return PAGES.bosh(page);
-    const cat = S.ui.pcat ?? "te";
+    const qp = new URLSearchParams(location.hash.split("?")[1] || "");
+    if (qp.get("p")) { const pid = +qp.get("p"); history.replaceState(null, "", "#/masalalar"); S.ui.pcat = ""; setTimeout(() => openPost(pid), 60); }
+    let cat = S.ui.pcat ?? "te";
+    if (!["te", "metodistlar"].includes(cat) && !MZ_ROWS.some(r => r[0] === cat)) cat = S.ui.pcat = "";
     const mgr = isManager();
-    const counts = c => S.posts.filter(p => p.category === c && p.status !== "hal_qilindi").length;
-    const newIn = c => S.posts.filter(p => (!c || p.category === c) && isNewForMe("post", p)).length;
-    const teBadge = unseenMine().length;
-    const teActive = S.tasks.filter(t => (S.me.role !== "xodim" || t.assigned_to === S.me.id) && (ACTIVE_T.includes(t.status) || t.status === "bajarildi")).length;
     const right = cat === "te"
       ? (mgr ? `<button class="btn" id="rc-open" title="Takrorlanuvchi topshiriqlar">🔁</button><button class="btn" id="tt-open" title="Shablonlar">📋</button><button class="btn" id="new-dt">+ Eslatma</button><button class="btn primary" id="new-task">+ Topshiriq</button>` : "")
       : cat === "metodistlar" ? `<button class="btn primary" id="met-new">+ Band qilish</button>`
-      : `<button class="btn primary" id="new-post">+ Yangi masala</button>`;
-    page.innerHTML = head("Masalalar", mgr ? "Topshiriqlar, eslatmalar va masalalar — bitta joyda. Har bir xodim ko'rgani va bajargani ko'rinib turadi." : "Faqat sizga kelgan topshiriq, eslatma va masalalar hamda o'zingiz yuborganlaringiz — bitta joyda.", `<div class="row" style="gap:8px">${right}</div>`) + `
+      : `<button class="btn" id="new-tk">💡 Taklif</button><button class="btn primary" id="new-post">+ Muammo</button>`;
+    page.innerHTML = head("Masalalar", "Har kim faqat o'ziga tegishlisini ko'radi: o'zi yuborgan, o'zi mas'ul bo'lgan va o'ziga kelgan topshiriq, eslatma va masalalar.", `<div class="row" style="gap:8px">${right}</div>`) + `
       <div class="posts-layout">
         <div class="card cat-list">
           <button class="cat-row te-row ${cat === "te" ? "active" : ""}" data-cat="te"><div class="cat-dot" style="background:#8e4ec6">✓</div><span>${S.me.role === "xodim" ? "Topshiriq va eslatmalarim" : "Topshiriqlar va eslatmalar"}</span><span class="spacer"></span><span data-tail="te">${mzTail("te")}</span></button>
+          <button class="cat-row ${cat === "metodistlar" ? "active" : ""}" data-cat="metodistlar">${dotOf("#f76b15", "M")}<span>Metodistlar vaqti</span><span class="spacer"></span><span data-tail="metodistlar">${mzTail("metodistlar")}</span></button>
           <div class="cat-sep"></div>
-          <button class="cat-row ${cat === "" ? "active" : ""}" data-cat=""><div class="cat-dot" style="background:var(--brand)">≡</div><span>Barcha masalalar</span><span class="spacer"></span><span data-tail="">${mzTail("")}</span></button>
-          ${POST_CATS.map(([k, [label]]) => `<button class="cat-row ${cat === k ? "active" : ""}" data-cat="${k}">${catBadge(k, 30)}<span>${esc(label)}</span><span class="spacer"></span><span data-tail="${k}">${mzTail(k)}</span></button>`).join("")}
+          ${MZ_ROWS.map(([k, label]) => { const sub = k.startsWith("pt_");
+            const dot = k === "" ? dotOf("var(--brand)", "≡") : k === "muammo" ? dotOf("#e5484d", "🔧") : k === "taklif" ? dotOf("#f5a524", "💡") : dotOf(PTYPES[k.slice(3)][1], PTYPES[k.slice(3)][0][0], 24);
+            return `<button class="cat-row ${sub ? "mz-sub" : ""} ${cat === k ? "active" : ""}" data-cat="${k}">${dot}<span>${esc(label)}</span><span class="spacer"></span><span data-tail="${k}">${mzTail(k)}</span></button>`; }).join("")}
         </div>
         <div id="mz-body"></div>
       </div>`;
     $$("[data-cat]", page).forEach(b => b.onclick = () => { S.ui.pcat = b.dataset.cat; PAGES.masalalar(page); });
     clearTimeout(S._mzSeenT); S._mzSeenT = setTimeout(() => mzAutoSeen(page), 1500);
-    if ($("#new-post", page)) $("#new-post", page).onclick = () => postForm();
+    const ptPre = cat.startsWith("pt_") ? cat.slice(3) : "";
+    if ($("#new-post", page)) $("#new-post", page).onclick = () => postForm(null, { kind: "muammo", ptype: ptPre });
+    if ($("#new-tk", page)) $("#new-tk", page).onclick = () => postForm(null, { kind: "taklif" });
     if ($("#new-task", page)) $("#new-task", page).onclick = () => taskForm();
     if ($("#new-dt", page)) $("#new-dt", page).onclick = () => dtForm();
     if ($("#rc-open", page)) $("#rc-open", page).onclick = () => recurringView();
@@ -4374,35 +4457,32 @@ window.METODISTLAR = [
     const body = $("#mz-body", page);
     if (cat === "te") return teView(body);
     if (cat === "metodistlar") { const nb = $("#met-new", page); if (nb) nb.onclick = () => metBookForm("asosiy", S.ui.mday && S.ui.mday >= today() ? S.ui.mday : today(), body); return metView(body); }
-    const st = S.ui.pst ?? "";
-    let list = S.posts.filter(p => (!cat || p.category === cat) && (!st || p.status === st)).sort(byNew);
-    let attHtml = "";
-    if (isFounder()) {
-      const sp = attnSplit(S.posts.filter(p => !cat || p.category === cat), postAttn); const ids = new Set(sp.att.map(a => a.x.id));
-      list = list.filter(p => !ids.has(p.id));
-      attHtml = attnCard(sp.att, (p, w) => postLine(p).replace(/<\/div>\s*(<span class="pill[^]*?<\/span>)<\/div>$/, m => m).replace('<div class="small muted" style="margin-top:4px">', attnTags(w) + '<div class="small muted" style="margin-top:4px">'), "p");
-    }
-    body.innerHTML = `<div class="filters">
-        <select id="p-st"><option value="">Barcha holatlar</option>${Object.entries(PSTAT).map(([k, v]) => `<option value="${k}" ${st === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+    const st = MZ_ST[S.ui.pst] ? S.ui.pst : "faol", who = MZ_WHO[S.ui.pwho] ? S.ui.pwho : "all";
+    const base = S.posts.filter(p => mzMatch(cat, p) && mzWho(who, p));
+    const list = base.filter(p => mzSt(st, p)).sort((a, b) => postNeedsMe(b) - postNeedsMe(a) || postOverdue(b) - postOverdue(a) || byNew(a, b));
+    const whoKeys = Object.keys(MZ_WHO).filter(k => k === "all" || S.posts.some(p => mzWho(k, p)));
+    const lim = S.ui.plim || 60;
+    body.innerHTML = `<div class="filters" style="align-items:center">
+        <select id="p-st" style="width:auto">${Object.entries(MZ_ST).map(([k, v]) => `<option value="${k}" ${st === k ? "selected" : ""}>${v} (${base.filter(p => mzSt(k, p)).length})</option>`).join("")}</select>
+        ${whoKeys.length > 1 ? `<div class="row mz-who" style="gap:6px">${whoKeys.map(k => `<button class="btn sm ${who === k ? "primary" : ""}" data-pwho="${k}">${MZ_WHO[k]}</button>`).join("")}</div>` : ""}
       </div>
-      ${attHtml}<div class="card">${list.length ? list.map(postLine).join("") : `<div class="empty">Bu bo'limda hali masala yo'q</div>`}</div>`;
-    $("#p-st", body).onchange = e => { S.ui.pst = e.target.value; PAGES.masalalar(page); };
-    bindPostLines(body); bindAttn(body, () => PAGES.masalalar(page));
+      <div class="card">${list.length ? list.slice(0, lim).map(postLine).join("") + (list.length > lim ? `<div style="text-align:center;padding:10px"><button class="btn sm" id="p-more">Yana ${list.length - lim} ta</button></div>` : "")
+        : `<div class="empty">${st === "faol" ? "Hal qilinmagan masala yo'q 👍" : "Bu yerda hali masala yo'q"}</div>`}</div>`;
+    $("#p-st", body).onchange = e => { S.ui.pst = e.target.value; S.ui.plim = 0; PAGES.masalalar(page); };
+    $$("[data-pwho]", body).forEach(b => b.onclick = () => { S.ui.pwho = b.dataset.pwho; PAGES.masalalar(page); });
+    if ($("#p-more", body)) $("#p-more", body).onclick = () => { S.ui.plim = lim + 60; PAGES.masalalar(page); };
+    bindPostLines(body);
   };
   function teView(root) {
-    const legacy = S.posts.filter(p => p.category === "topshiriq_eslatma");
     const tabs = [["t", "Topshiriqlar", unseenMine().filter(x => x.kind === "task").length],
       ["e", "Eslatmalar", unseenMine().filter(x => x.kind === "dtask").length]];
-    if (legacy.length) tabs.push(["x", "Guruhdagi xabarlar", legacy.filter(p => isNewForMe("post", p)).length]);
     const tab = tabs.some(t => t[0] === S.ui.teTab) ? S.ui.teTab : (unseenMine().some(x => x.kind === "dtask") && !unseenMine().some(x => x.kind === "task") ? "e" : "t");
     root.innerHTML = `<div class="tabs" style="margin-top:0">${tabs.map(([k, l, n]) => `<button data-tt="${k}" class="${k === tab ? "active" : ""}">${l}${n ? ` <span class="badge">${n}</span>` : ""}</button>`).join("")}</div><div id="te-body"></div>`;
     $$("[data-tt]", root).forEach(b => b.onclick = () => { S.ui.teTab = b.dataset.tt; teView(root); });
     const tb = $("#te-body", root);
     if (tab === "t") return tasksView(tb);
-    if (tab === "e") return dtView(tb);
-    tb.innerHTML = `<div class="card">${legacy.slice().sort(byNew).map(postLine).join("")}</div>`; bindPostLines(tb);
+    return dtView(tb);
   }
-
 
   // =============================================================
   // ---- Metodistlar vaqti: metodist kompyuterini bron qilish
@@ -5346,6 +5426,20 @@ window.METODISTLAR = [
     { k: "natija", l: "Bo'lim natijasi", max: 25, d: "Akademik: oylik reja bajarilishi (3 / bog'cha 4). Intizomiy: holatlar hal qilinishi (70%) va takrorlar kamligi (30%)" },
     { k: "topshiriq", l: "Topshiriqlar muddatida bajarilishi", max: 10, d: "Rahbarga va bo'lim xodimlariga SHU OYDA berilgan topshiriq va eslatmalar (muddatsizi — 3 kun ichida). Keyingi oyga o'tmaydi; bajarilishi bilan ball darhol o'zgaradi" },
     { k: "asoschi", l: "Monitoring bo'limi rahbari bahosi", max: 15, d: "Oyda bir marta qo'yiladi" }];
+  // 55: noyabrdan — «Muammolar muddatida hal qilinishi» (10 ball) qo'shildi: hisobot intizomi 20→15, o'z hisoboti 15→10
+  const MZ_V2 = "2026-11-12";
+  const CR_ITEMS2 = CR_ITEMS.map(it => it.k === "intizom" ? { ...it, max: 15 } : it.k === "oz" ? { ...it, max: 10 } : it);
+  CR_ITEMS2.splice(CR_ITEMS2.findIndex(it => it.k === "asoschi"), 0, { k: "masala", l: "Muammolarni muddatida hal qilish", max: 10, d: "Rahbar mas'ul bo'lgan muammolar (Masalalar): muddatida hal qilingani — to'liq, kechikib — yarim, muddati o'tib hal qilinmagani — 0. Yuboruvchi «hal bo'lmadi» deb qaytarsa — hal qilinmagan hisoblanadi" });
+  const crItems = ms => ms >= "2026-11-01" ? CR_ITEMS2 : CR_ITEMS;
+  function masalaScore(uid, from, to) {
+    const now = Date.now(); let n = 0, g = 0, late = 0, open = 0;
+    (S.posts || []).forEach(p => { if (p.kind !== "muammo" || !(p.assignees || []).includes(uid)) return;
+      const cd = localOf(p.created_at); if (cd < from || cd > to || cd < MZ_V2) return;
+      const due = p.due_at ? new Date(p.due_at).getTime() : null;
+      if (p.resolved_at && ["hal_qilindi", "tasdiqlandi"].includes(p.status)) { n++; const ok = !due || new Date(p.resolved_at).getTime() <= due; g += ok ? 1 : 0.5; if (!ok) late++; }
+      else if (due && due < now && postOpen(p)) { n++; open++; } });
+    return { n, g, late, open };
+  }
   const crStart = () => KPI_ANCHOR;
   const crDesc = (it, c) => it.k !== "natija" ? it.d : deptOf(c) === "akademik" ? "Oylik reja bajarilishi (har ustoz 3, bog'cha 4 marta) — bugungacha kutilgan sur'atga nisbatan" : "Holatlar hal qilinishi (70%) va takrorlar kamligi (30%)";
   const crLetter = v => v === null || v === undefined ? "—" : v >= 90 ? "A" : v >= 75 ? "B" : v >= 60 ? "C" : "D";
@@ -5387,10 +5481,13 @@ window.METODISTLAR = [
     // 5) topshiriqlar
     { const ids = new Set([c.id, ...memIds]); const T = taskScore(x => ids.has(x), ms, me);
       R.topshiriq = T.n ? { r: T.g / T.n, why: `${rnd(T.g)} / ${T.n} topshiriq va eslatma muddatida` } : { r: null, why: "shu oyda berilgan topshiriq yo'q" }; }
+    // 5b) muammolar (55)
+    { const M = masalaScore(c.id, from, me);
+      R.masala = M.n ? { r: M.g / M.n, why: `${M.n - M.late - M.open} / ${M.n} muammo muddatida hal qilingan${M.late ? ` · ${M.late} tasi kechikib` : ""}${M.open ? ` · ${M.open} tasi muddati o'tib ochiq` : ""}` } : { r: null, why: "muddati kelgan muammo yo'q" }; }
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
-    const items = CR_ITEMS.map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
+    const items = crItems(ms).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
     const av = items.filter(x => x.v !== null), sum = rnd(av.reduce((a, x) => a + x.v, 0)), maxA = av.reduce((a, x) => a + x.it.max, 0);
     const final = maxA ? rnd(sum / maxA * 100) : null;
     return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: R.asoschi.r === null, members: mem.length };
@@ -5423,7 +5520,7 @@ window.METODISTLAR = [
     const cur = mStart(today());
     const months = []; for (let m = cur; m >= "2026-10-01"; m = mStart(addD(m, -1))) months.push(m);
     const ms = months.includes(S.ui.crM) ? S.ui.crM : cur;
-    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. Beshta mezon ma'lumotlardan avtomatik hisoblanadi, bittasini Monitoring bo'limi rahbari qo'yadi.",
+    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. Mezonlar ma'lumotlardan avtomatik hisoblanadi (noyabrdan «Muammolarni muddatida hal qilish» ham), bittasini Monitoring bo'limi rahbari qo'yadi.",
       `<div class="row" style="gap:8px"><select id="cr-m" style="width:auto">${months.map(m => `<option value="${m}" ${m === ms ? "selected" : ""}>${mLabel(m)}${m === cur ? " (joriy)" : ""}</option>`).join("")}</select>${isA ? `<button class="btn" id="cr-pdf">⬇ Word</button>` : ""}</div>`) +
       `<div id="cr-body"><div class="card empty">Hisoblanmoqda…</div></div>`;
     $("#cr-m", page).onchange = e => { S.ui.crM = e.target.value; PAGES["rahbar-reyting"](page); };
@@ -5442,7 +5539,7 @@ window.METODISTLAR = [
           <div class="cr-let cr-${x.letter === "—" ? "N" : x.letter}">${x.letter}<small>${CR_LL[x.letter]}</small></div></div>
         ${x.pending ? `<div class="note" style="margin:10px 0 0">Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA}).</div>` : ""}
         <div class="table-wrap"><table class="cr-tbl"><thead><tr><th>Mezon</th><th style="width:28%">Natija</th><th>Ball</th><th class="hide-sm">Izoh</th>${px ? `<th class="hide-sm">O'tgan oy</th>` : ""}</tr></thead><tbody>
-        ${x.items.map((c, k) => { const pc = c.r === null ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100); const pv = px ? px.items[k].v : null;
+        ${x.items.map((c, k) => { const pc = c.r === null ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100); const pv = px ? (px.items.find(i => i.it.k === c.it.k)?.v ?? null) : null;
           return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(crDesc(c.it, x.c))}</div></td>
             <td>${pc === null ? `<span class="muted small">—</span>` : `<div class="cr-bar"><i style="width:${pc}%" class="${pc >= 90 ? "a" : pc >= 75 ? "b" : pc >= 60 ? "c" : "d"}"></i></div><span class="small">${pc}%</span>`}</td>
             <td style="white-space:nowrap"><b>${c.v ?? "—"}</b> <span class="muted">/ ${c.it.max}</span></td><td class="hide-sm small">${esc(c.why || "")}</td>
@@ -6518,54 +6615,157 @@ window.METODISTLAR = [
   setInterval(() => { if (S.me && isStaff()) liveStart(); if (!document.hidden && Date.now() - lastAct < 10 * 60e3 && (!LIVE.ok || Date.now() - LIVE.last > 600e3)) { LIVE.last = Date.now(); pollLight(); } }, 120e3);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && SY.lastSync && Date.now() - SY.lastSync > 120e3) { lastAct = Date.now(); pollLight(); } });
 
-  function postForm(p) {
-    const cur = p?.category || (PCATS[S.ui.pcat] && S.ui.pcat !== "topshiriq_eslatma" ? S.ui.pcat : "general");
-    const m = openModal(p ? "Masalani tahrirlash" : "Yangi masala", `<form id="pform">
-      <div class="field"><label>Bo'lim</label><select name="category">${Object.entries(PCATS).filter(([k]) => k !== "topshiriq_eslatma" || cur === k).map(([k, [l]]) => `<option value="${k}" ${cur === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
-      <div class="field"><label>Matn *</label><textarea name="body" required style="min-height:130px" placeholder="Masalan: 426-xonada doska ishlamayapti">${esc(p?.body)}</textarea></div>
-      ${p ? "" : `<div class="field"><label>Kimga</label>
-        <div class="small muted" style="margin-bottom:6px">Masalani faqat siz, tanlangan xodimlar, Monitoring bo'limi rahbari va bo'lim rahbarlari ko'radi. Hech kim tanlanmasa — faqat rahbariyatga boradi.</div>
-        <input type="search" id="p-rq" placeholder="Xodimni qidiring…" style="margin-bottom:6px">
-        <div id="p-rcp" style="max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 10px">${S.profiles.filter(x => x.active && !x.archived && ["xodim", "ceo", "asoschi"].includes(x.role) && x.id !== S.me.id).sort((a, b) => a.full_name.localeCompare(b.full_name)).map(x => `<label class="row" data-rn="${esc(x.full_name.toLowerCase())}" style="gap:8px;align-items:center;font-weight:400;margin:3px 0"><input type="checkbox" data-rcp="${x.id}" style="width:auto">${esc(x.full_name)} <span class="small muted">· ${esc(titleOf(x))}</span></label>`).join("")}</div></div>`}
-      <div class="field"><label>Havola (ixtiyoriy: video, hujjat)</label><input name="link" type="url" placeholder="https://..." value="${esc(p?.link)}"></div>
-      <div class="field"><label>Rasm <span class="muted">(ixtiyoriy, 6 tagacha)</span></label>${p && (p.images || []).length ? `<div class="small muted">Mavjud rasmlar: ${p.images.length} ta — yangilari qo'shiladi</div>` : ""}<div id="p-img"></div></div>
-    </form>`, `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="psave">${p ? "Saqlash" : "Yuborish"}</button>`);
-    const getPImg = imgPicker($("#p-img", m));
-    const rq = $("#p-rq", m); if (rq) rq.oninput = () => { const q = rq.value.trim().toLowerCase(); $$("[data-rn]", m).forEach(l => { l.style.display = !q || l.dataset.rn.includes(q) ? "" : "none"; }); };
+  // ---- Yangi muammo / taklif: turi -> mas'ul avtomatik; muhimlik -> muddat; o'xshash ochiq muammo bo'lsa — unga qo'shilish
+  const ceosOf = d => S.profiles.filter(x => x.role === "ceo" && x.active && !x.archived && deptOf(x) === d);
+  function masulPreview(kind, pt) {
+    let L = [];
+    if (kind === "taklif") { L = S.profiles.filter(x => x.role === "asoschi" && x.active); const c = person(S.me.ceo_id); if (c) L.push(c); }
+    else if (pt === "intizomiy" || pt === "texnik") L = ceosOf("intizomiy");
+    else if (pt === "akademik") L = ceosOf("akademik");
+    else L = [...ceosOf("intizomiy"), ...ceosOf("akademik")];
+    L = L.filter(x => x.id !== S.me.id);
+    return L.length ? L.map(x => x.full_name).join(" va ") : "Monitoring bo'limi rahbari";
+  }
+  const simNorm = t => String(t || "").toLowerCase().replace(/ğ/g, "g").replace(/ş/g, "sh").replace(/ç/g, "ch").replace(/[öô]/g, "o").replace(/[üû]/g, "u").replace(/ı/g, "i").replace(/[ʻʼ'`‘’"]/g, "");
+  const SIM_STOP = new Set(["xona", "xonad", "xonas", "filia", "maktab", "uchun", "bilan", "kerak", "ham", "yoq", "bor", "emas", "juda"]);
+  const simToks = t => new Set(simNorm(t).split(/[^a-zа-яё0-9]+/).filter(w => /^\d+$/.test(w) || w.length >= 3).map(w => /^\d+$/.test(w) ? "#" + w : w.slice(0, 5)).filter(w => !SIM_STOP.has(w)));
+  function simScore(a, b) { let s = 0; a.forEach(w => { if (b.has(w)) s += w[0] === "#" ? 2 : 1; }); return s; }
+  function postForm(p, pre = {}) {
+    if (p) {
+      const m = openModal("Masalani tahrirlash", `<form id="pform">
+        <div class="field"><label>Matn *</label><textarea name="body" required style="min-height:130px">${esc(p.body)}</textarea></div>
+        <div class="field"><label>Havola (ixtiyoriy)</label><input name="link" type="url" placeholder="https://..." value="${esc(p.link)}"></div>
+        <div class="field"><label>Rasm <span class="muted">(ixtiyoriy)</span></label>${(p.images || []).length ? `<div class="small muted">Mavjud rasmlar: ${p.images.length} ta — yangilari qo'shiladi</div>` : ""}<div id="p-img"></div></div></form>`,
+        `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="psave">Saqlash</button>`);
+      const getPImg = imgPicker($("#p-img", m));
+      $("#psave", m).onclick = async e => {
+        const f = $("#pform", m); if (!f.reportValidity()) return;
+        const d = { body: f.body.value.trim(), link: f.link.value.trim() }; if (!d.body) return toast("Matnni yozing", true);
+        e.target.disabled = true;
+        try { const add = await getPImg(); if (add.length) d.images = [...(p.images || []), ...add]; } catch (err) { e.target.disabled = false; return toast(err.message, true); }
+        await act(() => db.updatePost(p.id, d), "Saqlandi").catch(() => { e.target.disabled = false; }); await refresh(); render(); openPost(p.id);
+      };
+      return;
+    }
+    const F = { kind: pre.kind || "muammo", ptype: pre.ptype || "", priority: "oddiy", body: "", link: "" };
+    const SIM = {}; let simT = 0;
+    const m = openModal(F.kind === "taklif" ? "Yangi taklif" : "Yangi muammo", `<div id="pf"></div>`,
+      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="psave">Yuborish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "680px";
+    const root = $("#pf", m); let getPImg = null;
+    const draw = () => {
+      $(".modal-head h2", $("#modal-root")).textContent = F.kind === "taklif" ? "Yangi taklif" : "Yangi muammo";
+      root.innerHTML = `
+        <div class="seg mz-kind"><button type="button" data-k="muammo" class="${F.kind === "muammo" ? "active" : ""}">🔧 Muammo</button><button type="button" data-k="taklif" class="${F.kind === "taklif" ? "active" : ""}">💡 Taklif</button></div>
+        ${F.kind === "muammo" ? `<div class="field"><label>Muammo turi *</label><div class="mz-types">${Object.entries(PTYPES).map(([k, [l, col]]) => `<label class="mz-type ${F.ptype === k ? "on" : ""}" style="--c:${col}"><input type="radio" name="pt" value="${k}" ${F.ptype === k ? "checked" : ""}><b>${l}</b><span class="small muted">Mas'ul: ${esc(masulPreview("muammo", k))}</span></label>`).join("")}</div></div>`
+          : `<div class="note" style="margin:0 0 12px">Taklifni <b>${esc(masulPreview("taklif"))}</b> ko'rib chiqadi va qabul yoki rad etadi (sababi bilan).</div>`}
+        <div class="field"><label>Muhimlik</label><div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(PRIOS).map(([k, [l, t]]) => `<button type="button" class="btn sm ${F.priority === k ? "primary" : ""}" data-pr="${k}">${l} · ${t}</button>`).join("")}</div>
+          <div class="small muted" style="margin-top:4px">Mas'ul shu muddatda hal qilishi kerak. Muddat o'tsa — unga, yana 1 kun o'tsa — Monitoring bo'limi rahbariga xabar boradi.</div></div>
+        <div class="field"><label>${F.kind === "taklif" ? "Taklif matni" : "Muammo nimada? (filial, xona, nima ishlamayapti)"} *</label><textarea id="pf-b" style="min-height:120px" placeholder="${F.kind === "taklif" ? "Masalan: PD mashg'ulotlarini har ikki haftada o'tkazish…" : "Masalan: Farg'ona filiali 102-xona kamerasi ishlamayapti"}">${esc(F.body)}</textarea></div>
+        <div id="pf-sim"></div>
+        <div class="field"><label>Havola <span class="muted">(ixtiyoriy: video, hujjat)</span></label><input id="pf-l" type="url" placeholder="https://..." value="${esc(F.link)}"></div>
+        <div class="field"><label>Rasm <span class="muted">(ixtiyoriy, 6 tagacha)</span></label><div id="p-img"></div></div>
+        <div class="err-text" id="pf-e"></div>`;
+      getPImg = imgPicker($("#p-img", root));
+      $$("[data-k]", root).forEach(b => b.onclick = () => { F.kind = b.dataset.k; draw(); });
+      $$("[name=pt]", root).forEach(r => r.onchange = () => { F.ptype = r.value; draw(); });
+      $$("[data-pr]", root).forEach(b => b.onclick = () => { F.priority = b.dataset.pr; $$("[data-pr]", root).forEach(x => x.classList.toggle("primary", x === b)); });
+      $("#pf-b", root).oninput = e => { F.body = e.target.value; clearTimeout(simT); simT = setTimeout(simDraw, 450); };
+      $("#pf-l", root).oninput = e => { F.link = e.target.value; };
+      simDraw();
+    };
+    async function simDraw() {
+      const box = $("#pf-sim", root); if (!box) return;
+      if (F.kind !== "muammo" || F.body.trim().length < 6 || !db.postSimilar) { box.innerHTML = ""; return; }
+      const key = F.ptype || "*";
+      if (!SIM[key]) { try { SIM[key] = await db.postSimilar(F.ptype || ""); } catch (e) { SIM[key] = []; } }
+      const me = simToks(F.body);
+      const top = SIM[key].map(x => ({ x, s: simScore(me, simToks(x.body)) })).filter(z => z.s >= 3).sort((a, b) => b.s - a.s).slice(0, 3);
+      if (!$("#pf-sim", root)) return;
+      box.innerHTML = top.length ? `<div class="mz-sim"><b>🔎 Shunga o'xshash muammo allaqachon yozilgan</b><div class="small muted">Takror yozmasdan, mavjudiga qo'shiling — mas'ul nechta odam duch kelganini ko'radi.</div>
+        ${top.map(({ x }) => `<div class="mz-sim-i"><div style="flex:1;min-width:0"><div class="small">#${x.id} · ${esc(x.body)}</div><div class="small muted">${fmtDate(x.created_at)} · ${esc(PSTAT[x.status] || x.status)} · ${x.n} kishi duch kelgan</div></div>
+          ${x.mine ? `<button class="btn sm" data-simopen="${x.id}">Ochish</button>` : `<button class="btn sm primary" data-join="${x.id}">➕ Men ham duch keldim</button>`}</div>`).join("")}</div>` : "";
+      $$("[data-simopen]", box).forEach(b => b.onclick = () => openPost(+b.dataset.simopen));
+      $$("[data-join]", box).forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try { await db.postJoin(+b.dataset.join, F.body.trim()); toast("Muammoga qo'shildingiz — mas'ulga xabar ketdi"); await refresh(); render(); openPost(+b.dataset.join); }
+        catch (e) { b.disabled = false; toast(e.message, true); }
+      });
+    }
+    draw();
     $("#psave", m).onclick = async e => {
-      const f = $("#pform", m); if (!f.reportValidity()) return;
-      const d = Object.fromEntries(new FormData(f)); d.body = d.body.trim();
-      if (!p) d.recipients = $$("[data-rcp]", m).filter(x => x.checked).map(x => x.dataset.rcp);
-      if (!d.body) return toast("Matnni yozing", true);
-      e.target.disabled = true;
-      try { const add = await getPImg(); if (add.length || !p) d.images = [...((p && p.images) || []), ...add]; } catch (err) { e.target.disabled = false; return toast(err.message, true); }
-      await act(() => p ? db.updatePost(p.id, d) : db.createPost(d), p ? "Saqlandi" : "Masala kiritildi");
-      await refresh(); render();
+      const err = $("#pf-e", root); err.textContent = "";
+      if (F.kind === "muammo" && !F.ptype) return (err.textContent = "Muammo turini tanlang");
+      const body = F.body.trim(); if (body.length < 5) return (err.textContent = "Matnni yozing");
+      e.target.disabled = true; let images = [];
+      try { images = await getPImg(); } catch (x) { e.target.disabled = false; return (err.textContent = x.message); }
+      try { const r = await db.createPost({ kind: F.kind, ptype: F.kind === "muammo" ? F.ptype : null, priority: F.priority, body, link: F.link.trim(), images });
+        toast(F.kind === "taklif" ? "Taklif yuborildi" : "Muammo yuborildi — mas'ulga xabar ketdi"); await refresh(); render(); if (r && r.id) openPost(r.id); }
+      catch (x) { e.target.disabled = false; err.textContent = x.message; }
     };
   }
 
+  // ---- Masalani ochish: tarix (harakatlar + izohlar) va rolga qarab tugmalar
+  const PEV = { yaratildi: "🆕 yubordi", boshla: "🛠 ishni boshladi", hal: "✅ «hal qilindi» deb belgiladi", tasdiq: "👍 hal bo'lganini tasdiqladi", qaytar: "↩️ «hal bo'lmadi» deb qaytardi",
+    muhimlik: "⚡ muhimlikni o'zgartirdi", tur: "🔀 turini o'zgartirdi", tqabul: "✅ taklifni qabul qildi", trad: "❌ taklifni rad etdi", joriy: "🚀 joriy etildi deb belgiladi",
+    qayta_och: "🔁 qayta ochdi", qoshildi: "➕ ham shu muammoga duch keldi", muddat: "⏰ Muddat o'tdi — mas'ulga eslatildi", eskalatsiya: "🚨 Muddat 1 kundan ortiq o'tdi — Monitoring bo'limi rahbariga yuborildi" };
+  const pevNote = ev => ev.act === "muhimlik" ? (PRIOS[ev.note]?.[0] || ev.note) : ev.act === "tur" ? (() => { const [k, ...r] = String(ev.note || "").split(" · "); return (PTYPES[k]?.[0] || k) + (r.length ? " · " + r.join(" · ") : ""); })() : ev.note;
   async function openPost(id) {
-    const p = S.posts.find(x => x.id === id); if (!p) return;
-    const mine = p.author_id === S.me.id;
+    let p = S.posts.find(x => x.id === id);
+    if (!p) { toast("Bu masala sizga tegishli emas yoki o'chirilgan", true); return; }
+    const me = S.me.id, isA = S.me.role === "asoschi", isM = isPostMasul(p), isAu = p.author_id === me;
     markSeen("post", p.id);
-    const canStatus = mine || isManager();
-    const comments = await db.listComments(p.id).catch(() => []);
-    const m = openModal(`${esc(PCATS[p.category]?.[0] || "Umumiy")}`, `
-      <div class="row" style="gap:10px;margin-bottom:10px">${catBadge(p.category, 30)}<div><b>${esc(nameOf(p.author_id))}</b><div class="small muted">${fmtDate(p.created_at)} · Kimga: ${p.recipients && p.recipients.length ? esc(p.recipients.map(nameOf).join(", ")) + " va rahbariyat" : "rahbariyatga"}</div></div><span class="spacer"></span>${pill(PSTAT_CLS[p.status], PSTAT[p.status])}</div>
-      <div style="white-space:pre-wrap">${linkify(p.body)}</div>
+    const [comments, events] = await Promise.all([db.listComments(p.id).catch(() => []), db.listPostEvents ? db.listPostEvents(p.id).catch(() => []) : []]);
+    const hist = [...events.map(e => ({ t: e.at, ev: e })), ...comments.map(c => ({ t: c.created_at, c }))].sort((a, b) => a.t < b.t ? -1 : 1);
+    const can = { boshla: (isM || isA) && p.status === "ochiq",
+      hal: p.kind === "muammo" && (isM || isA) && postOpen(p), tur: p.kind === "muammo" && (isM || isA) && postOpen(p),
+      tasdiq: (isAu || isA) && p.status === "hal_qilindi", muhim: (isAu || isA) && postOpen(p),
+      tq: p.kind === "taklif" && (isM || isA) && postOpen(p), joriy: p.kind === "taklif" && (isM || isA) && p.status === "qabul",
+      qayta: isA && !postOpen(p) };
+    const acts = [];
+    if (can.boshla) acts.push(`<button class="btn sm" data-pa="boshla">🛠 ${p.kind === "taklif" ? "Ko'rib chiqyapman" : "Ishni boshladim"}</button>`);
+    if (can.hal) acts.push(`<button class="btn sm primary" data-pa="hal" data-need="Nima qilindi? (yuboruvchi ko'rib tasdiqlaydi)">✅ Hal qilindi</button>`);
+    if (can.tasdiq) acts.push(`<button class="btn sm primary" data-pa="tasdiq">👍 Tasdiqlayman — hal bo'ldi</button><button class="btn sm bad" data-pa="qaytar" data-need="Nima hal bo'lmadi?">↩️ Hal bo'lmadi</button>`);
+    if (can.tq) acts.push(`<button class="btn sm primary" data-pa="tqabul" data-opt="Izoh (ixtiyoriy)">✅ Qabul qilish</button><button class="btn sm bad" data-pa="trad" data-need="Rad etish sababi">❌ Rad etish</button>`);
+    if (can.joriy) acts.push(`<button class="btn sm primary" data-pa="joriy">🚀 Joriy etildi</button>`);
+    if (can.qayta) acts.push(`<button class="btn sm" data-pa="qayta_och" data-opt="Nega qayta ochilyapti? (ixtiyoriy)">🔁 Qayta ochish</button>`);
+    const m = openModal(`${esc(ptLabel(p))} <span class="small muted">#${p.id}</span>`, `
+      <div class="row" style="gap:10px;margin-bottom:10px">${postBadge(p, 30)}<div><b>${esc(nameOf(p.author_id))}</b><div class="small muted">${fmtDate(p.created_at)} ${tmOf(p.created_at)}</div></div><span class="spacer"></span>${pill(PSTAT_CLS[p.status], pStat(p))}</div>
+      <div class="mz-meta">
+        <div><span class="muted">Mas'ul:</span> <b>${esc(masulNames(p))}</b></div>
+        <div><span class="muted">Muhimlik:</span> ${esc(PRIOS[p.priority]?.[0] || "")}${postOpen(p) && p.due_at ? ` · muddat ${fmtDate(localOf(p.due_at))} ${tmOf(p.due_at)} ${dueTxt(p)}` : ""}${can.muhim ? ` <select id="pa-pr" class="mz-mini">${Object.entries(PRIOS).map(([k, [l]]) => `<option value="${k}" ${p.priority === k ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}</div>
+        ${(p.followers || []).length ? `<div><span class="muted">Yana duch kelganlar:</span> ${esc(p.followers.map(nameOf).join(", "))}</div>` : ""}
+        ${can.tur ? `<div><span class="muted">Turi noto'g'ri bo'lsa:</span> <select id="pa-tur" class="mz-mini"><option value="">— boshqa turga o'tkazish —</option>${Object.entries(PTYPES).filter(([k]) => k !== p.ptype).map(([k, [l]]) => `<option value="${k}">${l} (${esc(masulPreview("muammo", k))})</option>`).join("")}</select></div>` : ""}
+      </div>
+      <div style="white-space:pre-wrap;margin-top:10px">${linkify(p.body)}</div>
       ${imgGallery(p.images)}
       ${p.link ? `<p><a class="btn sm" href="${esc(p.link)}" target="_blank" rel="noopener">Havolani ochish ↗</a></p>` : ""}
-      ${S.me.role === "asoschi" ? `<div class="assign-band"><div><b>📌 Topshiriq qilib berish</b><div class="small muted">Shu masalani jamoadagi istalgan odamga muddat va izoh bilan yuklang.</div></div><button class="btn primary sm" id="p-assign">Topshiriq qilish</button></div>` : ""}
+      ${p.resolution ? `<div class="mz-res"><b>${p.kind === "taklif" ? (p.status === "rad" ? "Rad etish sababi" : "Qaror izohi") : "Nima qilindi"}:</b> ${linkify(p.resolution)}<div class="small muted">${esc(nameOf(p.decided_by))}${p.resolved_at ? " · " + fmtDate(p.resolved_at) + " " + tmOf(p.resolved_at) : ""}${p.confirmed_at ? " · ✅ tasdiqlangan" : ""}</div></div>` : ""}
+      ${p.status === "hal_qilindi" && isAu ? `<div class="note" style="margin-top:10px"><b>Mas'ul muammoni hal qildim dedi.</b> Tekshirib ko'ring: hal bo'lgan bo'lsa — tasdiqlang, bo'lmagan bo'lsa — sababini yozib qaytaring.</div>` : ""}
+      ${acts.length ? `<div class="mz-acts"><div class="row" style="gap:6px;flex-wrap:wrap">${acts.join("")}</div><div id="pa-box" style="display:none;margin-top:8px"><label class="small" id="pa-lbl"></label><textarea id="pa-note" rows="3"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="btn sm primary" id="pa-go">Yuborish</button><button class="btn sm" id="pa-x">Bekor</button></div></div></div>` : ""}
+      ${isA ? `<div class="assign-band"><div><b>📌 Topshiriq qilib berish</b><div class="small muted">Shu masalani jamoadagi istalgan odamga muddat va izoh bilan yuklang.</div></div><button class="btn primary sm" id="p-assign">Topshiriq qilish</button></div>` : ""}
       ${(() => { const tl = S.tasks.filter(t => t.post_id === p.id); return tl.length ? `<div class="small" style="margin-top:8px">${tl.map(t => `<div>📌 <b>${esc(nameOf(t.assigned_to))}</b>ga topshirilgan · ${pill(t.status, TSTAT[t.status])} <a href="#" data-opent="${t.id}">ochish</a></div>`).join("")}</div>` : ""; })()}
-      ${viewersBlock(postViewers(p))}
-      ${canStatus ? `<div class="row" style="margin-top:14px"><span class="small muted">Holat:</span>${Object.entries(PSTAT).map(([k, v]) => `<button class="btn sm ${p.status === k ? "primary" : ""}" data-pst="${k}">${v}</button>`).join("")}</div>` : ""}
-      <h3 style="margin-top:18px">Izohlar (${comments.length})</h3>
-      <div>${comments.map(c => `<div class="list-item"><div style="flex:1;min-width:0"><b class="small">${esc(nameOf(c.author_id))}</b> <span class="small muted">${fmtDate(c.created_at)} ${tmOf(c.created_at)}</span><div style="white-space:pre-wrap">${linkify(c.body)}</div>${imgGallery(c.images, true)}</div></div>`).join("") || `<p class="small muted">Hali izoh yo'q</p>`}</div>
-      <div class="field" style="margin-top:10px"><textarea id="cbody" placeholder="Izoh yozing…" style="min-height:64px"></textarea><div id="c-img" style="margin-top:8px"></div></div>`,
-      `${mine ? `<button class="btn sm" id="p-edit">Tahrirlash</button>` : ""}${mine || S.me.role === "asoschi" ? `<button class="btn sm bad" id="p-del">O'chirish</button>` : ""}<span class="spacer"></span><button class="btn primary" id="c-send">Izoh yuborish</button>`);
-    $$("[data-pst]", m).forEach(b => b.onclick = async () => {
-      await act(() => db.updatePost(p.id, { status: b.dataset.pst }), "Holat yangilandi"); await refresh(); render(); openPost(id);
+      <h3 style="margin-top:18px">Tarix va izohlar</h3>
+      <div class="mz-hist">${hist.map(h => h.ev ? `<div class="mz-ev"><span>${h.ev.actor ? `<b>${esc(nameOf(h.ev.actor))}</b> ` : ""}${esc(PEV[h.ev.act] || h.ev.act)}${h.ev.note && h.ev.act !== "yaratildi" ? `: <i>${esc(pevNote(h.ev))}</i>` : ""}</span><span class="small muted">${fmtDate(h.t)} ${tmOf(h.t)}</span></div>`
+        : `<div class="list-item"><div style="flex:1;min-width:0"><b class="small">💬 ${esc(nameOf(h.c.author_id))}</b> <span class="small muted">${fmtDate(h.t)} ${tmOf(h.t)}</span><div style="white-space:pre-wrap">${linkify(h.c.body)}</div>${imgGallery(h.c.images, true)}</div></div>`).join("") || `<p class="small muted">Hali harakat yo'q</p>`}</div>
+      <div class="field" style="margin-top:10px"><textarea id="cbody" placeholder="Izoh yozing… (boshqa tomonlarga Telegram orqali boradi)" style="min-height:64px"></textarea><div id="c-img" style="margin-top:8px"></div></div>`,
+      `${isAu && p.status === "ochiq" ? `<button class="btn sm" id="p-edit">Tahrirlash</button>` : ""}${(isAu && p.status === "ochiq") || isA ? `<button class="btn sm bad" id="p-del">O'chirish</button>` : ""}<span class="spacer"></span><button class="btn primary" id="c-send">Izoh yuborish</button>`);
+    const run = async (a, note = "", val = null) => {
+      try { await db.postAct(p.id, a, note, val); toast("Saqlandi"); await refresh(); render(); openPost(id); } catch (e) { toast(e.message, true); throw e; }
+    };
+    let pend = null;
+    $$("[data-pa]", m).forEach(b => b.onclick = () => {
+      const need = b.dataset.need, opt = b.dataset.opt;
+      if (!need && !opt) { b.disabled = true; return run(b.dataset.pa).catch(() => { b.disabled = false; }); }
+      pend = { a: b.dataset.pa, need: !!need }; $("#pa-box", m).style.display = ""; $("#pa-lbl", m).textContent = (need || opt) + (need ? " *" : ""); $("#pa-note", m).focus();
     });
+    if ($("#pa-x", m)) $("#pa-x", m).onclick = () => { pend = null; $("#pa-box", m).style.display = "none"; };
+    if ($("#pa-go", m)) $("#pa-go", m).onclick = async e => {
+      if (!pend) return; const v = $("#pa-note", m).value.trim(); if (pend.need && v.length < 3) return toast("Izohni yozing", true);
+      e.target.disabled = true; await run(pend.a, v).catch(() => { e.target.disabled = false; });
+    };
+    if ($("#pa-pr", m)) $("#pa-pr", m).onchange = e => run("muhimlik", "", e.target.value).catch(() => {});
+    if ($("#pa-tur", m)) $("#pa-tur", m).onchange = e => { if (e.target.value) run("tur", "", e.target.value).catch(() => {}); };
     hydrateImgs(m);
     const getCImg = imgPicker($("#c-img", m), "Rasm");
     $$("[data-opent]", m).forEach(a => a.onclick = e => { e.preventDefault(); openTask(+a.dataset.opent || a.dataset.opent); });
@@ -6608,10 +6808,10 @@ window.METODISTLAR = [
       try {
         const extra = await getImg(); const images = [...(p.images || []), ...extra];
         const title = "Masala: " + p.body.replace(/\s+/g, " ").slice(0, 90) + (p.body.length > 90 ? "…" : "");
-        const description = `${PCATS[p.category]?.[0] || "Masala"} — ${nameOf(p.author_id)} (${fmtDate(p.created_at)}):\n${p.body}${p.link ? "\n" + p.link : ""}${note ? "\n\nRahbar izohi: " + note : ""}`;
+        const description = `${ptLabel(p)} — ${nameOf(p.author_id)} (${fmtDate(p.created_at)}):\n${p.body}${p.link ? "\n" + p.link : ""}${note ? "\n\nRahbar izohi: " + note : ""}`;
         for (const id of ids) await db.createTask({ title, description, category: "boshqa", priority: f.priority.value, ...getDl(), assigned_to: id, images, post_id: p.id });
         await db.addComment(p.id, `📌 Topshiriq qilib berildi: ${ids.map(nameOf).join(", ")}${note ? "\nIzoh: " + note : ""}`, []).catch(() => {});
-        if (p.status === "ochiq") await db.updatePost(p.id, { status: "jarayonda" }).catch(() => {});
+        if (p.status === "ochiq" && db.postAct) await db.postAct(p.id, "boshla", "").catch(() => {});
         toast(`${ids.length} kishiga topshiriq yuborildi`); await refresh(); render(); openPost(p.id);
       } catch (err) { e.target.disabled = false; e.target.textContent = "Topshiriq qilib yuborish"; $("#af-err", m).textContent = err.message; }
     };
@@ -6729,8 +6929,8 @@ window.METODISTLAR = [
     const pe = addD(ps, 13);
     const mine = S.posts.filter(x => x.author_id === p.id && x.created_at && inDays(localOf(x.created_at), ps, pe));
     if (item.hint === "posts") return `${mine.length} ta masala kiritgan`;
-    if (item.hint === "resolved") return `${mine.filter(x => x.status === "hal_qilindi").length} ta masala hal qilingan`;
-    if (item.hint === "taklif") return `${mine.filter(x => x.category === "taklif").length} ta taklif`;
+    if (item.hint === "resolved") return `${mine.filter(x => ["hal_qilindi", "tasdiqlandi"].includes(x.status)).length} ta masala hal qilingan`;
+    if (item.hint === "taklif") return `${mine.filter(x => x.kind === "taklif" || x.category === "taklif").length} ta taklif`;
     return "";
   }
   // ---- KPI darajalari: kunlik -> haftalik -> 2 haftalik (bosqich)
@@ -8209,7 +8409,7 @@ window.METODISTLAR = [
         ["chat", "Masalalar", "Muammo va takliflarni kiriting, hamkasblar bilan muhokama qiling."]],
       day: [["Ish boshida", "Rejani ko'ring", "Bosh sahifadagi «Bugungi rejangiz» va rahbaringiz eslatmasini o'qing."],
         ["Kun davomida", "Topshiriqlarni bajaring", "Boshlaganda «Boshlash», tugatganda «Bajarildi» tugmasini bosing va natijani yozing."],
-        ["Muammo bo'lsa", "Masala kiriting", "Kerakli bo'limni tanlab yozing — rahbarlar darhol ko'radi."],
+        ["Muammo bo'lsa", "Masala kiriting", "Muammo turini tanlang — mas'ul rahbarga darhol boradi, hal bo'lgach siz tasdiqlaysiz."],
         ["Kun oxirida", "Bahoni ko'ring", "Rahbaringiz kunlik hisobot va bahoni yozadi — «Kunlik baholarim»da chiqadi."]],
       grade: null,
       privacy: ["Baholaringiz va ball izohlarini faqat siz va rahbaringiz ko'radi.", "Boshqa xodimlar sizning bahoyingizni ko'rmaydi."],
@@ -9491,7 +9691,7 @@ window.METODISTLAR = [
       body += D.h2(`${x.c.full_name} — ${x.final ?? "—"} / 100 · ${x.letter}`) + D.p(`${titleOf(x.c)} · ${x.members} xodim${x.pending ? ` · Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA})` : ""}`, { c: "4A5A70", sz: 19, keep: 1 })
         + D.tableX([{ h: "Mezon", w: 4600 }, { h: "Natija", w: 1500, al: "center" }, { h: "Ball", w: 1600, al: "center" }, { h: "Izoh", w: 5300 }, { h: "O'tgan oy", w: 2000, al: "center" }],
           x.items.map((c, k) => { const pc = c.r === null || c.r === undefined ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100);
-            return { cells: [{ v: c.it.l, b: 1 }, pc === null ? "—" : { v: pc + "%", ...(wPct(pc / 100) || {}) }, { v: `${c.v ?? "—"} / ${c.it.max}`, b: 1 }, { v: c.why || "", sz: 17 }, px ? String(px.items[k].v ?? "—") : "—"] }; }))
+            return { cells: [{ v: c.it.l, b: 1 }, pc === null ? "—" : { v: pc + "%", ...(wPct(pc / 100) || {}) }, { v: `${c.v ?? "—"} / ${c.it.max}`, b: 1 }, { v: c.why || "", sz: 17 }, px ? String(px.items.find(i => i.it.k === c.it.k)?.v ?? "—") : "—"] }; }))
         + (x.rate?.note ? D.p(`💬 Monitoring bo'limi rahbari: ${x.rate.note}`, { sz: 19 }) : ""); });
     return { blob: D.build(body, true, `Registon maktabi · Monitoring bo'limi · Rahbarlar reytingi · ${mLabel(ms)}`), name: wFile("Rahbarlar-reytingi", mLabel(ms)), cap: `📄 Bo'lim rahbarlari reytingi — ${mLabel(ms)}` };
   }
