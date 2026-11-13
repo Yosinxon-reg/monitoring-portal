@@ -3265,7 +3265,7 @@ window.METODISTLAR = [
     if (has("davomat")) { const a = attDay(S.me, t); if (a && a.ded) out.push(`🕘 Bugungi davomat: ${esc(attTxt(a))}`); }
     if (deptOf(S.me) === "akademik") {
       const ch = (S.recs || []).filter(o => o.user_id === S.me.id && o.day === t && o.status === "tanlandi" && !recSeen(o));
-      if (ch.length) out.push(`👁 Tavsiyalardan tanlagan <b>${ch.length}</b> ta ustozingiz hali hisobotga kiritilmagan${now < 15 * 60 ? " (rejadan ortiq tanlanganlari 15:00 da bo'shatiladi)" : ""}`);
+      if (ch.length) out.push(`👁 Tavsiyalardan tanlagan <b>${ch.length}</b> ta ustozingiz hali hisobotga kiritilmagan`);
       const plan = dayPlan(S.me, t); if (plan && !isWritten(r) && has("reja")) out.push(`📍 Bugungi rejangiz: <b>${esc(plan)}</b> — hisobotdagi filial rejaga mos kelmasa, «Reja» mezoniga 0 ball`);
     }
     const od = (S.tasks || []).filter(x => x.assigned_to === S.me.id && isOverdue(x)).length, dueT = (S.tasks || []).filter(x => x.assigned_to === S.me.id && ACTIVE_T.includes(x.status) && x.due_date === t && !isOverdue(x)).length;
@@ -4060,9 +4060,6 @@ window.METODISTLAR = [
         ${tt && tnShort(tt.full_name) ? (() => { const pq = ismPending(tt.id);
           return pq ? `<div class="ar-fn small">✏️ To'liq ism so'rovi yuborilgan: <b>${esc(pq.new_name)}</b> — CEO tasdig'ini kutmoqda</div>`
             : `<div class="ar-fn"><label class="small"><b>✏️ Bu ustozning ismi qisqa yozilgan («${esc(tt.full_name)}»).</b> To'liq familiya, ism va otasining ismini yozing *</label><input data-r="${i}" data-f="fullname" value="${esc(x.fullname || "")}" placeholder="Masalan: ${esc(String(tt.full_name).split(" ")[0])} Nodira Ravshanovna"><div class="small muted">CEO tasdiqlagach, ustozning ismi hamma joyda to'liq ko'rinadi. Eski kuzatuvlari saqlanadi.</div></div>`; })() : ""}
-        ${kind === "akademik" ? (() => { const pv = tt ? prevAdvice(tt.id, x.date || date, date) : null;
-          return `<div class="ar-adv">${pv ? `<div class="ar-prev small">💡 <b>Avvalgi tavsiya</b> (${fmtDate(pv.day)}, ${esc(shortName(pv.author_id))}): «${esc(pv.advice)}» <span class="muted">— bajarildimi?</span> ${[["ha", "Ha"], ["qisman", "Qisman"], ["yoq", "Yo'q"]].map(([k, l]) => `<button type="button" class="chip-btn sm ${x.prev_ok === k ? "on" : ""}" data-pok="${i}" data-v="${k}">${l}</button>`).join("")}</div>` : ""}
-            <div class="field" style="margin:6px 0 0"><label class="small">Ustozga tavsiya <span class="muted">(ixtiyoriy · keyingi kuzatuvda tekshiriladi · KPI «Tahlil»ga ta'sir qiladi)</span></label><textarea data-r="${i}" data-f="advice" rows="2" placeholder="Masalan: dars boshida maqsadni aniq ayting, o'quvchilarni juftlikda ishlating">${esc(x.advice || "")}</textarea></div></div>`; })() : ""}
         <div class="ar-act"><button type="button" class="btn sm" data-rdup="${i}" title="Shu ustozning keyingi darsi">⧉ Shu ustoz, keyingi sinf</button>${F.rows.length > 1 || kind !== "akademik" ? `<button type="button" class="btn sm ghost" data-rdel="${i}">O'chirish</button>` : ""}</div>
       </div>`; };
     const rowsBlock = () => `<div class="ar-list">${F.rows.map(rowHtml).join("")}</div>
@@ -5109,7 +5106,7 @@ window.METODISTLAR = [
   const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
   const recFromPlan = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); return !!m && +m[0] >= 1 && +m[0] <= 30; };
   // Yana qancha «taklif» kerak: reja − tanlanganlar
-  // Kunlik rejadan tashqari yana REC_EXTRA tagacha «qo'shimcha» tanlash mumkin (15:00 gacha ko'rilmasa — navbatga qaytadi)
+  // Kunlik rejadan tashqari yana REC_EXTRA tagacha «qo'shimcha» tanlash mumkin (kun oxirigacha saqlanadi)
   const REC_EXTRA = 2;
   const recWant = day => !isWorkdayOn(S.me, day) ? 0 : Math.max(0, recTarget(day) + REC_EXTRA - recMine(day, ["tanlandi"]).length);
   const recExtraIds = day => { const ch = recMine(day, ["tanlandi"]).slice().sort((a, b) => String(a.decided_at || "").localeCompare(String(b.decided_at || "")) || a.id - b.id);
@@ -5205,11 +5202,11 @@ window.METODISTLAR = [
       box.innerHTML = `<div class="card pl-rec rec-w" style="margin:0 0 16px"><div class="card-head"><h2>📌 Tavsiyalar</h2>
           <div class="seg" style="margin-left:8px">${tOff ? "" : `<button type="button" data-rd="${t}" class="${day === t ? "active" : ""}">Bugun</button>`}<button type="button" data-rd="${nd}" class="${day === nd ? "active" : ""}">${esc(KUN[dowOf(nd)])}, ${fmtDate(nd)}</button></div>
           <span class="spacer"></span><span class="small muted">${recFromPlan(day) ? "kunlik rejangiz" : "tavsiya"}: <b>${recTarget(day)}</b> ta · tanlangan: <b>${ch.length}</b>${ch.length > recTarget(day) ? ` <span class="muted">(${ch.length - recTarget(day)} qo'shimcha)</span>` : ""}</span></div>
-        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng; reja to'lgach yana ${REC_EXTRA} tagacha qo'shimcha tanlash mumkin (qo'shimchalar soat 15:00 gacha ko'rilmasa, boshqalarga qaytadi). Navbat: avval hech qachon ko'rilmagan, keyin eng uzoq ko'rilmagan ustozlar (3+ hafta → 2 hafta → 1 hafta); oxirgi ${REC_GAP} kunda ko'rilganlar tavsiya qilinmaydi. Bir xil muddatdagilar ichida filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
+        <p class="small muted" style="margin:0 0 8px">Soni — haftalik rejangizdagi shu kungi dars soniga teng; reja to'lgach yana ${REC_EXTRA} tagacha qo'shimcha tanlash mumkin (qo'shimchalar ham kun oxirigacha sizda qoladi). Navbat: avval hech qachon ko'rilmagan, keyin eng uzoq ko'rilmagan ustozlar (3+ hafta → 2 hafta → 1 hafta); oxirgi ${REC_GAP} kunda ko'rilganlar tavsiya qilinmaydi. Bir xil muddatdagilar ichida filiallar ustozlar soniga mos. Bitta ustoz bir kunda faqat bitta xodimga tavsiya qilinadi. Tanlaganlaringiz haftalik rejangizga va hisobot formasiga tushadi, rad etsangiz — o'rniga boshqasi chiqadi.</p>
         ${pend.length ? pend.map(o => `<div class="list-item">${info(o.teacher_id)}<button type="button" class="btn sm primary" data-rok="${o.id}">✓ Tanlash</button><button type="button" class="btn sm ghost" data-rno="${o.id}">✕ Rad etish</button></div>`).join("")
           : `<div class="empty" style="padding:10px">${REC.busy ? "Yuklanmoqda…" : !recWant(day) ? `✓ Kunlik rejangiz (${recTarget(day)} ta) va ${REC_EXTRA} ta qo'shimcha to'liq tanlandi` : "Hozircha yangi tavsiya yo'q — rejadagi ustozlar ko'rilgan yoki boshqa xodimlarga berilgan"}</div>`}
         ${ch.length ? `<div class="small muted" style="margin:12px 0 4px"><b>Tanlanganlar — ${day === t ? "bugungi" : fmtDate(day)} rejangizda</b></div>
-          ${(() => { const ex = recExtraIds(day); return ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${ex.has(o.id) ? `<span class="pl-tag2" title="Kunlik rejadan tashqari — soat 15:00 gacha ko'rilmasa, navbatga qaytadi">qo'shimcha</span>` : ""}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Ustozni ko'ra olmasangiz — sababini belgilang, o'rniga yangi tavsiya chiqadi">Ko'ra olmadim</button>`}</div>`; }).join(""); })()}` : ""}
+          ${(() => { const ex = recExtraIds(day); return ch.map(o => { const seen = recSeen(o); return `<div class="list-item">${info(o.teacher_id)}${ex.has(o.id) ? `<span class="pl-tag2" title="Kunlik rejadan tashqari qo'shimcha — kun oxirigacha sizda qoladi">qo'shimcha</span>` : ""}${seen ? pill("bajarildi", "ko'rildi") : `<button type="button" class="btn sm ghost" data-rcx="${o.id}" title="Ustozni ko'ra olmasangiz — sababini belgilang, o'rniga yangi tavsiya chiqadi">Ko'ra olmadim</button>`}</div>`; }).join(""); })()}` : ""}
         <div class="row" style="margin-top:8px"><span class="spacer"></span><button type="button" class="btn sm ghost" id="rec-more">+ Yana tavsiya</button></div></div>`;
       $$("[data-rd]", box).forEach(b => b.onclick = async () => { S.ui.recDay = b.dataset.rd; await recFill(b.dataset.rd); recWidget(box, opts); });
       $$("[data-rok]", box).forEach(b => b.onclick = async () => { b.disabled = true; const o = (S.recs || []).find(x => String(x.id) === b.dataset.rok);
@@ -6853,7 +6850,7 @@ window.METODISTLAR = [
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 5, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 25, per: "hafta", d: "Haftada bir marta CEO qo'yadi: rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi. Portal xodim qo'ygan ballar taqsimotini ko'rsatadi («yumshoq baholash» belgisi)" },
-      { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 10, per: "hafta", d: "Haftada bir marta CEO qo'yadi. Portal tavsiya ball ko'rsatadi: kuzatuvlarda ustozga tavsiya yozilgani va avvalgi tavsiya bajarilgani tekshirilgani" },
+      { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 10, per: "hafta", d: "Haftada bir marta CEO qo'yadi: xodimning dars tahlillari sifati bo'yicha" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 10, per: "hafta", hint: "taklif", d: "Haftada bir marta CEO qo'yadi: amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] },
 
   };
@@ -6995,6 +6992,7 @@ window.METODISTLAR = [
   function weekSug(p, it, from, to) {
     if (it.k === "baholash") { const s0 = softRate(p, from, to); return s0 ? { v: null, txt: s0.txt, soft: s0.soft } : null; }
     if (it.k !== "tahlil") return null;
+    return null; // 13-noyabrdan: kuzatuvda ustozga tavsiya yozish olib tashlandi — «Tahlil»ni CEO o'zi qo'yadi
     const all = (S.tobs || []), mine = all.filter(o => o.author_id === p.id && o.day >= from && o.day <= to);
     if (!mine.length) return null;
     const A = mine.filter(o => String(o.advice || "").trim().length >= 20).length / mine.length;
@@ -7068,7 +7066,7 @@ window.METODISTLAR = [
   const TIPS = { reja: "Haftalik rejadagi filialga boring va tavsiyalardan tanlagan ustozlarni o'sha kuni ko'ring.", davomat: "Ishga grafik bo'yicha o'z vaqtida keling — 10 daqiqadan ortiq kechikish ball kamaytiradi.",
     hisobot: "Kunlik hisobotni ish tugaganidan keyin 30 daqiqa ichida yuboring.", etika: "Topshiriqlarni tez oching, «jarayonda»ga o'tkazing va muddatida bajaring.",
     qayta: "Uzoq ko'rilmagan va past ball olgan ustozlarni 14 kun ichida qayta ko'ring.", baholash: "Ballarni rubrikaga qat'iy mos va dalil bilan qo'ying — hammaga yuqori ball qo'ymang.",
-    tahlil: "Har kuzatuvda ustozga aniq tavsiya yozing va keyingi safar bajarilganini tekshiring.", tashabbus: "Ishni yaxshilash bo'yicha asosli taklif kiriting.",
+    tahlil: "Dars tahlillarini rubrikaga mos, aniq va dalil bilan yozing.", tashabbus: "Ishni yaxshilash bo'yicha asosli taklif kiriting.",
     soni: "Kuzatuv davomida ko'proq holatni aniqlang va kiriting.", sifat: "Holatlarni to'liq yozing: turi, joyi, kim bilan bog'liq, og'irligi, natijasi va izoh.",
     vaqt: "Ishga o'z vaqtida keling.", filial: "Haftalik rejadagi filialga boring.", ochiqlik: "Topshiriqlarni tez oching va muddatida bajaring.", kreativ: "Muammolarga yechim taklif qiling." };
   function stageDetail(x, d) {
