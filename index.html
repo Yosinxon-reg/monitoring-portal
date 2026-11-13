@@ -6099,6 +6099,8 @@ window.METODISTLAR = [
     const top = L.filter(z => z.rank === 1)[0] || L.slice().sort((a, b) => b.total - a.total || b.n - a.n)[0];
     if (top && !xs.length) xs.push({ ...top, best: true });   // faqat shu fanda 98–100% natija hech kimda bo'lmasa
     return { g, xs: xs.sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) }; }).filter(w => w.xs.length);
+  // Filial kesimi: fan bo'yicha «eng yuqori natija» butun maktab bo'yicha olinadi — boshqa filialda yaxshiroq natija bo'lsa, bu filialdagisi chiqmaydi
+  const oyFil = (ws, ok) => ws.map(w => ({ ...w, xs: w.xs.filter(ok) })).filter(w => w.xs.length);
   const YA = v => window.yA ? window.yA(String(v)) : String(v);
   function oyAnnounce(winners, m, cur, fil) {
     const L = [cur ? `🏅 ${monthLabel(m)} — «Oy o'qituvchisi» nomzodlari${fil ? " (" + fil + ")" : ""}` : `🏆 ${monthLabel(m)} — Oy o'qituvchilari${fil ? " (" + fil + ")" : ""}`, "",
@@ -6220,8 +6222,8 @@ window.METODISTLAR = [
     const allG = RK_GROUPS.filter(g => (full[g] || []).length), allF = FILIALLAR.slice();
     const st = { g: new Set(o.fil ? allG : allG), f: new Set(o.fil ? [o.fil] : allF) };
     const lbl = (set, all, word) => set.size === all.length ? `barcha ${word}` : [...set].join(", ");
-    const build = () => { const out = {}; [...st.g].forEach(g => out[g] = (full[g] || []).filter(x => st.f.has(x.t.filial)));
-      const ws = oyWinners(out).filter(w => st.g.has(w.g)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
+    // g'oliblar barcha filiallar bo'yicha aniqlanadi, keyin tanlangan filial(lar)dagilari ko'rsatiladi
+    const build = () => { const ws = oyFil(oyWinners(full).filter(w => st.g.has(w.g)), x => st.f.has(x.t.filial)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
       return { ws, label, c: oyLand(ws, o.m, o.cur, label), text: oyAnnounce(ws, o.m, o.cur, st.f.size === allF.length ? "" : [...st.f].join(", ")) }; };
     const chips = (k, all) => `<div class="chips ox-ch" data-k="${k}"><button type="button" class="chip-btn sm ${st[k].size === all.length ? "on" : ""}" data-all="1">Hammasi</button>${all.map(v => `<button type="button" class="chip-btn sm ${st[k].has(v) && st[k].size !== all.length ? "on" : ""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
     const md = openModal(`🖼 ${o.cur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} — ${esc(monthLabel(o.m))}`, `<div id="ox-f"></div><div class="oy-prev" style="margin-top:10px"><img id="ox-img" alt=""></div>
@@ -6270,7 +6272,7 @@ window.METODISTLAR = [
       const d = p - x.rank; return d > 0 ? `<span class="rk-up" title="${esc(P.pLabel)}: ${p}-o'rin">↑${d}</span>` : d < 0 ? `<span class="rk-down" title="${esc(P.pLabel)}: ${p}-o'rin">↓${-d}</span>` : `<span class="rk-eq" title="${esc(P.pLabel)}: ${p}-o'rin">=</span>`; };
     const over = obs.filter(o => (o.ib !== null && +o.ib > IB_MAX) || (o.ab !== null && +o.ab > abMax(o.subject)));
     // Oy o'qituvchisi: oy davomida 98–100% natija qayd etgan barcha ustozlar (1 marta ko'rilgan bo'lsa ham; har fan alohida). Joriy oyda — nomzodlar, oy tugagach shu natija bilan qolganlar — «Oy o'qituvchisi» (soni cheklanmagan)
-    const winners = P.mode === "oy" ? oyWinners(out) : [];
+    const winners = P.mode === "oy" ? (fil ? oyFil(oyWinners(buildRating(P.from, P.to, "").out), x => x.t.filial === fil) : oyWinners(out)) : [];
     const nWin = winners.reduce((a, w) => a + w.xs.length, 0);
     const isCur = P.mode === "oy" && P.m === monthOf(t);
     const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} · ${esc(monthLabel(P.m))}${nWin ? ` <span class="badge">${nWin}</span>` : ""}</h2><span class="spacer"></span>
