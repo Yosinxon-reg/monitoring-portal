@@ -1217,6 +1217,7 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .mz-ev { display: flex; justify-content: space-between; gap: 10px; font-size: .9em; color: var(--muted); padding: 4px 2px; border-bottom: 1px solid var(--border); }
 .mz-ev b { color: var(--text, inherit); }
 @media (max-width: 560px) { .mz-types { grid-template-columns: 1fr; } .mz-ev { flex-direction: column; gap: 0; } }
+.cr-bonus { font-size: .78em; font-weight: 700; color: var(--ok); margin-top: 2px; }
 
 </style>
 </head>
@@ -1815,6 +1816,7 @@ window.LESSONS = [
         p.followers = p.followers || []; if (!p.followers.includes(m.id) && p.author_id !== m.id) { p.followers.push(m.id); demoEv(d, pid, m.id, "qoshildi", note || ""); } save(); return true;
       },
       async listPostEvents(id) { return ok((load().post_events || []).filter(e => e.post_id === id)); },
+      async ceoMetrics(ms) { return (load().ceoMetrics || {})[ms] || {}; },
       async deletePost(id) {
         const m = me(); const d = load(); const p = d.posts.find(x => x.id === id);
         if (!p || !(p.author_id === m.id || m.role === "asoschi")) return fail("Ruxsat yo'q");
@@ -2411,6 +2413,7 @@ window.LESSONS = [
       async postSimilar(pt) { return chk(await sb.rpc("post_similar", { pt: pt || "" })) || []; },
       async postJoin(pid, note) { chk(await sb.rpc("post_join", { pid, note: note || "" })); return true; },
       async listPostEvents(id) { return chk(await sb.from("post_events").select("*").eq("post_id", id).order("at")); },
+      async ceoMetrics(ms) { return chk(await sb.rpc("ceo_metrics", { ms })) || {}; },
       async uploadImage(blob) {
         const path = `${meCache.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const up = await sb.storage.from("rasmlar").upload(path, blob, { contentType: "image/jpeg", upsert: false });
@@ -5427,7 +5430,24 @@ window.METODISTLAR = [
   const MZ_V2 = "2026-11-12";
   const CR_ITEMS2 = CR_ITEMS.map(it => it.k === "intizom" ? { ...it, max: 15 } : it.k === "oz" ? { ...it, max: 10 } : it);
   CR_ITEMS2.splice(CR_ITEMS2.findIndex(it => it.k === "asoschi"), 0, { k: "masala", l: "Muammolarni muddatida hal qilish", max: 10, d: "Rahbar mas'ul bo'lgan muammolar (Masalalar): muddatida hal qilingani — to'liq, kechikib — yarim, muddati o'tib hal qilinmagani — 0. Yuboruvchi «hal bo'lmadi» deb qaytarsa — hal qilinmagan hisoblanadi" });
-  const crItems = ms => ms >= "2026-11-01" ? CR_ITEMS2 : CR_ITEMS;
+  // 57: dekabrdan — to'liq avtomatik: Monitoring bo'limi rahbari bahosi olib tashlandi; javob tezligi, ballarni vaqtida kiritish (22:00 gacha),
+  // akademik bo'lim rahbariga haftalik 10 ta shaxsiy dars kuzatuvi (+ ortig'i uchun bonus, 100 balldan alohida)
+  const CR3_FROM = "2026-12-01";
+  const CR_J = { k: "javob", l: "So'rovlarga javob tezligi", d: "Xodimlarning ustoz so'rovlariga 24 soat, KPI e'tirozlariga 48 soat, rahbarga kelgan yordam so'rovlariga 24 soat ichida javob berilgan ulushi" };
+  const CR_K = { k: "kirit", l: "Ballarni o'z vaqtida kiritish (22:00 gacha)" };
+  const CR_O = { k: "kuzat", l: "Shaxsiy dars kuzatuvlari — haftasiga 10 ta", max: 15, d: "Har hafta (dushanba–shanba) kamida 10 ta dars kuzatuvi majburiy; kuniga 10 tagacha hisoblanadi. 10 tadan ortig'ining har biri — +1 bonus ball (100 balldan alohida)" };
+  const CR_BASE = it => CR_ITEMS.find(x => x.k === it);
+  const CR3 = {
+    intizomiy: [["intizom", 15], ["tezlik", 10], ["oz", 10], ["natija", 25], ["topshiriq", 10], ["masala", 10], ["javob", 10], ["kirit", 10]],
+    akademik: [["intizom", 15], ["tezlik", 10], ["oz", 5], ["natija", 20], ["topshiriq", 10], ["masala", 10], ["javob", 5], ["kirit", 10], ["kuzat", 15]] };
+  const crItems = (ms, c) => {
+    if (ms < CR3_FROM) return ms >= "2026-11-01" ? CR_ITEMS2 : CR_ITEMS;
+    const ak = c && deptOf(c) === "akademik";
+    return CR3[ak ? "akademik" : "intizomiy"].map(([k, max]) => {
+      const b = k === "javob" ? CR_J : k === "kirit" ? { ...CR_K, d: ak ? "Har ish kuni xodimlar davomati (o'sha kuni 22:00 gacha) va haftalik baholash/tahlil/tashabbus ballari (shanba 22:00 gacha)" : "2 haftalik bosqich ballari — etika va kreativ (bosqichning 2-shanbasi 22:00 gacha)" }
+        : k === "kuzat" ? CR_O : k === "masala" ? CR_ITEMS2.find(x => x.k === "masala") : CR_BASE(k);
+      return { ...b, max }; });
+  };
   function masalaScore(uid, from, to) {
     const now = Date.now(); let n = 0, g = 0, late = 0, open = 0;
     (S.posts || []).forEach(p => { if (p.kind !== "muammo" || !(p.assignees || []).includes(uid)) return;
@@ -5481,13 +5501,28 @@ window.METODISTLAR = [
     // 5b) muammolar (55)
     { const M = masalaScore(c.id, from, me);
       R.masala = M.n ? { r: M.g / M.n, why: `${M.n - M.late - M.open} / ${M.n} muammo muddatida hal qilingan${M.late ? ` · ${M.late} tasi kechikib` : ""}${M.open ? ` · ${M.open} tasi muddati o'tib ochiq` : ""}` } : { r: null, why: "muddati kelgan muammo yo'q" }; }
+    // 7–9) 57: javob tezligi, ballarni kiritish, shaxsiy kuzatuvlar (server hisoblaydi: ceo_metrics)
+    const MT = ((ctx.met || {})[ms] || {})[c.id]; let bonus = 0;
+    if (MT) {
+      const pr = (a, lbl) => a && a[0] ? `${a[1]}/${a[0]} ${lbl}` : "";
+      const jn = MT.rq[0] + MT.ap[0] + MT.hp[0], jo = MT.rq[1] + MT.ap[1] + MT.hp[1];
+      R.javob = jn ? { r: jo / jn, why: [pr(MT.rq, "ustoz so'rovi"), pr(MT.ap, "e'tiroz"), pr(MT.hp, "yordam so'rovi")].filter(Boolean).join(" · ") + " vaqtida" } : { r: null, why: "shu oyda so'rov yo'q" };
+      const kn = MT.at[0] + MT.wk[0], ko = MT.at[1] + MT.wk[1];
+      R.kirit = kn ? { r: ko / kn, why: [MT.at[0] ? `davomat ${MT.at[1]}/${MT.at[0]}` : "", MT.wk[0] ? `${deptOf(c) === "akademik" ? "haftalik" : "bosqich"} ballari ${MT.wk[1]}/${MT.wk[0]}` : ""].filter(Boolean).join(" · ") + " 22:00 gacha" } : { r: null, why: "muddati kelgan ball yo'q" };
+      const W = (MT.obs || []), Wd = W.filter(w => w.done);
+      bonus = W.reduce((a, w) => a + Math.max(0, w.cnt - 10), 0);
+      const cur = W.find(w => !w.done);
+      R.kuzat = Wd.length ? { r: Wd.reduce((a, w) => a + Math.min(10, w.cnt), 0) / (10 * Wd.length), why: Wd.map(w => `${fmtDate(w.ws)}: ${w.cnt}`).join(" · ") + (cur ? ` · joriy hafta: ${cur.cnt}/10` : "") + (bonus ? ` · bonus +${bonus}` : "") }
+        : { r: null, why: cur ? `joriy hafta: ${cur.cnt}/10 (hafta tugagach hisoblanadi)${bonus ? ` · bonus +${bonus}` : ""}` : "hali hafta yakunlanmagan" };
+    } else { R.javob = R.kirit = R.kuzat = { r: null, why: "ma'lumot yuklanmadi" }; }
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
-    const items = crItems(ms).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
+    const items = crItems(ms, c).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
     const av = items.filter(x => x.v !== null), sum = rnd(av.reduce((a, x) => a + x.v, 0)), maxA = av.reduce((a, x) => a + x.it.max, 0);
     const final = maxA ? rnd(sum / maxA * 100) : null;
-    return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: R.asoschi.r === null, members: mem.length };
+    const auto3 = ms >= CR3_FROM;
+    return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: !auto3 && R.asoschi.r === null, members: mem.length, bonus: auto3 && deptOf(c) === "akademik" ? bonus : 0, auto3 };
   }
   // Topshiriq va eslatmalarni muddatida bajarish (0..1 ball har biriga). Muddatsiz topshiriq — 3 kun ichida.
   // Har bir topshiriq faqat o'zi BERILGAN oy (KPI davri) hisobiga kiradi — keyingi oyga o'tmaydi.
@@ -5509,7 +5544,8 @@ window.METODISTLAR = [
     const pms = mStart(addD(ms, -1)), me = mEndOf(ms);
     const [reps, creps, rates] = await Promise.all([db.listReports({ from: addD(pms, -HOL_REP_DAYS), to: me }).catch(() => S.reports || []),
       db.listCeoReports(addD(pms, -HOL_REP_DAYS), me).catch(() => []), db.listCeoRatings ? db.listCeoRatings(pms, ms).catch(() => []) : Promise.resolve([])]);
-    return { reps, creps, rates, pms };
+    const met = {}; if (db.ceoMetrics) await Promise.all([ms, pms].filter(m => m >= CR3_FROM).map(m => db.ceoMetrics(m).then(x => { met[m] = x || {}; }).catch(() => {})));
+    return { reps, creps, rates, pms, met };
   }
   PAGES["rahbar-reyting"] = async page => {
     const isA = S.me.role === "asoschi";
@@ -5517,7 +5553,7 @@ window.METODISTLAR = [
     const cur = mStart(today());
     const months = []; for (let m = cur; m >= "2026-10-01"; m = mStart(addD(m, -1))) months.push(m);
     const ms = months.includes(S.ui.crM) ? S.ui.crM : cur;
-    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. Mezonlar ma'lumotlardan avtomatik hisoblanadi (noyabrdan «Muammolarni muddatida hal qilish» ham), bittasini Monitoring bo'limi rahbari qo'yadi.",
+    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. Dekabrdan barcha mezonlar 100% avtomatik hisoblanadi (qo'lda baho yo'q); akademik bo'lim rahbariga haftalik 10 ta dars kuzatuvidan ortig'i uchun alohida bonus.",
       `<div class="row" style="gap:8px"><select id="cr-m" style="width:auto">${months.map(m => `<option value="${m}" ${m === ms ? "selected" : ""}>${mLabel(m)}${m === cur ? " (joriy)" : ""}</option>`).join("")}</select>${isA ? `<button class="btn" id="cr-pdf">⬇ Word</button>` : ""}</div>`) +
       `<div id="cr-body"><div class="card empty">Hisoblanmoqda…</div></div>`;
     $("#cr-m", page).onchange = e => { S.ui.crM = e.target.value; PAGES["rahbar-reyting"](page); };
@@ -5532,7 +5568,7 @@ window.METODISTLAR = [
       <div class="cr-legend small muted">Daraja: <b class="cr-let cr-A">A</b> 90+ a'lo · <b class="cr-let cr-B">B</b> 75–89 · <b class="cr-let cr-C">C</b> 60–74 · <b class="cr-let cr-D">D</b> 60 dan past. Ma'lumoti yo'q mezon hisobga olinmaydi, ball qolganlaridan 100 ga keltiriladi.</div>
       ${RS.map(({ cur: x, prev: px }, i) => `<div class="card cr-card">
         <div class="cr-head">${isA ? `<div class="cr-rank">${i + 1}</div>` : ""}${avatar(x.c.full_name, photoOf(x.c))}<div style="min-width:0"><b>${esc(x.c.full_name)}</b><div class="small muted">${esc(titleOf(x.c))} · ${x.members} xodim</div></div><span class="spacer"></span>
-          <div class="cr-score"><b>${x.final ?? "—"}</b><span>/100</span>${px ? `<div>${dl(x.final, px.final)} <span class="small muted">o'tgan oy: ${px.final ?? "—"}</span></div>` : ""}</div>
+          <div class="cr-score"><b>${x.final ?? "—"}</b><span>/100</span>${x.bonus ? `<div class="cr-bonus" title="Haftalik 10 ta dars kuzatuvidan ortig'i uchun — 100 balldan alohida">+${x.bonus} bonus</div>` : ""}${px ? `<div>${dl(x.final, px.final)} <span class="small muted">o'tgan oy: ${px.final ?? "—"}</span></div>` : ""}</div>
           <div class="cr-let cr-${x.letter === "—" ? "N" : x.letter}">${x.letter}<small>${CR_LL[x.letter]}</small></div></div>
         ${x.pending ? `<div class="note" style="margin:10px 0 0">Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA}).</div>` : ""}
         <div class="table-wrap"><table class="cr-tbl"><thead><tr><th>Mezon</th><th style="width:28%">Natija</th><th>Ball</th><th class="hide-sm">Izoh</th>${px ? `<th class="hide-sm">O'tgan oy</th>` : ""}</tr></thead><tbody>
@@ -5541,7 +5577,7 @@ window.METODISTLAR = [
             <td>${pc === null ? `<span class="muted small">—</span>` : `<div class="cr-bar"><i style="width:${pc}%" class="${pc >= 90 ? "a" : pc >= 75 ? "b" : pc >= 60 ? "c" : "d"}"></i></div><span class="small">${pc}%</span>`}</td>
             <td style="white-space:nowrap"><b>${c.v ?? "—"}</b> <span class="muted">/ ${c.it.max}</span></td><td class="hide-sm small">${esc(c.why || "")}</td>
             ${px ? `<td class="hide-sm small">${pv ?? "—"} ${dl(c.v, pv)}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
-        ${isA ? `<div class="cr-rate"><label class="small" style="margin:0">Sizning bahoyingiz (0–15):</label><input type="number" min="0" max="15" step="0.5" class="num" data-crs="${x.c.id}" value="${x.rate && x.rate.score !== null ? x.rate.score : ""}" style="width:90px">
+        ${isA && !x.auto3 ? `<div class="cr-rate"><label class="small" style="margin:0">Sizning bahoyingiz (0–15):</label><input type="number" min="0" max="15" step="0.5" class="num" data-crs="${x.c.id}" value="${x.rate && x.rate.score !== null ? x.rate.score : ""}" style="width:90px">
           <input data-crn="${x.c.id}" value="${esc(x.rate?.note || "")}" placeholder="Izoh (ixtiyoriy)" style="flex:1;min-width:160px"><button class="btn sm primary" data-crsave="${x.c.id}">Saqlash</button></div>`
           : x.rate?.note ? `<div class="rc-note" style="margin-top:10px">💬 <b>Monitoring bo'limi rahbari:</b> ${esc(x.rate.note)}</div>` : ""}
       </div>`).join("") || `<div class="card empty">Bo'lim rahbarlari yo'q</div>`}${isA ? `<div class="card" id="dc-card" style="margin-top:16px"></div>` : ""}`;
@@ -9688,7 +9724,7 @@ window.METODISTLAR = [
       RS.map((x, i) => ({ cells: [String(i + 1), { v: x.cur.c.full_name, b: 1 }, DEPTS[deptOf(x.cur.c)].l, { v: x.cur.final ?? "—", b: 1, sz: 24, ...LC[x.cur.letter] }, { v: `${x.cur.letter} · ${CR_LL[x.cur.letter]}`, b: 1, ...LC[x.cur.letter] }, x.prev ? String(x.prev.final ?? "—") : "—"] })));
     body += D.p("Ma'lumoti yo'q mezon hisobga olinmaydi — ball qolgan mezonlardan 100 ga keltiriladi.", { sz: 17, c: "6B7A90", i: 1 });
     RS.forEach(({ cur: x, prev: px }) => {
-      body += D.h2(`${x.c.full_name} — ${x.final ?? "—"} / 100 · ${x.letter}`) + D.p(`${titleOf(x.c)} · ${x.members} xodim${x.pending ? ` · Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA})` : ""}`, { c: "4A5A70", sz: 19, keep: 1 })
+      body += D.h2(`${x.c.full_name} — ${x.final ?? "—"} / 100${x.bonus ? ` (+${x.bonus} bonus)` : ""} · ${x.letter}`) + D.p(`${titleOf(x.c)} · ${x.members} xodim${x.pending ? ` · Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA})` : ""}`, { c: "4A5A70", sz: 19, keep: 1 })
         + D.tableX([{ h: "Mezon", w: 4600 }, { h: "Natija", w: 1500, al: "center" }, { h: "Ball", w: 1600, al: "center" }, { h: "Izoh", w: 5300 }, { h: "O'tgan oy", w: 2000, al: "center" }],
           x.items.map((c, k) => { const pc = c.r === null || c.r === undefined ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100);
             return { cells: [{ v: c.it.l, b: 1 }, pc === null ? "—" : { v: pc + "%", ...(wPct(pc / 100) || {}) }, { v: `${c.v ?? "—"} / ${c.it.max}`, b: 1 }, { v: c.why || "", sz: 17 }, px ? String(px.items.find(i => i.it.k === c.it.k)?.v ?? "—") : "—"] }; }))
