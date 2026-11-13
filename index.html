@@ -2413,7 +2413,7 @@ window.LESSONS = [
       async postSimilar(pt) { return chk(await sb.rpc("post_similar", { pt: pt || "" })) || []; },
       async postJoin(pid, note) { chk(await sb.rpc("post_join", { pid, note: note || "" })); return true; },
       async listPostEvents(id) { return chk(await sb.from("post_events").select("*").eq("post_id", id).order("at")); },
-      async ceoMetrics(ms) { return chk(await sb.rpc("ceo_metrics", { ms })) || {}; },
+      async ceoMetrics(ms, d1) { return chk(await sb.rpc("ceo_metrics", { ms, d1: d1 || null })) || {}; },
       async uploadImage(blob) {
         const path = `${meCache.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const up = await sb.storage.from("rasmlar").upload(path, blob, { contentType: "image/jpeg", upsert: false });
@@ -5433,6 +5433,18 @@ window.METODISTLAR = [
   // 57: dekabrdan — to'liq avtomatik: Monitoring bo'limi rahbari bahosi olib tashlandi; javob tezligi, ballarni vaqtida kiritish (22:00 gacha),
   // akademik bo'lim rahbariga haftalik 10 ta shaxsiy dars kuzatuvi (+ ortig'i uchun bonus, 100 balldan alohida)
   const CR3_FROM = "2026-12-01";
+  const CR3_START = "2026-11-16";   // yangi tartib shu kundan; noyabr: 1–15 eski tartib, 16–30 yangi — ish kunlari bo'yicha qo'shiladi
+  function crMonth(c, ms, ctx) {
+    if (ms !== mStart(CR3_START)) return crCompute(c, ms, ctx);
+    const me = mEndOf(ms), mid = addD(CR3_START, -1);
+    const A = crCompute(c, ms, ctx, { from: ms < crStart() ? crStart() : ms, to: mid, v3: false });
+    const B = crCompute(c, ms, ctx, { from: CR3_START, to: me, v3: true });
+    const wd = (f, to) => { let n = 0; for (let d = f; d <= to; d = addD(d, 1)) if (isWorkdayOn(c, d)) n++; return n; };
+    const tt = today(), w1 = wd(ms, mid), w2 = tt >= CR3_START ? wd(CR3_START, me < tt ? me : tt) : 0;
+    const parts = [[A.final, w1], [B.final, w2]].filter(([f, w]) => f !== null && w > 0);
+    const final = parts.length ? rnd(parts.reduce((a, [f, w]) => a + f * w, 0) / parts.reduce((a, [, w]) => a + w, 0)) : null;
+    return { ...(w2 ? B : A), final, letter: crLetter(final), rate: A.rate, pending: A.pending, split: { A, B, w1, w2 } };
+  }
   const CR_J = { k: "javob", l: "So'rovlarga javob tezligi", d: "Xodimlarning ustoz so'rovlariga 24 soat, KPI e'tirozlariga 48 soat, rahbarga kelgan yordam so'rovlariga 24 soat ichida javob berilgan ulushi" };
   const CR_K = { k: "kirit", l: "Ballarni o'z vaqtida kiritish (22:00 gacha)" };
   const CR_O = { k: "kuzat", l: "Shaxsiy dars kuzatuvlari — haftasiga 10 ta", max: 15, d: "Har hafta (dushanba–shanba) kamida 10 ta dars kuzatuvi majburiy; kuniga 10 tagacha hisoblanadi. 10 tadan ortig'ining har biri — +1 bonus ball (100 balldan alohida)" };
@@ -5461,8 +5473,8 @@ window.METODISTLAR = [
   const crDesc = (it, c) => it.k !== "natija" ? it.d : deptOf(c) === "akademik" ? "Oylik reja bajarilishi (har ustoz 3, bog'cha 4 marta) — bugungacha kutilgan sur'atga nisbatan" : "Holatlar hal qilinishi (70%) va takrorlar kamligi (30%)";
   const crLetter = v => v === null || v === undefined ? "—" : v >= 90 ? "A" : v >= 75 ? "B" : v >= 60 ? "C" : "D";
   const CR_LL = { A: "A'lo", B: "Yaxshi", C: "Qoniqarli", D: "Past", "—": "Ma'lumot yo'q" };
-  function crCompute(c, ms, ctx) {
-    const me = mEndOf(ms), t = today(), yest = addD(t, -1), from = ms < crStart() ? crStart() : ms;
+  function crCompute(c, ms, ctx, span) {
+    const t = today(), yest = addD(t, -1), me = span ? span.to : mEndOf(ms), from = span ? span.from : ms < crStart() ? crStart() : ms;
     const upto = me < t ? me : yest;
     const mem = S.profiles.filter(p => p.role === "xodim" && p.ceo_id === c.id && p.active);
     const memIds = new Set(mem.map(p => p.id));
@@ -5491,18 +5503,18 @@ window.METODISTLAR = [
         why: `oylik reja ${P.pct}% (${P.got}/${P.sumPlan})${P.cur ? ` · bugungacha kutilgan ${Math.round(P.pace * 100)}%` : ""}` } : { r: null, why: "ustozlar bazasi bo'sh" };
     } else {
       const inR = r => r.report_date >= addD(ms, -HOL_REP_DAYS) && r.report_date <= me;
-      const L = holFlat(ctx.reps.filter(r => memIds.has(r.author_id) && inR(r)), ctx.creps.filter(r => r.ceo_id === c.id && inR(r))).filter(h => h.day >= ms && h.day <= me);
+      const L = holFlat(ctx.reps.filter(r => memIds.has(r.author_id) && inR(r)), ctx.creps.filter(r => r.ceo_id === c.id && inR(r))).filter(h => h.day >= from && h.day <= me);
       if (L.length) { const M = itMetrics(L); R.natija = { r: 0.7 * (M.hal / M.n) + 0.3 * (1 - M.rep / M.n), why: `${M.n} holat · hal ${M.p.hal}% · takror ${M.p.rep}%` }; }
       else R.natija = { r: null, why: "holatlar kiritilmagan" };
     }
     // 5) topshiriqlar
-    { const ids = new Set([c.id, ...memIds]); const T = taskScore(x => ids.has(x), ms, me);
+    { const ids = new Set([c.id, ...memIds]); const T = taskScore(x => ids.has(x), from, me);
       R.topshiriq = T.n ? { r: T.g / T.n, why: `${rnd(T.g)} / ${T.n} topshiriq va eslatma muddatida` } : { r: null, why: "shu oyda berilgan topshiriq yo'q" }; }
     // 5b) muammolar (55)
     { const M = masalaScore(c.id, from, me);
       R.masala = M.n ? { r: M.g / M.n, why: `${M.n - M.late - M.open} / ${M.n} muammo muddatida hal qilingan${M.late ? ` · ${M.late} tasi kechikib` : ""}${M.open ? ` · ${M.open} tasi muddati o'tib ochiq` : ""}` } : { r: null, why: "muddati kelgan muammo yo'q" }; }
     // 7–9) 57: javob tezligi, ballarni kiritish, shaxsiy kuzatuvlar (server hisoblaydi: ceo_metrics)
-    const MT = ((ctx.met || {})[ms] || {})[c.id]; let bonus = 0;
+    const v3 = span ? span.v3 : ms >= CR3_FROM; const MT = v3 ? ((ctx.met || {})[ms] || {})[c.id] : null; let bonus = 0;
     if (MT) {
       const pr = (a, lbl) => a && a[0] ? `${a[1]}/${a[0]} ${lbl}` : "";
       const jn = MT.rq[0] + MT.ap[0] + MT.hp[0], jo = MT.rq[1] + MT.ap[1] + MT.hp[1];
@@ -5518,10 +5530,10 @@ window.METODISTLAR = [
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
-    const items = crItems(ms, c).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
+    const items = (v3 ? crItems(CR3_FROM, c) : crItems(ms < CR3_FROM ? ms : "2026-11-01", c)).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
     const av = items.filter(x => x.v !== null), sum = rnd(av.reduce((a, x) => a + x.v, 0)), maxA = av.reduce((a, x) => a + x.it.max, 0);
     const final = maxA ? rnd(sum / maxA * 100) : null;
-    const auto3 = ms >= CR3_FROM;
+    const auto3 = v3;
     return { c, ms, items, sum, maxA, final, letter: crLetter(final), rate: rr || null, pending: !auto3 && R.asoschi.r === null, members: mem.length, bonus: auto3 && deptOf(c) === "akademik" ? bonus : 0, auto3 };
   }
   // Topshiriq va eslatmalarni muddatida bajarish (0..1 ball har biriga). Muddatsiz topshiriq — 3 kun ichida.
@@ -5544,7 +5556,7 @@ window.METODISTLAR = [
     const pms = mStart(addD(ms, -1)), me = mEndOf(ms);
     const [reps, creps, rates] = await Promise.all([db.listReports({ from: addD(pms, -HOL_REP_DAYS), to: me }).catch(() => S.reports || []),
       db.listCeoReports(addD(pms, -HOL_REP_DAYS), me).catch(() => []), db.listCeoRatings ? db.listCeoRatings(pms, ms).catch(() => []) : Promise.resolve([])]);
-    const met = {}; if (db.ceoMetrics) await Promise.all([ms, pms].filter(m => m >= CR3_FROM).map(m => db.ceoMetrics(m).then(x => { met[m] = x || {}; }).catch(() => {})));
+    const met = {}; if (db.ceoMetrics) await Promise.all([ms, pms].filter(m => m >= mStart(CR3_START)).map(m => db.ceoMetrics(m, m === mStart(CR3_START) ? CR3_START : null).then(x => { met[m] = x || {}; }).catch(() => {})));
     return { reps, creps, rates, pms, met };
   }
   PAGES["rahbar-reyting"] = async page => {
@@ -5553,7 +5565,7 @@ window.METODISTLAR = [
     const cur = mStart(today());
     const months = []; for (let m = cur; m >= "2026-10-01"; m = mStart(addD(m, -1))) months.push(m);
     const ms = months.includes(S.ui.crM) ? S.ui.crM : cur;
-    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. Dekabrdan barcha mezonlar 100% avtomatik hisoblanadi (qo'lda baho yo'q); akademik bo'lim rahbariga haftalik 10 ta dars kuzatuvidan ortig'i uchun alohida bonus.",
+    page.innerHTML = head(isA ? "Rahbarlar reytingi" : "Mening reytingim", "Bo'lim rahbarlarining oylik natijasi — 100 ball. 16-noyabrdan barcha mezonlar 100% avtomatik hisoblanadi (qo'lda baho yo'q); akademik bo'lim rahbariga haftalik 10 ta dars kuzatuvidan ortig'i uchun alohida bonus.",
       `<div class="row" style="gap:8px"><select id="cr-m" style="width:auto">${months.map(m => `<option value="${m}" ${m === ms ? "selected" : ""}>${mLabel(m)}${m === cur ? " (joriy)" : ""}</option>`).join("")}</select>${isA ? `<button class="btn" id="cr-pdf">⬇ Word</button>` : ""}</div>`) +
       `<div id="cr-body"><div class="card empty">Hisoblanmoqda…</div></div>`;
     $("#cr-m", page).onchange = e => { S.ui.crM = e.target.value; PAGES["rahbar-reyting"](page); };
@@ -5561,7 +5573,7 @@ window.METODISTLAR = [
     let ctx; try { ctx = await crLoad(ms); } catch (e) { ctx = { reps: [], creps: [], rates: [], pms: mStart(addD(ms, -1)) }; }
     if (route() !== "rahbar-reyting") return;
     const ceos = isA ? S.profiles.filter(p => p.role === "ceo" && p.active) : [S.me];
-    const RS = ceos.map(c => ({ cur: crCompute(c, ms, ctx), prev: ms > "2026-10-01" ? crCompute(c, ctx.pms, ctx) : null })).sort((a, b) => (b.cur.final ?? -1) - (a.cur.final ?? -1));
+    const RS = ceos.map(c => ({ cur: crMonth(c, ms, ctx), prev: ms > "2026-10-01" ? crMonth(c, ctx.pms, ctx) : null })).sort((a, b) => (b.cur.final ?? -1) - (a.cur.final ?? -1));
     const body = $("#cr-body", page);
     const dl = (a, b) => { if (a === null || a === undefined || b === null || b === undefined) return ""; const d = rnd(a - b); return d ? `<span class="cr-d ${d > 0 ? "up" : "down"}">${d > 0 ? "▲" : "▼"} ${Math.abs(d)}</span>` : `<span class="cr-d">=</span>`; };
     body.innerHTML = `${isA ? `<label class="row small" style="gap:8px;margin:0 0 14px;cursor:pointer"><input type="checkbox" id="cr-vis" style="width:auto" ${S.crVisible ? "checked" : ""}> Bo'lim rahbarlari o'z natijasini «Mening reytingim» bo'limida ko'rsin</label>` : ""}
@@ -5570,14 +5582,15 @@ window.METODISTLAR = [
         <div class="cr-head">${isA ? `<div class="cr-rank">${i + 1}</div>` : ""}${avatar(x.c.full_name, photoOf(x.c))}<div style="min-width:0"><b>${esc(x.c.full_name)}</b><div class="small muted">${esc(titleOf(x.c))} · ${x.members} xodim</div></div><span class="spacer"></span>
           <div class="cr-score"><b>${x.final ?? "—"}</b><span>/100</span>${x.bonus ? `<div class="cr-bonus" title="Haftalik 10 ta dars kuzatuvidan ortig'i uchun — 100 balldan alohida">+${x.bonus} bonus</div>` : ""}${px ? `<div>${dl(x.final, px.final)} <span class="small muted">o'tgan oy: ${px.final ?? "—"}</span></div>` : ""}</div>
           <div class="cr-let cr-${x.letter === "—" ? "N" : x.letter}">${x.letter}<small>${CR_LL[x.letter]}</small></div></div>
-        ${x.pending ? `<div class="note" style="margin:10px 0 0">Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA}).</div>` : ""}
+        ${x.split ? `<div class="note" style="margin:10px 0 0"><b>Noyabr — ikki qism:</b> 1–15-noyabr eski tartibda: <b>${x.split.A.final ?? "—"}</b> (${x.split.w1} ish kuni${x.split.A.pending ? ", sizning bahoyingizsiz" : ""}) · 16-noyabrdan yangi tartibda: <b>${x.split.B.final ?? "—"}</b> (${x.split.w2} ish kuni) → yakuniy ball ish kunlari bo'yicha qo'shiladi. Quyidagi jadval — ${x.split.w2 ? "yangi tartib (16-noyabrdan)" : "eski tartib (1–15-noyabr); 16-noyabrdan yangi tartib qo'shiladi"}.</div>`
+          : x.pending ? `<div class="note" style="margin:10px 0 0">Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA}).</div>` : ""}
         <div class="table-wrap"><table class="cr-tbl"><thead><tr><th>Mezon</th><th style="width:28%">Natija</th><th>Ball</th><th class="hide-sm">Izoh</th>${px ? `<th class="hide-sm">O'tgan oy</th>` : ""}</tr></thead><tbody>
         ${x.items.map((c, k) => { const pc = c.r === null ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100); const pv = px ? (px.items.find(i => i.it.k === c.it.k)?.v ?? null) : null;
           return `<tr><td><b>${esc(c.it.l)}</b><div class="small muted">${esc(crDesc(c.it, x.c))}</div></td>
             <td>${pc === null ? `<span class="muted small">—</span>` : `<div class="cr-bar"><i style="width:${pc}%" class="${pc >= 90 ? "a" : pc >= 75 ? "b" : pc >= 60 ? "c" : "d"}"></i></div><span class="small">${pc}%</span>`}</td>
             <td style="white-space:nowrap"><b>${c.v ?? "—"}</b> <span class="muted">/ ${c.it.max}</span></td><td class="hide-sm small">${esc(c.why || "")}</td>
             ${px ? `<td class="hide-sm small">${pv ?? "—"} ${dl(c.v, pv)}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
-        ${isA && !x.auto3 ? `<div class="cr-rate"><label class="small" style="margin:0">Sizning bahoyingiz (0–15):</label><input type="number" min="0" max="15" step="0.5" class="num" data-crs="${x.c.id}" value="${x.rate && x.rate.score !== null ? x.rate.score : ""}" style="width:90px">
+        ${isA && (!x.auto3 || x.split) ? `<div class="cr-rate"><label class="small" style="margin:0">Sizning bahoyingiz (0–15)${x.split ? " — 1–15-noyabr uchun" : ""}:</label><input type="number" min="0" max="15" step="0.5" class="num" data-crs="${x.c.id}" value="${x.rate && x.rate.score !== null ? x.rate.score : ""}" style="width:90px">
           <input data-crn="${x.c.id}" value="${esc(x.rate?.note || "")}" placeholder="Izoh (ixtiyoriy)" style="flex:1;min-width:160px"><button class="btn sm primary" data-crsave="${x.c.id}">Saqlash</button></div>`
           : x.rate?.note ? `<div class="rc-note" style="margin-top:10px">💬 <b>Monitoring bo'limi rahbari:</b> ${esc(x.rate.note)}</div>` : ""}
       </div>`).join("") || `<div class="card empty">Bo'lim rahbarlari yo'q</div>`}${isA ? `<div class="card" id="dc-card" style="margin-top:16px"></div>` : ""}`;
@@ -8874,7 +8887,7 @@ window.METODISTLAR = [
     root.innerHTML = `<div class="card-head"><h2>📊 Bo'limlar taqqoslashi — oyma-oy</h2></div><div class="empty">Hisoblanmoqda…</div>`;
     const data = [];
     for (const ms of months.slice(-6)) { let ctx; try { ctx = await crLoad(ms); } catch (e) { continue; }
-      ceos.forEach(c => { const x = crCompute(c, ms, ctx); data.push({ ms, c, final: x.final, nat: x.items.find(i => i.it.k === "natija") }); }); }
+      ceos.forEach(c => { const x = crMonth(c, ms, ctx); data.push({ ms, c, final: x.final, nat: x.items.find(i => i.it.k === "natija") }); }); }
     if (!root.isConnected) return;
     const W = 640, Hh = 220, pad = 34, ms6 = months.slice(-6), bw = Math.max(14, Math.min(46, (W - pad * 2) / (ms6.length * (ceos.length + 1))));
     const colr = c => deptOf(c) === "akademik" ? "#2f6fdf" : "#e08a1e";
