@@ -2628,7 +2628,9 @@ window.METODISTLAR = [
   const seenPill = p => { const [c, l] = seenLabel(p); return `<span class="seen ${c}" title="Oxirgi faollik">${c === "on" ? "" : "Oxirgi faollik: "}${esc(l)}</span>`; };
   const canSeeSeen = p => S.me.role === "asoschi" || (S.me.role === "ceo" && p.ceo_id === S.me.id);
   // Asoschi o'zi yozadiganlar: CEOlar va shaxsiy bo'lim; CEO — o'z jamoasi
-  const writeFor = () => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && (p.role === "ceo" || (p.role === "xodim" && !p.ceo_id))) : [];
+  // 16-noyabrdan bo'lim rahbarlari KPI'si to'liq avtomatik — Monitoring bo'limi rahbari ularni kunlik baholamaydi (faqat shaxsiy bo'lim)
+  const CEO_AUTO = "2026-11-16";
+  const writeFor = (d = today()) => S.me.role === "asoschi" ? S.profiles.filter(p => p.active && ((p.role === "ceo" && d < CEO_AUTO) || (p.role === "xodim" && !p.ceo_id))) : [];
   // Hisobotni o'zi yozadigan xodimlar (Akademik va Intizomiy bo'lim xodimlari)
   const isSelfReporter = p => !!p && p.role === "xodim" && !!p.ceo_id && ["akademik", "intizomiy"].includes(deptOf(p));
   const repOf = (p, d) => S.reports.find(x => x.author_id === p.id && x.report_date === d);
@@ -3660,7 +3662,7 @@ window.METODISTLAR = [
     const isA = S.me.role === "asoschi";
     const ceoF = S.ui.tceo ?? (isA ? "mine" : "");
     let mem = isA ? S.profiles.filter(p => p.active && ["ceo", "xodim"].includes(p.role)) : members();
-    if (ceoF === "mine") mem = writeFor();
+    if (ceoF === "mine") mem = writeFor(date);
     else if (ceoF) mem = mem.filter(p => p.ceo_id === ceoF);
     const ps = periodOf(date);
     const rows = mem.map(p => ({ p, r: S.reports.find(x => x.author_id === p.id && x.report_date === date), g: avgGrade(p, ps, addD(ps, 13)) }))
@@ -3671,7 +3673,7 @@ window.METODISTLAR = [
       <div class="filters">
         <input type="date" id="td" value="${date}" max="${t}" style="width:auto">
         ${isA ? `<select id="tc" style="width:auto"><option value="mine" ${ceoF === "mine" ? "selected" : ""}>Men baholaydiganlar (bo'lim rahbarlari va shaxsiy bo'lim)</option>${S.profiles.filter(p => p.role === "ceo" && p.active).map(c => `<option value="${c.id}" ${ceoF === c.id ? "selected" : ""}>${esc(c.full_name)} jamoasi</option>`).join("")}</select>` : ""}
-        ${isA && rows.some(x => byFounder(x.p) && sched(x.p).days.includes(dowOf(date)) && !(x.r && +x.r.grade === 10)) ? `<button class="btn sm max-btn" id="qmax-all">★ Hammasiga maksimal ball</button>` : ""}
+        ${isA && rows.some(x => byFounder(x.p, date) && sched(x.p).days.includes(dowOf(date)) && !(x.r && +x.r.grade === 10)) ? `<button class="btn sm max-btn" id="qmax-all">★ Hammasiga maksimal ball</button>` : ""}
         <span class="spacer"></span><div class="row"><b>${done}/${work.length}</b><span class="muted">ta xodimga yozildi · ${fmtDate(date)}, ${esc(KUN[dowOf(date)].toLowerCase())}</span></div>
       </div>
       <div class="rep-grid">${rows.map(({ p, r, g }) => {
@@ -3683,10 +3685,10 @@ window.METODISTLAR = [
             <div style="text-align:right">${isGraded(r) ? gradePill(r.grade) : isSelfReporter(p) && isWritten(r) ? pill("yangi", "Baholanmagan") : r ? gradePill(r.grade) : off ? `<span class="small muted">Dam olish</span>` : pill("missing", isSelfReporter(p) ? "Yubormagan" : "Yozilmagan")}<div class="small muted" style="margin-top:4px">Bosqich: ${g.avg ?? "—"} ${levelOf(g.avg) ? "· " + levelOf(g.avg)[1] : ""}</div></div></div>
           <div class="rc-plan"><span class="small muted">Reja:</span> ${plan ? esc(plan) : `<span class="muted">kiritilmagan</span>`}</div>
           ${r ? `<div class="rc-done">${esc((r.done || "").slice(0, 180))}${(r.done || "").length > 180 ? "…" : ""}</div>${r.staff_note ? `<div class="rc-note">📌 ${esc(r.staff_note)}</div>` : ""}` : ""}
-          <div class="row" style="margin-top:10px">${canRate(p) ? (isSelfReporter(p)
+          <div class="row" style="margin-top:10px">${canRate(p) && !(p.role === "ceo" && date >= CEO_AUTO) ? (isSelfReporter(p)
               ? `<button class="btn sm ${isWritten(r) && !isGraded(r) ? "primary" : ""}" data-wrep="${p.id}">${isGraded(r) ? "Ko'rish va tahrirlash" : isWritten(r) ? "Ko'rish va baholash" : "Baholash"}</button>`
               : `<button class="btn sm ${r ? "" : "primary"}" data-wrep="${p.id}">${r ? "Tahrirlash" : "Hisobot yozish va baholash"}</button>`) : ""}
-            ${isA && byFounder(p) && !off && !(r && +r.grade === 10) ? `<button class="btn sm max-btn" data-qmax="${p.id}" title="Baho 10, umumiy ball 100">★ Maksimal ball</button>` : ""}
+            ${isA && byFounder(p, date) && !off && !(r && +r.grade === 10) ? `<button class="btn sm max-btn" data-qmax="${p.id}" title="Baho 10, umumiy ball 100">★ Maksimal ball</button>` : ""}
             <button class="btn sm ghost" data-info="${p.id}">Profil va reja</button><button class="btn sm ghost" data-wordp="${p.id}" title="Hisobotlarini Word'da yuklab olish">⬇ Word</button></div></div>`; }).join("") || `<div class="empty">Xodimlar yo'q</div>`}</div>`;
     $("#td", root).onchange = e => { S.ui.tdate = e.target.value; teamReports(root); };
     if ($("#tc", root)) $("#tc", root).onchange = e => { S.ui.tceo = e.target.value; teamReports(root); };
@@ -3697,7 +3699,7 @@ window.METODISTLAR = [
       try { await quickMax(person(b.dataset.qmax), date); toast("Maksimal ball qo'yildi"); await refresh(); render(); } catch (e) { b.disabled = false; toast(e.message, true); } });
     const qa = $("#qmax-all", root);
     if (qa) qa.onclick = async () => { qa.disabled = true; qa.textContent = "Saqlanmoqda…"; let n = 0;
-      try { for (const x of rows) if (byFounder(x.p) && sched(x.p).days.includes(dowOf(date)) && !(x.r && +x.r.grade === 10)) { await quickMax(x.p, date); n++; } toast(`${n} kishiga maksimal ball qo'yildi`); }
+      try { for (const x of rows) if (byFounder(x.p, date) && sched(x.p).days.includes(dowOf(date)) && !(x.r && +x.r.grade === 10)) { await quickMax(x.p, date); n++; } toast(`${n} kishiga maksimal ball qo'yildi`); }
       catch (e) { toast(e.message, true); } await refresh(); render(); };
   }
 
@@ -6918,7 +6920,7 @@ window.METODISTLAR = [
     return ROLES[p.role] || "";
   }
   // Monitoring bo'limi rahbari (asoschi) o'zi baholaydiganlar: bo'lim rahbarlari va shaxsiy bo'lim
-  const byFounder = p => !!p && (p.role === "ceo" || (p.role === "xodim" && !p.ceo_id));
+  const byFounder = (p, d = today()) => !!p && ((p.role === "ceo" && d < CEO_AUTO) || (p.role === "xodim" && !p.ceo_id));
   // Shaxsiy bo'lim (Monitoring bo'limi rahbariga to'g'ridan-to'g'ri bo'ysunadi) — KPI'da qatnashmaydi
   const isPersonal = p => !!p && p.role === "xodim" && !p.ceo_id;
   const SIMPLE = { k: "umumiy", l: "Umumiy natija", s: "Ball", max: 100, auto: "reja", d: "Monitoring bo'limi rahbari qo'yadi. Qo'yilmasa — kunlik hisobot bahosidan (baho × 10)" };
