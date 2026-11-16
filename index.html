@@ -5440,7 +5440,7 @@ window.METODISTLAR = [
     const A = crCompute(c, ms, ctx, { from: ms < crStart() ? crStart() : ms, to: mid, v3: false });
     const B = crCompute(c, ms, ctx, { from: CR3_START, to: me, v3: true });
     const wd = (f, to) => { let n = 0; for (let d = f; d <= to; d = addD(d, 1)) if (isWorkdayOn(c, d)) n++; return n; };
-    const tt = today(), w1 = wd(ms, mid), w2 = tt >= CR3_START ? wd(CR3_START, me < tt ? me : tt) : 0;
+    const tt = today(), y = addD(tt, -1), w1 = wd(ms, mid), w2 = y >= CR3_START ? wd(CR3_START, me < y ? me : y) : 0;  // bugungi kun — ma'lumot to'liq kelgach (ertasi kuni) qo'shiladi
     const parts = [[A.final, w1], [B.final, w2]].filter(([f, w]) => f !== null && w > 0);
     const final = parts.length ? rnd(parts.reduce((a, [f, w]) => a + f * w, 0) / parts.reduce((a, [, w]) => a + w, 0)) : null;
     return { ...(w2 ? B : A), final, letter: crLetter(final), rate: A.rate, pending: A.pending, split: { A, B, w1, w2 } };
@@ -5582,7 +5582,7 @@ window.METODISTLAR = [
         <div class="cr-head">${isA ? `<div class="cr-rank">${i + 1}</div>` : ""}${avatar(x.c.full_name, photoOf(x.c))}<div style="min-width:0"><b>${esc(x.c.full_name)}</b><div class="small muted">${esc(titleOf(x.c))} · ${x.members} xodim</div></div><span class="spacer"></span>
           <div class="cr-score"><b>${x.final ?? "—"}</b><span>/100</span>${x.bonus ? `<div class="cr-bonus" title="Haftalik 10 ta dars kuzatuvidan ortig'i uchun — 100 balldan alohida">+${x.bonus} bonus</div>` : ""}${px ? `<div>${dl(x.final, px.final)} <span class="small muted">o'tgan oy: ${px.final ?? "—"}</span></div>` : ""}</div>
           <div class="cr-let cr-${x.letter === "—" ? "N" : x.letter}">${x.letter}<small>${CR_LL[x.letter]}</small></div></div>
-        ${x.split ? `<div class="note" style="margin:10px 0 0"><b>Noyabr — ikki qism:</b> 1–15-noyabr eski tartibda: <b>${x.split.A.final ?? "—"}</b> (${x.split.w1} ish kuni${x.split.A.pending ? ", sizning bahoyingizsiz" : ""}) · 16-noyabrdan yangi tartibda: <b>${x.split.B.final ?? "—"}</b> (${x.split.w2} ish kuni) → yakuniy ball ish kunlari bo'yicha qo'shiladi. Quyidagi jadval — ${x.split.w2 ? "yangi tartib (16-noyabrdan)" : "eski tartib (1–15-noyabr); 16-noyabrdan yangi tartib qo'shiladi"}.</div>`
+        ${x.split ? `<div class="note" style="margin:10px 0 0"><b>Noyabr — ikki qism:</b> 1–15-noyabr eski tartibda: <b>${x.split.A.final ?? "—"}</b> (${x.split.w1} ish kuni${x.split.A.pending ? ", sizning bahoyingizsiz" : ""}) · 16-noyabrdan yangi tartibda: <b>${x.split.B.final ?? "—"}</b> (${x.split.w2} ish kuni) → yakuniy ball ish kunlari bo'yicha qo'shiladi. Quyidagi jadval — ${x.split.w2 ? "yangi tartib (16-noyabrdan)" : "eski tartib (1–15-noyabr). Yangi tartib avtomatik ishlayapti — 16-noyabr natijalari ertaga (hisobotlar, davomat 22:00 gacha kiritilgach) qo'shiladi"}.</div>`
           : x.pending ? `<div class="note" style="margin:10px 0 0">Monitoring bo'limi rahbari bahosi hali qo'yilmagan — ball qolgan mezonlardan hisoblandi (${x.sum} / ${x.maxA}).</div>` : ""}
         <div class="table-wrap"><table class="cr-tbl"><thead><tr><th>Mezon</th><th style="width:28%">Natija</th><th>Ball</th><th class="hide-sm">Izoh</th>${px ? `<th class="hide-sm">O'tgan oy</th>` : ""}</tr></thead><tbody>
         ${x.items.map((c, k) => { const pc = c.r === null ? null : Math.round(Math.max(0, Math.min(1, c.r)) * 100); const pv = px ? (px.items.find(i => i.it.k === c.it.k)?.v ?? null) : null;
