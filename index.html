@@ -1982,6 +1982,7 @@ window.LESSONS = [
       async assignHelp(to, tids, due, msg) { const d = load(); d.helpreq = d.helpreq || []; to.forEach((u, k) => { const part = tids.filter((x, i) => i % to.length === k); if (part.length)
           d.helpreq.unshift({ id: Date.now() + k, from_id: me().id, to_id: u, teacher_ids: part, due, note: msg || "", status: "qabul", kind: "yonaltirish", reply: "", created_at: new Date().toISOString(), answered_at: new Date().toISOString() }); }); save(); return ok(to.length); },
       async listTeacherObs(from, subs, ids, to) { return ok((load().tobs || []).filter(o => o.day >= from && (!to || o.day <= to) && (!subs || !subs.length || subs.includes(o.subject)))); },
+      async setStaffMain(uid, subs) { const d = load(); const p = d.profiles.find(x => x.id === uid); if (p) p.main_subjects = subs || []; save(); return ok(true); },
       async setStaffSubjects(uid, subs) { const d = load(); const m = me(); if (!m || !(m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"))) return fail("Ruxsat yo'q");
         const p = d.profiles.find(x => x.id === uid); if (p) p.subjects = subs || []; save(); return ok(true); },
       // 65: intizomiy xodimlar haftalik yordam rejasi (demo)
@@ -2329,6 +2330,7 @@ window.LESSONS = [
       async noLessonClear(tid, dw) { chk(await sb.rpc("nolesson_clear", { tid, dw })); return true; },
       async assignHelp(to_users, tids, due_date, msg) { return chk(await sb.rpc("assign_help", { to_users, tids, due_date, msg: msg || "" })); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
+      async setStaffMain(uid, subs) { chk(await sb.rpc("set_staff_main", { uid, subs: subs || [] })); return true; },
       async listIntzPlans(from) { const r = await sb.from("intz_plan").select("*").gte("week", from); return r.error ? [] : r.data; },
       async setIntzPlan(user_id, week, lessons, fils, note) { if (!(lessons > 0)) { chk(await sb.from("intz_plan").delete().eq("user_id", user_id).eq("week", week)); return true; }
         chk(await sb.from("intz_plan").upsert({ user_id, week, lessons, fils: fils || [], note: note || "", updated_at: new Date().toISOString() }, { onConflict: "user_id,week" })); return true; },
@@ -5118,6 +5120,9 @@ window.METODISTLAR = [
   const SCOPE_SUBJ = [BOSHL, BOG, "Ingliz tili", "Rus tili", "Arab tili", "Matematika", ...OTHER_SUBJ.filter(x => !["Ochiq mashg'ulot", "Boshqa fan"].includes(x))];
   const subsOf = p => p && p.role === "xodim" ? [...new Set((p.subjects || []).map(canonSubj).filter(Boolean))] : [];
   const mySubs = () => S.me && S.me.role === "xodim" && !canMetAdmin() ? subsOf(S.me) : [];
+  // 66: asosiy fanlar — javobgarlik (KPI «Reja», avtomatik topshiriq, 15-sana so'rovi) shu fanlarda; qolganlari — qo'shimcha
+  const mainOf = p => { const all = subsOf(p); const m = [...new Set((p && p.main_subjects || []).map(canonSubj).filter(x => all.includes(x)))]; return m.length ? m : all.length === 1 ? all : []; };
+  const fanMasul = fan => (S.profiles || []).filter(p => p.active && !p.archived && p.role === "xodim" && deptOf(p) === "akademik" && mainOf(p).includes(fan));
   const inSubs = (subs, s) => !subs || !subs.length || subs.includes(canonSubj(s));
   const inScope = s => inSubs(mySubs(), s);
   // ---- 35: yangi baza (fani yo'q ustozlar) va yordam so'rovi orqali ochilgan ustozlar
@@ -5292,6 +5297,9 @@ window.METODISTLAR = [
         out.push(groups[best].shift().r.t.id); took[best] = (took[best] || 0) + 1;
       }
     });
+    const ms0 = !canMetAdmin() ? new Set(mainOf(S.me)) : new Set();
+    if (ms0.size && mainOf(S.me).length < subsOf(S.me).length) { const nf = out.length - (out.length - first.length), rest = out.slice(first.length);
+      const isM = id => ms0.has(canonSubj((teacherById(id) || {}).subject)); return [...first, ...rest.filter(isM), ...rest.filter(id => !isM(id))].slice(0, 150); }
     return out.slice(0, 150);
   }
   async function recFill(day, force) {
@@ -5575,7 +5583,10 @@ window.METODISTLAR = [
         return sk.length ? `<details class="card" style="margin-top:16px" id="pl-skip"><summary><b>🚫 Bu oy kuzatilmaydi — ${sk.length} ta ustoz</b> <span class="small muted">rejadan va tavsiyalardan chiqarilgan, ro'yxatda qoladi</span></summary>
           ${sk.sort((a, b) => a.full_name.localeCompare(b.full_name)).map(x => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(x.full_name)}</div><div class="small muted">${esc([canonSubj(x.subject), x.filial].filter(Boolean).join(" · "))} · sababi: «${esc(skipOf(x.id, ms))}»</div></div>${canPlanAdmin() && ms === mStart(today()) ? `<button type="button" class="btn sm" data-skback="${x.id}">↩ Rejaga qaytarish</button>` : ""}</div>`).join("")}</details>` : ""; })()}
       ${canPlanAdmin() && akMembers.length ? `<details class="card" style="margin-top:16px" ${S.ui.plSubOpen ? "open" : ""} id="pl-subs"><summary><b>Xodimlar qaysi fanni kuzatadi</b> <span class="small muted">— xodim faqat o'z fani ma'lumotlarini ko'radi (bo'sh — hamma fan)</span></summary>
-        ${akMembers.map(p => `<div class="list-item pl-subrow"><div style="min-width:170px"><b>${esc(p.full_name)}</b></div><div class="chips" style="flex:1">${SCOPE_SUBJ.map(s => `<button type="button" class="chip-btn sm ${subsOf(p).includes(s) ? "on" : ""}" data-psub="${p.id}" data-v="${esc(s)}">${esc(s)}</button>`).join("")}</div></div>`).join("")}</details>` : ""}`;
+        <p class="small muted" style="margin:8px 0">⭐ — <b>asosiy fan</b>: shu fanda reja ortda qolsa yoki muammo bo'lsa, xodim reytingiga ta'sir qiladi (KPI «Reja» mezoni, avtomatik topshiriq, 15-sana so'rovi). Qolgan belgilangan fanlar — <b>qo'shimcha</b>: kuzatadi, lekin javobgar emas. Asosiy fani bir xil xodimlar teng javobgar; asosiy masʼuli yo'q fanlar uchun Akademik bo'lim rahbari javobgar.</p>
+        ${akMembers.map(p => `<div class="list-item pl-subrow" style="flex-wrap:wrap"><div style="min-width:170px"><b>${esc(p.full_name)}</b></div><div class="chips" style="flex:1">${SCOPE_SUBJ.map(s => `<button type="button" class="chip-btn sm ${subsOf(p).includes(s) ? "on" : ""}" data-psub="${p.id}" data-v="${esc(s)}">${esc(s)}</button>`).join("")}</div>
+          ${subsOf(p).length ? `<div class="row" style="gap:6px;width:100%;flex-wrap:wrap;margin-top:4px"><span class="small muted" style="min-width:170px">Asosiy fan(lar):</span>${subsOf(p).map(s => `<button type="button" class="chip-btn sm ${mainOf(p).includes(s) ? "on" : ""}" data-pmain="${p.id}" data-v="${esc(s)}">${mainOf(p).includes(s) ? "⭐ " : ""}${esc(s)}</button>`).join("")}</div>` : ""}</div>`).join("")}
+        ${(() => { const nm = [...new Set(akMembers.flatMap(subsOf))].filter(f => !fanMasul(f).length); return nm.length ? `<p class="small" style="margin:8px 0 0">Asosiy masʼuli yo'q fanlar (Akademik bo'lim rahbari javobgar): <b>${nm.map(esc).join(", ")}</b></p>` : ""; })()}</details>` : ""}`;
     const rerun = () => planView(root);
     const sel = (id, k) => { const el = $(id, root); if (el) el.onchange = e => { S.ui[k] = e.target.value; rerun(); }; };
     sel("#pl-m", "plM"); sel("#pl-f", "plF"); sel("#pl-s", "plS");
@@ -5598,7 +5609,11 @@ window.METODISTLAR = [
     $$("[data-psub]", root).forEach(b => b.onclick = async () => { const p = person(b.dataset.psub); if (!p) return;
       const cur0 = subsOf(p), v = b.dataset.v, next = cur0.includes(v) ? cur0.filter(x => x !== v) : [...cur0, v];
       b.disabled = true;
-      try { await act(() => db.setStaffSubjects(p.id, next), `${p.full_name}: ${next.length ? next.join(", ") : "hamma fan"}`); p.subjects = next; S.ui.plSubOpen = true; rerun(); } catch (e) { b.disabled = false; } });
+      try { await act(() => db.setStaffSubjects(p.id, next), `${p.full_name}: ${next.length ? next.join(", ") : "hamma fan"}`); p.subjects = next; p.main_subjects = (p.main_subjects || []).filter(x => next.includes(canonSubj(x))); S.ui.plSubOpen = true; rerun(); } catch (e) { b.disabled = false; } });
+    $$("[data-pmain]", root).forEach(b => b.onclick = async () => { const p = person(b.dataset.pmain); if (!p) return;
+      const cur0 = mainOf(p), v = b.dataset.v, next = cur0.includes(v) ? cur0.filter(x => x !== v) : [...cur0, v];
+      b.disabled = true;
+      try { await act(() => db.setStaffMain(p.id, next), `${p.full_name} — asosiy: ${next.length ? next.join(", ") : "belgilanmagan"}`); p.main_subjects = next; S.ui.plSubOpen = true; rerun(); } catch (e) { b.disabled = false; } });
   }
 
 
@@ -5803,7 +5818,7 @@ window.METODISTLAR = [
   const tblS = (h, rows) => `<table><thead><tr>${h.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   // ---- KPI: akademik xodimning «Reja» mezoni 2 haftalik bosqichda — oylik reja sur'atidan
   function planKpi(p, it, ps) {
-    const subs = subsOf(p); if (!subs.length) return null;
+    const subs = mainOf(p).length ? mainOf(p) : subsOf(p); if (!subs.length) return null;
     const pe = addD(ps, 13), t = today(), at = pe < t ? pe : t; if (at < ps) return null;
     const P = planCalc(mStart(at), { subs, at, bog: "all" }); if (!P.sumPlan) return null;
     const cov = P.got / P.sumPlan, ratio = P.pace ? Math.min(1, cov / P.pace) : 1;
