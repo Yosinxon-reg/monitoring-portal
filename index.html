@@ -10354,7 +10354,7 @@ window.METODISTLAR = [
     const fans = [...new Set(obs.map(fanOf))].sort((a, b) => (RK_GROUPS.indexOf(a) + 1 || 50) - (RK_GROUPS.indexOf(b) + 1 || 50) || a.localeCompare(b));
     body += D.h3("Fanlar kesimida") + D.p("«Qamrov» — davr davomida kamida bir marta ko'rilgan ustozlarning shu fan bo'yicha bazadagi barcha ustozlarga nisbati.", { sz: 17, c: "6B7A90", i: 1 })
       + D.tableX(full([{ h: "Fan", w: 0 }, { h: "Bazada", w: 1100, al: "center" }, { h: "Ko'rilgan (qamrov)", w: 2100, al: "center" }, { h: "Darslar", w: 1100, al: "center" }, { h: "O'rt. intizomiy", w: 1600, al: "center" }, { h: "O'rt. akademik", w: 1600, al: "center" }, { h: "Umumiy natija", w: 1600, al: "center" }, { h: "🏅 Kun ustozi", w: 1400, al: "center" }]),
-        fans.map(f => { const z = tsum(obs.filter(o => fanOf(o) === f)), nb = T.filter(t => canonSubj(t.subject) === f).length;
+        fans.map(f => { const z = tsum(obs.filter(o => fanOf(o) === f)), seenIds = new Set(obs.filter(o => fanOf(o) === f).map(o => o.teacher_id)), nb = (S.teachers || []).filter(t => !tPool(t) && canonSubj(t.subject) === f && (!tArch(t) || seenIds.has(t.id))).length;
           return { cells: [{ v: f, b: 1 }, String(nb || "—"), `${z.t}${nb ? ` (${pv(hpct(Math.min(z.t, nb), nb))})` : ""}`, String(z.n), nf(z.ib), nf(z.ab), { v: pv(z.tot), b: 1, ...(z.tot === null ? {} : wPct(z.tot / 100) || {}) }, String(z.kun)] }; }));
     const filOf = o => (teacherById(o.teacher_id) || o).filial || o.filial || "—";
     body += D.h3("Filiallar kesimida") + D.tableX(aCols("Filial"), [...FILIALLAR.map(f => aRow(f, tsum(obs.filter(o => filOf(o) === f)))).filter(r => r.cells[1] !== "0"), aRow("Jami", A, 1)]);
@@ -10396,8 +10396,10 @@ window.METODISTLAR = [
     // 4. Xodimlar faoliyati
     body += pageBreak() + D.h2("4. Xodimlar faoliyati va intizomi");
     body += D.p("Ish kunlari — xodimning ish grafigi bo'yicha (ta'til kunlari chiqarilgan). Hisobot vaqtida — ish tugaganidan 30 daqiqagacha topshirilgan kunlar. Baho — bo'lim rahbari kunlik hisobotga qo'ygan baho (10 ballik). Davomat — bo'lim rahbari kelgan vaqtni kiritgan kunlar bo'yicha.", { sz: 17, c: "6B7A90", i: 1 });
-    const days = []; for (let d = from; d <= to; d = addD(d, 1)) days.push(d);
-    const sRows = staff.map(p => { const wd = days.filter(d => isWorkdayOn(p, d) && (!p.start_date || d >= p.start_date)), mine = X.reps.filter(r => r.author_id === p.id && isWritten(r));
+    const repStart = (() => { const ds = X.reps.filter(r => isWritten(r) && r.written_by === r.author_id).map(r => r.report_date).sort(); return ds[0] && ds[0] > from ? ds[0] : from; })();
+    if (repStart > from) body += D.p(`Xodimlar kunlik hisobotni o'zlari ${wDay(repStart)} dan yoza boshlagan (undan oldin hisobotni bo'lim rahbari yozgan), shuning uchun ish kunlari va hisobotlar ${wDay(repStart)} dan hisoblandi.`, { sz: 17, c: "6B7A90", i: 1 });
+    const days = []; for (let d = repStart; d <= to; d = addD(d, 1)) days.push(d);
+    const sRows = staff.map(p => { const wd = days.filter(d => isWorkdayOn(p, d) && (!p.start_date || d >= p.start_date)), mine = X.reps.filter(r => r.author_id === p.id && isWritten(r) && r.report_date >= repStart);
       const vq = wd.map(d => vaqtDay(p, d, X.reps)).filter(v => v !== null), on = vq.filter(v => v === 1).length;
       const at = wd.map(d => attDay(p, d)).filter(Boolean), late = at.filter(a => !a.absent && a.late > 10), abs = at.filter(a => a.absent && !a.excused);
       const gr = mine.map(r => r.grade).filter(g => g !== null && g !== undefined && g !== "");
