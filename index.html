@@ -1984,6 +1984,13 @@ window.LESSONS = [
       async listTeacherObs(from, subs, ids, to) { return ok((load().tobs || []).filter(o => o.day >= from && (!to || o.day <= to) && (!subs || !subs.length || subs.includes(o.subject)))); },
       async setStaffSubjects(uid, subs) { const d = load(); const m = me(); if (!m || !(m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"))) return fail("Ruxsat yo'q");
         const p = d.profiles.find(x => x.id === uid); if (p) p.subjects = subs || []; save(); return ok(true); },
+      // 65: intizomiy xodimlar haftalik yordam rejasi (demo)
+      async listIntzPlans(from) { return ok((load().izp || []).filter(x => x.week >= from)); },
+      async setIntzPlan(user_id, week, lessons, fils, note) { const d = load(); d.izp = (d.izp || []).filter(x => !(x.user_id === user_id && x.week === week));
+        if (lessons > 0) d.izp.push({ user_id, week, lessons, fils: fils || [], note: note || "", set_by: me().id }); save(); return ok(true); },
+      async listIntzMiss(from) { return ok((load().izm || []).filter(x => x.week >= from)); },
+      async intzMissReason(wk, txt) { const d = load(); const m = (d.izm || []).find(x => x.user_id === me().id && x.week === wk && x.status === "kutilmoqda"); if (!m) return fail("So'rov topilmadi"); m.reason = txt; save(); return ok(true); },
+      async intzMissDecide(uid, wk, minus, msg) { const d = load(); const m = (d.izm || []).find(x => x.user_id === uid && x.week === wk); if (!m) return fail("So'rov topilmadi"); m.status = minus ? "minus" : "kechirildi"; m.reply = msg || ""; m.decided_by = me().id; save(); return ok(true); },
       // 62: «Bu oy kuzatmaymiz» (demo)
       async listSkips(ms) { return ok((load().tskip || []).filter(x => x.month >= ms)); },
       async skipRequest(tid, ms, choice, txt) { const d = load(); const m = me(); d.tskip = d.tskip || []; const adm = m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik");
@@ -2322,6 +2329,12 @@ window.LESSONS = [
       async noLessonClear(tid, dw) { chk(await sb.rpc("nolesson_clear", { tid, dw })); return true; },
       async assignHelp(to_users, tids, due_date, msg) { return chk(await sb.rpc("assign_help", { to_users, tids, due_date, msg: msg || "" })); },
       async setStaffSubjects(uid, subs) { chk(await sb.rpc("set_staff_subjects", { uid, subs: subs || [] })); return true; },
+      async listIntzPlans(from) { const r = await sb.from("intz_plan").select("*").gte("week", from); return r.error ? [] : r.data; },
+      async setIntzPlan(user_id, week, lessons, fils, note) { if (!(lessons > 0)) { chk(await sb.from("intz_plan").delete().eq("user_id", user_id).eq("week", week)); return true; }
+        chk(await sb.from("intz_plan").upsert({ user_id, week, lessons, fils: fils || [], note: note || "", updated_at: new Date().toISOString() }, { onConflict: "user_id,week" })); return true; },
+      async listIntzMiss(from) { const r = await sb.from("intz_miss").select("*").gte("week", from); return r.error ? [] : r.data; },
+      async intzMissReason(wk, txt) { chk(await sb.rpc("intz_miss_reason", { wk, txt })); return true; },
+      async intzMissDecide(uid, wk, minus, msg) { chk(await sb.rpc("intz_miss_decide", { uid, wk, minus, msg: msg || "" })); return true; },
       async listSkips(ms) { const r = await sb.from("teacher_skip").select("*, teachers(full_name, subject, filial)").gte("month", ms); return r.error ? [] : r.data; },
       async skipRequest(tid, ms, choice, txt) { return chk(await sb.rpc("skip_request", { tid, ms, choice, txt })); },
       async skipDecide(sid, ok, msg) { chk(await sb.rpc("skip_decide", { sid, ok, msg: msg || "" })); return true; },
@@ -2980,6 +2993,7 @@ window.METODISTLAR = [
         isManager() ? db.listCeoReports(today(), today()).catch(() => []) : Promise.resolve(S.creps || []),
         db.listHelpReqs ? db.listHelpReqs().catch(() => S.help || []) : Promise.resolve([]), tqLoad()]);
       S.plans = pl || []; if (isManager()) S.creps = cr || []; S.help = hp || [];
+      if (deptOf(S.me) === "intizomiy" || canMetAdmin()) { try { await izLoad(); } catch (e) {} }
       if (db.amalAccess) { try { S.amalAcc = await db.amalAccess(); } catch (e) {} }
       if (db.listRecs) { try { const [rc, nl] = await Promise.all([db.listRecs(addD(w0, -7), addD(w0, 13)), db.listNoLesson()]);
         const keep = (S.recs || []).filter(o => o.day < addD(w0, -7) || o.day > addD(w0, 13)); S.recs = keep.concat(recFix(rc)); S.nolesson = nl || []; } catch (e) {} }
@@ -3470,7 +3484,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page); izInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -3516,7 +3530,7 @@ window.METODISTLAR = [
             ${active.length ? active.slice(0, 6).map(taskLine).join("") : `<div class="empty">Faol topshiriq yo'q</div>`}</div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page); nameAskInsert(page); skipInsert(page);
+    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page); nameAskInsert(page); skipInsert(page); izInsert(page);
     const nb = $("#notif-on", page);
     if (nb) nb.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "Eslatmalar yoqildi" : "Eslatmalar yoqilmadi"); } catch (e) {} nb.remove(); };
   }
@@ -5212,7 +5226,7 @@ window.METODISTLAR = [
   const recSeen = (o) => (S.tobs || []).some(x => x.teacher_id === o.teacher_id && x.author_id === o.user_id && (x.day === o.day || x.report_date === o.day));
   const recNextDay = () => nextWorkday(S.me, today());
   // Kunlik reja (haftalik rejadagi shu kun) — akademik xodimlarda kuniga necha dars ko'rishi: «7», «8 ta dars» va h.k.
-  const recTarget = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
+  const recTarget = day => { const iz = izDayTarget(day); if (iz !== null) return iz; const m = String(dayPlan(S.me, day) || "").match(/\d+/); const v = m ? +m[0] : 0; return v >= 1 && v <= 30 ? v : REC_N; };
   const recFromPlan = day => { const m = String(dayPlan(S.me, day) || "").match(/\d+/); return !!m && +m[0] >= 1 && +m[0] <= 30; };
   // Yana qancha «taklif» kerak: reja − tanlanganlar
   // Kunlik rejadan tashqari yana REC_EXTRA tagacha «qo'shimcha» tanlash mumkin (kun oxirigacha saqlanadi)
@@ -5252,12 +5266,12 @@ window.METODISTLAR = [
   }
   function recCands(day) {
     const me = S.me.id, dw = dowOf(day);
-    const akad = deptOf(S.me) === "akademik" || canMetAdmin();
+    const izp = izMy(), akad = deptOf(S.me) === "akademik" || canMetAdmin() || !!izp;
     const blocked = new Set((S.nolesson || []).filter(z => +z.dow === dw).map(z => z.teacher_id));
     const first = recDirected(day).filter(id => !blocked.has(id));
     if (!akad) return first;
     const P = planCalc(mStart(day), { bog: "all" });
-    const scope = P.rows.filter(r => tLive(r.t, day) && recFits(r.t));
+    const scope = P.rows.filter(r => tLive(r.t, day) && (izp ? canonSubj(r.t.subject) !== BOG && (!(izp.fils || []).length || izp.fils.includes(r.t.filial)) : recFits(r.t)));
     const key = r => canonSubj(r.t.subject) + "|" + (r.t.filial || "—");
     const w = {}; scope.forEach(r => { w[key(r)] = (w[key(r)] || 0) + 1; });
     const cand = scope.filter(r => !blocked.has(r.t.id) && !first.includes(r.t.id)).map(r => { const L = recLast(r, day); return { r, L, need: r.plan - L.n }; })
@@ -5295,7 +5309,7 @@ window.METODISTLAR = [
     catch (e) { console.warn("recFill", e); return false; }
     finally { REC.busy = false; }
   }
-  const recShow = () => !!S.me && S.me.role !== "oqituvchi" && (((deptOf(S.me) === "akademik" && canPlan()) || canMetAdmin()) || recDirected(today()).length > 0);
+  const recShow = () => !!S.me && S.me.role !== "oqituvchi" && (((deptOf(S.me) === "akademik" && canPlan()) || canMetAdmin()) || recDirected(today()).length > 0 || !!izMy());
   // Vidjet: hisobot formasida (va bosh sahifada). onPick(teacher) — bugungi tanlov hisobot qatoriga qo'shiladi
   function recWidget(box, opts = {}) {
     if (!box || !recShow()) { if (box) box.innerHTML = ""; return; }
@@ -5396,6 +5410,73 @@ window.METODISTLAR = [
       catch (x) { $("#as-e", m).textContent = x.message; e.target.disabled = false; } };
   }
   // Oylik reja sahifasi: yo'naltirilganlar holati va tavsiyalar statistikasi
+  // ===== 65: Intizomiy xodimlar — haftalik «akademik yordam» rejasi (Akademik CEO qo'yadi) =====
+  const IZ_MAXDED = 10;
+  let IZC = { at: 0 };
+  async function izLoad(force) { if (!db.listIntzPlans) return; if (!force && Date.now() - IZC.at < 60e3) return;
+    const from = addD(weekOf(today()), -7 * 10);
+    try { const [a, b] = await Promise.all([db.listIntzPlans(from), db.listIntzMiss(from)]); S.izp = a || []; S.izm = b || []; IZC.at = Date.now(); } catch (e) {} }
+  const izPlan = (uid, wk) => (S.izp || []).find(x => x.user_id === uid && String(x.week).slice(0, 10) === wk && +x.lessons > 0) || null;
+  const izDone = (uid, wk) => (S.tobs || []).filter(o => o.author_id === uid && o.day >= wk && o.day <= addD(wk, 5)).length;
+  const izMy = () => !!S.me && deptOf(S.me) === "intizomiy" && S.me.role === "xodim" ? izPlan(S.me.id, weekOf(today())) : null;
+  const izStaff = () => (S.profiles || []).filter(p => p.active && !p.archived && p.role === "xodim" && deptOf(p) === "intizomiy").sort((a, b) => a.full_name.localeCompare(b.full_name));
+  // KPI: tasdiqlangan minus ballar (hafta — to'liq, 2 haftalik bosqich — yarmi)
+  const izDed = (uid, from, to, lvl) => lvl === "kun" ? 0 : (S.izm || []).filter(x => x.user_id === uid && x.status === "minus" && String(x.week).slice(0, 10) >= from && String(x.week).slice(0, 10) <= to)
+    .reduce((a, x) => a + (+x.ded || 0), 0) / (lvl === "bosqich" ? 2 : 1);
+  // Kunlik tavsiya soni: haftaning qolgan ish kunlariga teng bo'lib
+  function izDayTarget(day) { const pl = izMy(); if (!pl) return null; const wk = weekOf(day); const left = Math.max(0, +pl.lessons - izDone(S.me.id, wk));
+    let wd = 0; for (let d = day; d <= addD(wk, 5); d = addD(d, 1)) if (isWorkdayOn(S.me, d)) wd++; return wd ? Math.ceil(left / wd) : 0; }
+  function izCard() {
+    const t = today(), w0 = weekOf(t), ws = [w0, addD(w0, 7)], wk = ws.includes(S.ui.izW) ? S.ui.izW : w0;
+    const st = izStaff(); if (!st.length) return "";
+    return `<div class="card" style="margin-top:16px" id="iz-card"><div class="card-head"><h2>🧭 Intizomiy xodimlar — haftalik yordam rejasi</h2><span class="spacer"></span>
+        <select id="iz-w" style="width:auto">${ws.map((w, i) => `<option value="${w}" ${w === wk ? "selected" : ""}>${fmtDate(w)} – ${fmtDate(addD(w, 5))}${i ? " (keyingi)" : " (joriy)"}</option>`).join("")}</select></div>
+      <p class="small muted" style="margin-top:0">Har intizomiy xodim shu hafta nechta dars kuzatishi kerak (0 — reja yo'q). Xodim har kuni tavsiya oladi (filial tanlansa — faqat shu filial ustozlari). Shanba 19:00 da reja bajarilmagan bo'lsa sizga «minus ball tushsinmi?» so'rovi keladi — tasdiqlasangiz KPI'dan bajarilmagan qismga mutanosib, ko'pi bilan −${IZ_MAXDED} ball.</p>
+      <div class="table-wrap"><table><thead><tr><th>Xodim</th><th>Darslar</th><th>Filial(lar)</th><th class="hide-sm">Izoh</th><th>Bajarildi</th><th></th></tr></thead><tbody>
+      ${st.map(p => { const pl = (S.izp || []).find(x => x.user_id === p.id && String(x.week).slice(0, 10) === wk) || {}; const dn = izDone(p.id, wk);
+        return `<tr data-izr="${p.id}"><td><b>${esc(p.full_name)}</b></td><td><input type="number" min="0" max="60" class="num" data-izn value="${pl.lessons || ""}" placeholder="0" style="width:70px"></td>
+          <td><div class="chips">${FILIALLAR.map(f => `<button type="button" class="chip-btn sm ${(pl.fils || []).includes(f) ? "on" : ""}" data-izf="${esc(f)}">${esc(f)}</button>`).join("")}</div></td>
+          <td class="hide-sm"><input data-izt value="${esc(pl.note || "")}" placeholder="ixtiyoriy" style="min-width:140px"></td>
+          <td>${pl.lessons ? `<span class="pl-cnt ${dn >= pl.lessons ? "ok" : dn ? "mid" : "no"}">${dn}/${pl.lessons}</span>` : `<span class="muted">${dn ? dn + " dars" : "—"}</span>`}</td>
+          <td><button type="button" class="btn sm primary" data-izs>Saqlash</button></td></tr>`; }).join("")}</tbody></table></div></div>`;
+  }
+  function izBind(root, rerun) {
+    const c = $("#iz-card", root); if (!c) return;
+    $("#iz-w", c).onchange = e => { S.ui.izW = e.target.value; rerun(); };
+    $$("[data-izf]", c).forEach(b => b.onclick = () => b.classList.toggle("on"));
+    $$("[data-izr]", c).forEach(r => { $("[data-izs]", r).onclick = async e => { const wk = $("#iz-w", c).value, n = Math.max(0, Math.min(60, Math.round(+$("[data-izn]", r).value || 0)));
+      const fils = $$("[data-izf]", r).filter(b => b.classList.contains("on")).map(b => b.dataset.izf); e.target.disabled = true;
+      try { await db.setIntzPlan(r.dataset.izr, wk, n, fils, $("[data-izt]", r).value.trim()); await izLoad(true); toast(n ? "Reja saqlandi — xodimga xabar yuborildi" : "Reja olib tashlandi"); rerun(); }
+      catch (x) { e.target.disabled = false; toast(x.message, true); } }; });
+  }
+  // Bosh sahifa: CEO uchun «minus tushsinmi?» va xodim uchun haftalik reja holati
+  async function izInsert(page) {
+    if (!S.me || !db.listIntzPlans) return; await izLoad();
+    const old = $("#izd-card", page); if (old) old.remove(); if (!page.isConnected) return;
+    let html = "";
+    if (canMetAdmin()) { const pend = (S.izm || []).filter(x => x.status === "kutilmoqda");
+      if (pend.length) html = `<div class="card na-card" id="izd-card" style="margin-bottom:16px"><div class="card-head"><h2>🧭 Yordam rejasi bajarilmadi — minus ball tushsinmi? (${pend.length})</h2></div>
+        <p class="small muted" style="margin-top:0">Agar xodim boshqa ishlar bilan band bo'lgan bo'lsa — «Kechirilsin». Minus faqat siz tasdiqlasangiz tushadi.</p>
+        ${pend.map(x => `<div class="na-row" data-izm="${x.user_id}" data-izmw="${String(x.week).slice(0, 10)}"><div class="small"><b>${esc(nameOf(x.user_id))}</b> · ${fmtDate(String(x.week).slice(0, 10))} haftasi · bajarildi <b>${x.done} / ${x.plan}</b> · taklif: <b style="color:var(--bad)">−${x.ded} ball</b></div>
+          <div class="small" style="margin:2px 0 4px">${x.reason ? `Xodim sababi: «${esc(x.reason)}»` : `<span class="muted">Xodim hali sabab yozmagan</span>`}</div>
+          <div class="row" style="gap:6px;flex-wrap:wrap"><input data-izmm placeholder="Izoh (ixtiyoriy)" style="flex:1;min-width:180px"><button class="btn sm bad" data-izd="1">➖ Minus tushsin</button><button class="btn sm" data-izd="0">✓ Kechirilsin</button></div></div>`).join("")}</div>`; }
+    else if (deptOf(S.me) === "intizomiy" && S.me.role === "xodim") { const wk = weekOf(today()), pl = izPlan(S.me.id, wk), mine = (S.izm || []).filter(x => x.user_id === S.me.id && x.status === "kutilmoqda");
+      if (pl || mine.length) { const dn = pl ? izDone(S.me.id, wk) : 0;
+        html = `<div class="card na-card" id="izd-card" style="margin-bottom:16px"><div class="card-head"><h2>🧭 Akademik bo'limga yordam — haftalik reja</h2></div>
+          ${pl ? `<div class="row" style="gap:10px;align-items:center"><div class="progress" style="flex:1"><i style="width:${Math.min(100, Math.round(dn / pl.lessons * 100))}%"></i></div><b>${dn} / ${pl.lessons}</b> dars</div>
+            <div class="small muted" style="margin-top:4px">${fmtDate(wk)} – ${fmtDate(addD(wk, 5))}${(pl.fils || []).length ? ` · filial: ${esc(pl.fils.join(", "))}` : ""}${pl.note ? ` · «${esc(pl.note)}»` : ""}. Qaysi ustozlarni ko'rish tavsiyalari — kunlik hisobot formasida; ko'rgan darslaringizni o'sha yerda «Akademik bo'limga yordam» qismiga yozing. Reja bajarilmasa, Akademik bo'lim rahbari qaroriga ko'ra KPI'dan ko'pi bilan −${IZ_MAXDED} ball.</div>` : ""}
+          ${mine.map(x => `<div class="na-row" data-izq="${String(x.week).slice(0, 10)}" style="margin-top:8px"><div class="small">⚠️ ${fmtDate(String(x.week).slice(0, 10))} haftasi: <b>${x.done} / ${x.plan}</b> — reja bajarilmadi. Boshqa ishlar bilan band bo'lgan bo'lsangiz, sababini yozing:</div>
+            <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap"><input data-izqt value="${esc(x.reason || "")}" placeholder="Masalan: filialda tekshiruv bo'ldi, topshiriq bilan band edim" style="flex:1;min-width:220px"><button class="btn sm primary" data-izqs>Yuborish</button></div></div>`).join("")}</div>`; } }
+    if (!html) return;
+    const anchor = $("#sk-card", page) || $("#na-card", page) || $(".card", page) || page.firstElementChild; if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+    const c = $("#izd-card", page);
+    $$("[data-izm]", c).forEach(r => $$("[data-izd]", r).forEach(b => b.onclick = async () => { $$("button", r).forEach(x => x.disabled = true);
+      try { await db.intzMissDecide(r.dataset.izm, r.dataset.izmw, b.dataset.izd === "1", $("[data-izmm]", r).value.trim()); await izLoad(true); toast(b.dataset.izd === "1" ? "Minus ball tushdi" : "Kechirildi"); izInsert(page); }
+      catch (x) { $$("button", r).forEach(y => y.disabled = false); toast(x.message, true); } }));
+    $$("[data-izq]", c).forEach(r => { $("[data-izqs]", r).onclick = async e => { const v = $("[data-izqt]", r).value.trim(); if (v.length < 3) return toast("Sababini yozing", true); e.target.disabled = true;
+      try { await db.intzMissReason(r.dataset.izq, v); await izLoad(true); toast("Yuborildi — Akademik bo'lim rahbari hal qiladi"); izInsert(page); } catch (x) { e.target.disabled = false; toast(x.message, true); } }; });
+  }
   function directedCard() {
     const list = (S.help || []).filter(h => h.kind === "yonaltirish" && h.due >= addD(today(), -7)); if (!list.length) return "";
     const rows = []; list.forEach(h => (h.teacher_ids || []).forEach(id => { const since = String(h.answered_at || h.created_at).slice(0, 10);
@@ -5478,7 +5559,7 @@ window.METODISTLAR = [
         ${canPlanAdmin() ? `<div class="row" style="gap:8px;margin:0 0 8px;flex-wrap:wrap"><label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="as-all" style="width:auto"> Hammasini belgilash (${P.risk.length})</label><span class="spacer"></span><button type="button" class="btn sm primary" id="as-go2">🧭 Intizomiy bo'limga yordamga berish</button></div>` : ""}
         ${(canPlanAdmin() ? P.risk : P.risk.slice(0, 30)).map(r => `<div class="list-item">${canPlanAdmin() ? `<input type="checkbox" data-asc="${r.t.id}" style="width:auto">` : ""}<div style="flex:1;min-width:0"><div class="t">${esc(r.t.full_name)}${directedFor(r.t.id).length ? ` <span class="pl-tag2">🧭 ${esc(directedFor(r.t.id).map(h => shortName(h.to_id)).join(", "))}</span>` : ""}</div><div class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}${r.last ? ` · oxirgi: ${fmtDate(r.last.day)}` : " · hali kuzatilmagan"}</div></div>${plCount(r)}<span class="small muted" style="white-space:nowrap">yana ${r.need} marta</span>${canPlanAdmin() ? `<button type="button" class="btn sm" data-tst="${r.t.id}">⚙ Holati / reja</button>` : ""}</div>`).join("")}
         ${!canPlanAdmin() && P.risk.length > 30 ? `<div class="small muted" style="padding-top:8px">… yana ${P.risk.length - 30} ta</div>` : ""}</div>` : ""}
-      ${canPlanAdmin() || canPlanPdf() ? directedCard() + recStatsCard(ms) : ""}
+      ${canPlanAdmin() || canPlanPdf() ? directedCard() + recStatsCard(ms) : ""}${canPlanAdmin() && P.cur ? izCard() : ""}
       ${P.over.length ? `<div class="card pl-over"><div class="card-head"><h2>⚖ Muvozanat</h2><span class="spacer"></span><span class="small muted">${OVER_N} martadan ko'p ko'rilganlar</span></div>
         <p class="small" style="margin:0 0 8px">Bu ustozlar oyida ${OVER_N} martadan ko'p ko'rilgan${P.zero ? `, shu paytda <b>${P.zero} ta</b> ustoz hali umuman ko'rilmagan` : ""}.</p>
         ${P.over.map(r => `<div class="list-item"><div style="flex:1"><b>${esc(r.t.full_name)}</b> <span class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}</span></div>${plCount(r)}</div>`).join("")}</div>` : ""}
@@ -5509,6 +5590,7 @@ window.METODISTLAR = [
         if (sk) await db.skipDecide(sk.id, false, "Rejaga qaytarildi"); else await db.setTeacherPlan(tid, ms, null, "");
         await skipAfter(); toast("Ustoz shu oy rejasiga qaytarildi"); rerun(); } catch (x) { b.disabled = false; toast(x.message, true); } });
     const pdf = $("#pl-pdf", root); if (pdf) pdf.onclick = () => planWordModal(ms, fil, subj);
+    izBind(root, rerun);
     const asA = $("#as-all", root); if (asA) asA.onchange = () => $$("[data-asc]", root).forEach(x => { x.checked = asA.checked; });
     const asG = $("#as-go2", root); if (asG) asG.onclick = () => { const ids = $$("[data-asc]", root).filter(x => x.checked).map(x => x.dataset.asc);
       if (!ids.length) return toast("Avval ustozlarni belgilang", true); assignModal(ids, rerun); };
@@ -5521,6 +5603,7 @@ window.METODISTLAR = [
 
 
   PAGES["oylik-reja"] = async page => {
+    izLoad();
     if (!canPlan()) return PAGES.bosh(page);
     const subs = mySubs();
     page.innerHTML = head("Oylik reja", `Har bir ustoz oyiga ${PLAN_BASE} marta, bog'cha ustozlari ${PLAN_BOG} marta ko'rilishi kerak${subs.length ? ` · ${subs.join(", ")}` : ""}.`) + `<div id="pl-body"><div class="card empty">Yuklanmoqda…</div></div>`;
@@ -5991,6 +6074,7 @@ window.METODISTLAR = [
     return "";
   }
   async function kpiPrep(from, to) {
+    try { await izLoad(); } catch (e) {}
     const key = from + "|" + to;
     if (!(S._kxKey === key && Date.now() - (S._kxAt || 0) < 60e3)) {
       const [ir, ac] = await Promise.all([db.listIssueReviews ? db.listIssueReviews(from, to).catch(() => []) : Promise.resolve([]), db.listActivity ? db.listActivity(from, to).catch(() => []) : Promise.resolve([])]);
@@ -7327,10 +7411,11 @@ window.METODISTLAR = [
     });
     const sum = cells.reduce((a, c) => a + (c.val || 0), 0);
     const maxT = items.reduce((a, it) => a + it.max, 0);
-    const pct = rnd(sum / maxT * 100);
+    const ded = deptOf(p) === "intizomiy" ? izDed(p.id, d, lvl === "hafta" ? addD(d, 6) : addD(d, 13), lvl) : 0;
+    const pct = rnd(Math.max(0, sum / maxT * 100 - ded));
     const fin = lvl === "bosqich" ? K.finals.find(r => r.period_start === d && r.user_id === p.id) : null;
     const final = picked ? 100 : fin && fin.final_score !== null ? +fin.final_score : pct;
-    return { p, cells, sum: rnd(sum), maxT, pct, final, overridden: !!fin && !picked, picked, has: cells.some(c => c.val !== null) || !!fin || picked };
+    return { p, cells, sum: rnd(sum), maxT, pct, final, ded, overridden: !!fin && !picked, picked, has: cells.some(c => c.val !== null) || !!fin || picked };
   }
   // 53: haftalik mezonlar uchun portal tavsiyasi (CEO qo'yadi): Baholash — xodim qo'ygan ballar taqsimoti; Tahlil — tavsiyalar
   function softRate(p, from, to) {
@@ -7608,7 +7693,7 @@ window.METODISTLAR = [
           <td>${c.val === null || c.val === undefined ? `<span class="muted small">—</span>` : `<div class="kpi-bar big"><i style="width:${Math.min(100, c.val / c.it.max * 100)}%"></i></div><div class="small muted">${Math.round(c.val / c.it.max * 100)}%</div>`}</td>
           <td style="min-width:220px">${ed ? `<textarea rows="2" data-sn="${c.it.k}" placeholder="Nima uchun shu ball…">${esc(note)}</textarea>` : note ? `<div class="score-note">${esc(note)}</div>` : ""}
             ${c.au.why && scoreOf(c.man) === null && !x.picked ? `<div class="small muted sc-why">ℹ ${esc(c.au.why)}</div>` : !note && !ed ? `<span class="muted small">—</span>` : ""}</td></tr>`; }).join("")}
-      <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b></td></tr>
+      <tr class="sc-total"><td><b>Jami</b></td><td><b>${x.sum}</b><span class="small muted"> / ${x.maxT}</span></td><td><div class="kpi-bar big"><i style="width:${Math.min(100, x.pct)}%"></i></div></td><td><b>${lvl === "bosqich" ? "Yakuniy" : "Foiz"}: ${x.final}%</b>${x.ded ? `<div class="small" style="color:var(--bad)">🧭 Yordam rejasi bajarilmagani uchun −${String(Math.round(x.ded * 10) / 10).replace(".", ",")} ball (Akademik bo'lim rahbari tasdiqlagan)</div>` : ""}</td></tr>
       </tbody></table></div>`;
   }
   async function saveCardInputs(root, p, lvl, d, cells) {
