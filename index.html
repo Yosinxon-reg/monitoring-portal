@@ -3470,7 +3470,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -10031,6 +10031,202 @@ window.METODISTLAR = [
     return { blob: D.build(body, true, `Registon maktabi · Monitoring bo'limi · Oylik reja · ${mLabel(o.ms)}`), name, cap };
   }
 
+  // ===== 64: Bo'lim hisoboti (Avaz aka uchun — to'liq, ismlar bilan) va Filial rahbariga hisobot (xodim ismlarisiz) =====
+  const DR_DEPTS = [["akademik", "Akademik monitoring bo'limi"], ["intizomiy", "Intizomiy monitoring bo'limi"]];
+  const drStaff = () => (S.profiles || []).filter(p => p.active && !p.archived && p.role === "xodim" && ["akademik", "intizomiy"].includes(deptOf(p))).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  async function deptRepData(lvl, anchor) {
+    const [from, to0] = rhRange(lvl, anchor), to = to0 > today() ? today() : to0;
+    if (!S.tobs || !S.tobs.length || (TC && TC.from > from)) { try { await teachReload(); } catch (e) {} }
+    const [reps, creps, K] = await Promise.all([db.listReports({ from, to }).catch(() => []), db.listCeoReports ? db.listCeoReports(from, to).catch(() => []) : [], db.listKpiRange(from, to).catch(() => ({ daily: [], week: [], scores: [], finals: [] }))]);
+    try { await kpiPrep(from, to); } catch (e) {}
+    const days = []; for (let d = from; d <= to; d = addD(d, 1)) days.push(d);
+    const inR = ts => { const d = ts ? localOf(ts) : ""; return d >= from && d <= to; };
+    const obs = (S.tobs || []).filter(o => o.day >= from && o.day <= to);
+    const hol = holFlat(reps, creps).filter(h => h.day >= from && h.day <= to);
+    const staff = drStaff().map(p => {
+      const wd = days.filter(d => isWorkdayOn(p, d)), mine = reps.filter(r => r.author_id === p.id);
+      const att = wd.map(d => ({ d, a: attDay(p, d) })), late = att.filter(x => x.a && !x.a.absent && x.a.late > 10), abs = att.filter(x => x.a && x.a.absent && !x.a.excused), exc = att.filter(x => x.a && x.a.excused);
+      const vq = wd.map(d => vaqtDay(p, d, reps)).filter(v => v !== null), repOn = vq.filter(v => v === 1).length;
+      const ob = obs.filter(o => o.author_id === p.id), hl = hol.filter(h => h.author === p.id);
+      let kpi = null; try { if (wd.length) { const row = kpiRow(p, lvl === "kun" ? "kun" : "hafta", lvl === "kun" ? from : weekOf(from), K, null, reps); kpi = row.has && (lvl !== "kun" || from < today() || mine.some(isWritten)) ? row.pct : null; } } catch (e) {}
+      const gr = mine.map(r => r.grade).filter(g => g !== null && g !== undefined && g !== ""), grade = gr.length ? Math.round(gr.reduce((x, y) => x + +y, 0) / gr.length * 10) / 10 : null;
+      const tk = (S.tasks || []).filter(x => x.assigned_to === p.id && x.created_by !== p.id);
+      const tGiven = tk.filter(x => inR(x.created_at)), tDone = tk.filter(x => ["bajarildi", "yopildi"].includes(x.status) && x.done_at && inR(x.done_at)), tOver = tk.filter(isOverdue);
+      const posts = (S.posts || []).filter(x => x.author_id === p.id && inR(x.created_at));
+      const rep1 = lvl === "kun" ? mine.find(r => r.report_date === from && isWritten(r)) : null;
+      return { p, dept: deptOf(p), wd: wd.length, came: att.filter(x => x.a && !x.a.absent).length, late, abs, exc, arrived: lvl === "kun" && att[0] && att[0].a ? att[0].a : null,
+        repN: mine.filter(isWritten).length, repOn, repAt: rep1 ? tmOf(rep1.created_at || rep1.updated_at) : null, rep1, deadline: lvl === "kun" && wd.length ? repDeadline(p, from) : null,
+        les: ob.length, tch: new Set(ob.map(o => o.teacher_id)).size, kunU: ob.filter(o => +o.ib === IB_MAX).length, hol: hl.length, holHal: hl.filter(h => h.res === "hal").length, holPosts: hl.reduce((x, h) => x + (+h.posts || 0), 0),
+        kpi, grade, tGiven: tGiven.length, tDone: tDone.length, tOver, taklif: posts.filter(x => x.kind === "taklif").length, muammo: posts.filter(x => x.kind === "muammo").length };
+    });
+    const pl = (() => { try { return planCalc(mStart(to), { at: to, subs: [] }); } catch (e) { return null; } })();
+    const fil = FILIALLAR.map(f => { const a = hol.filter(h => h.filial === f); return { f, n: a.length, hal: a.filter(h => h.res === "hal").length, vada: a.filter(h => h.res === "vada").length, jav: a.filter(h => h.res === "javobsiz").length, ser: a.filter(h => h.sev === "jiddiy").length, rep: a.filter(h => h.rep).length, posts: a.reduce((x, h) => x + (+h.posts || 0), 0) }; });
+    const mz = (S.posts || []).filter(x => x.kind === "muammo"), tkl = (S.posts || []).filter(x => x.kind === "taklif");
+    const mzNew = mz.filter(x => inR(x.created_at)), mzHal = mz.filter(x => x.resolved_at && inR(x.resolved_at)), mzOpen = mz.filter(x => ["ochiq", "jarayonda"].includes(x.status)), mzWait = mz.filter(x => x.status === "hal_qilindi");
+    const kunList = [...new Set(obs.filter(o => +o.ib === IB_MAX).map(o => o.teacher_id))].map(id => teacherById(id)).filter(Boolean);
+    return { lvl, from, to, to0, label: rhLabel(lvl, from, to0), days, staff, obs, hol, fil, pl, mzNew, mzHal, mzOpen, mzWait, tklNew: tkl.filter(x => inR(x.created_at)), kunList, creps, reps };
+  }
+  const drAge = x => Math.max(0, Math.floor((Date.now() - new Date(x.created_at).getTime()) / 864e5));
+  const drPostLine = x => String(x.body || "").replace(/\s+/g, " ").slice(0, 160);
+  function deptRepWord(R) {
+    const D = DOCX, pv = v => v === null || v === undefined ? "—" : `${String(v).replace(".", ",")}%`;
+    const isK = R.lvl === "kun", full = cols => { const sm = cols.reduce((a, x) => a + x.w, 0); const z = cols.find(x => x.w === 0); if (z) z.w = 15000 - sm; else cols[cols.length - 1].w += 15000 - sm; return cols; };
+    const T = R.staff, ak = T.filter(x => x.dept === "akademik"), iz = T.filter(x => x.dept === "intizomiy");
+    const sum = (a, k) => a.reduce((x, y) => x + (+y[k] || 0), 0);
+    let body = wPass(D, isK ? "Monitoring bo'limi — kunlik hisobot" : "Monitoring bo'limi — haftalik hisobot", R.label, [["Davr", R.label], ["Qamrov", "Akademik va Intizomiy monitoring bo'limlari — barcha xodimlar"],
+      ["Tarkib", "xodimlar natijalari, davomat, ish samaradorligi (KPI), takliflar, muammolar, intizom, filiallar bo'yicha holatlar"]], false);
+    // Umumiy xulosa
+    const K = [["Kuzatilgan darslar", String(R.obs.length)], ["Ko'rilgan ustozlar", String(new Set(R.obs.map(o => o.teacher_id)).size)], ["🏅 Kun ustozlari", String(R.kunList.length)],
+      ["Oylik reja", R.pl ? pv(R.pl.pct) : "—"], ["Intizomiy holatlar", String(R.hol.length)], ["Hal qilindi", String(R.hol.filter(h => h.res === "hal").length)],
+      ["Kechikishlar", String(sum(T.map(x => ({ v: x.late.length })), "v"))], ["Kelmaganlar", String(sum(T.map(x => ({ v: x.abs.length })), "v"))]];
+    const kw = Math.floor(15000 / K.length);
+    body += D.h2("Umumiy xulosa") + D.tableX(K.map(([l]) => ({ h: l, w: kw, al: "center" })), [{ cells: K.map(([, v]) => ({ v, b: 1, sz: 26 })) }], { hshd: "EEF3FA", af: 60 });
+    // Xodimlar
+    const sCols = dep => full([{ h: "№", w: 500, al: "center" }, { h: "Xodim", w: 2700 }, { h: isK ? "Kelgan vaqti" : "Kelgan / ish kuni", w: 1500, al: "center" }, { h: isK ? "Hisobot topshirdi" : "Hisobot vaqtida", w: 1500, al: "center" },
+      { h: dep === "akademik" ? "Ko'rilgan darslar (ustoz)" : "Holatlar (hal qilindi)", w: 1900, al: "center" }, { h: dep === "akademik" ? "🏅 Kun ustozi" : "Postlar", w: 1200, al: "center" },
+      { h: "KPI", w: 1000, al: "center" }, { h: "Rahbar bahosi", w: 1100, al: "center" }, { h: "Topshiriq: berildi / bajardi / kechikkan", w: 0, al: "center" }, { h: "Taklif / muammo", w: 1300, al: "center" }]);
+    const arrTxt = x => isK ? (!x.wd ? "dam olish" : x.arrived ? (x.arrived.excused ? "sababli" : x.arrived.absent ? "kelmadi" : `${x.arrived.arrived}${x.arrived.late > 10 ? ` (+${x.arrived.late} daq)` : ""}`) : "kiritilmagan") : `${x.came} / ${x.wd}${x.late.length ? ` · ${x.late.length} kech.` : ""}${x.abs.length ? ` · ${x.abs.length} kelmadi` : ""}`;
+    const repTxt = x => isK ? (!x.wd ? "—" : x.repAt ? `${x.repAt}${x.deadline && x.repAt > x.deadline ? " (kech)" : ""}` : "yozilmagan") : `${x.repOn} / ${x.wd}`;
+    const sRow = (x, i) => { const bad = isK && x.wd && !x.repAt; return { cells: [String(i + 1), { v: x.p.full_name, b: 1 }, { v: arrTxt(x), ...(x.abs.length || x.late.length ? { c: "A62626" } : {}) }, { v: repTxt(x), ...(bad ? { c: "A62626" } : {}) },
+      x.dept === "akademik" ? `${x.les} (${x.tch})` : `${x.hol} (${x.holHal})`, x.dept === "akademik" ? String(x.kunU) : String(x.holPosts), { v: pv(x.kpi), b: 1, ...(x.kpi === null ? {} : wPct(x.kpi / 100) || {}) }, x.grade === null ? "—" : String(x.grade).replace(".", ","),
+      `${x.tGiven} / ${x.tDone} / ${x.tOver.length}`, `${x.taklif} / ${x.muammo}`] }; };
+    DR_DEPTS.forEach(([k, l]) => { const a = T.filter(x => x.dept === k); if (!a.length) return;
+      body += D.h2(`${l} — xodimlar`) + D.tableX(sCols(k), a.slice().sort((x, y) => (y.kpi ?? -1) - (x.kpi ?? -1) || x.p.full_name.localeCompare(y.p.full_name)).map(sRow));
+      body += D.p(k === "akademik" ? `Jami: ${sum(a, "les")} ta dars kuzatildi, ${sum(a, "kunU")} ta kun ustozi darsi.` : `Jami: ${sum(a, "hol")} ta holat qayd etildi, ${sum(a, "holHal")} tasi joyida hal qilindi, ${sum(a, "holPosts")} ta post.`, { sz: 18, c: "4A5A70" }); });
+    const help = R.obs.filter(o => { const p = person(o.author_id); return p && deptOf(p) !== "akademik"; });
+    if (help.length) { const by = {}; help.forEach(o => { by[o.author_id] = (by[o.author_id] || 0) + 1; });
+      body += D.p(`Akademik bo'limga yordam (boshqa bo'limdan): ${Object.entries(by).map(([id, n]) => `${nameOf(id)} — ${n} dars`).join("; ")}.`, { sz: 18, c: "4A5A70" }); }
+    // Davomat va intizom
+    const lateL = T.flatMap(x => x.late.map(z => [x.p.full_name, z.d, `${z.a.arrived} keldi, ${z.a.late} daq kechikdi`])), absL = T.flatMap(x => [...x.abs.map(z => [x.p.full_name, z.d, "kelmadi"]), ...x.exc.map(z => [x.p.full_name, z.d, "sababli kelmadi"])]);
+    const noRep = isK ? T.filter(x => x.wd && !x.repAt && !x.abs.length).map(x => x.p.full_name) : T.filter(x => x.wd && x.repOn < x.wd).map(x => `${x.p.full_name} (${x.wd - x.repOn} kun)`);
+    const over = T.flatMap(x => x.tOver.map(tk => [x.p.full_name, tk.title, tk.due_date]));
+    body += D.h2("Davomat va intizom");
+    body += (lateL.length || absL.length) ? D.tableX(full([{ h: "Xodim", w: 4200 }, { h: "Sana", w: 2200, al: "center" }, { h: "Holat", w: 0 }]), [...lateL, ...absL].sort((a, b) => a[1] < b[1] ? -1 : 1).map(([n, d, t]) => ({ cells: [{ v: n, b: 1 }, fmtDate(d), { v: t, c: "A62626" }] })))
+      : D.p("Kechikkan va kelmagan xodim yo'q.", { c: "1B6E36" });
+    body += D.p(`${isK ? "Hisobot yozmaganlar" : "Hisobotni vaqtida topshirmagan kunlari bor"}: ${noRep.length ? noRep.join(", ") : "yo'q"}.`, { sz: 19 });
+    body += over.length ? D.h3("Muddati o'tgan topshiriqlar", `${over.length} ta`) + D.tableX(full([{ h: "Xodim", w: 3600 }, { h: "Topshiriq", w: 0 }, { h: "Muddat", w: 1800, al: "center" }]), over.map(([n, t, d]) => ({ cells: [{ v: n, b: 1 }, t, { v: d ? fmtDate(d) : "—", c: "A62626" }] }))) : D.p("Muddati o'tgan topshiriq yo'q.", { sz: 19, c: "1B6E36" });
+    // Akademik natijalar
+    body += D.h2("Akademik natijalar");
+    if (R.pl) { const P = R.pl, fans = [...new Set(P.rows.map(r => canonSubj(r.t.subject)).filter(Boolean))].sort();
+      const ag = a => { const pln = a.reduce((x, r) => x + r.plan, 0), got = a.reduce((x, r) => x + Math.min(r.n, r.plan), 0); return { n: a.length, pln, got, pct: hpct(got, pln), zero: a.filter(r => r.st === "zero").length }; };
+      body += D.p(`Oylik reja (${mLabel(P.ms)}, ${fmtDate(R.to)} holatiga): ${P.got} / ${P.sumPlan} — ${pv(P.pct)}. Umuman ko'rilmagan ustozlar: ${P.zero} ta.`, { b: 1 });
+      body += D.tableX(full([{ h: "Fan", w: 0 }, { h: "Ustozlar", w: 1500, al: "center" }, { h: "Kuzatuv / reja", w: 2200, al: "center" }, { h: "Bajarilish", w: 1800, al: "center" }, { h: "Ko'rilmagan", w: 1800, al: "center" }]),
+        fans.map(f => { const a = ag(P.rows.filter(r => canonSubj(r.t.subject) === f)); return { cells: [{ v: f, b: 1 }, String(a.n), `${a.got} / ${a.pln}`, { v: pv(a.pct), b: 1, ...(wPct((a.pct ?? 0) / 100) || {}) }, String(a.zero)] }; })); }
+    if (R.kunList.length) body += D.p(`🏅 Kun ustozlari (${R.kunList.length}): ${R.kunList.map(t => `${t.full_name} (${canonSubj(t.subject) || "—"}, ${t.filial || "—"})`).join("; ")}.`, { sz: 19 });
+    const low = (() => { const by = {}; R.obs.forEach(o => (by[o.teacher_id] = by[o.teacher_id] || []).push(o)); return Object.entries(by).map(([id, a]) => { const t = teacherById(id); return t ? { t, sc: tScore(a, subjGroup(t.subject)) } : null; }).filter(z => z && z.sc.total !== null && z.sc.total < PROB_LOW).sort((a, b) => a.sc.total - b.sc.total); })();
+    if (low.length) body += D.h3(`Past natija (${PROB_LOW}% dan past) olgan ustozlar`, `${low.length} ta`) + D.tableX(full([{ h: "Ustoz", w: 0 }, { h: "Fan", w: 2800 }, { h: "Filial", w: 2400 }, { h: "Natija", w: 1500, al: "center" }]),
+      low.map(z => ({ cells: [{ v: z.t.full_name, b: 1 }, canonSubj(z.t.subject) || "—", z.t.filial || "—", { v: `${z.sc.total}%`, c: "A62626", b: 1 }] })));
+    // Filiallar
+    body += D.h2("Filiallar bo'yicha intizomiy holatlar");
+    body += D.tableX(full([{ h: "Filial", w: 0 }, { h: "Holatlar", w: 1500, al: "center" }, { h: "Hal qilindi", w: 1700, al: "center" }, { h: "Hal qilinmadi (va'da)", w: 2200, al: "center" }, { h: "Javob berilmadi", w: 2000, al: "center" }, { h: "Jiddiy", w: 1300, al: "center" }, { h: "Takroriy", w: 1300, al: "center" }, { h: "Postlar", w: 1300, al: "center" }]),
+      [...R.fil.map(f => ({ cells: [{ v: f.f, b: 1 }, String(f.n), { v: String(f.hal), c: "1B6E36" }, { v: String(f.vada), c: f.vada ? "8A5A00" : undefined }, { v: String(f.jav), c: f.jav ? "A62626" : undefined }, String(f.ser), String(f.rep), String(f.posts)] })),
+       { b: 1, shd: "EAF0F8", cells: [{ v: "Jami", b: 1 }, ...["n", "hal", "vada", "jav", "ser", "rep", "posts"].map(k => String(R.fil.reduce((x, f) => x + f[k], 0)))] }]);
+    const serL = R.hol.filter(h => h.sev === "jiddiy" || h.res === "javobsiz");
+    if (serL.length) body += D.h3("Jiddiy va javobsiz qolgan holatlar", `${serL.length} ta`) + D.tableX(full([{ h: "Sana", w: 1400, al: "center" }, { h: "Filial", w: 2000 }, { h: "Holat", w: 2600 }, { h: "Joy / izoh", w: 0 }, { h: "Natija", w: 2000 }, { h: "Kim qayd etdi", w: 2200 }]),
+      serL.map(h => ({ cells: [fmtDate(h.day), h.filial || "—", { v: h.t || "—", b: 1 }, [h.place, h.room, h.note].filter(Boolean).join(" · ") || "—", { v: (HOL_NAT.find(x => x[0] === h.res) || [, "—"])[1], c: h.res === "javobsiz" ? "A62626" : undefined }, nameOf(h.author)] })));
+    // Masalalar
+    body += D.h2("Muammolar va takliflar");
+    body += D.p(`Davrda yangi muammolar: ${R.mzNew.length} ta, hal qilindi: ${R.mzHal.length} ta. Hozir jarayonda: ${R.mzOpen.length} ta (3 kundan ortig'i: ${R.mzOpen.filter(x => drAge(x) > MZ_NORM).length} ta), yuboruvchi tasdig'ini kutmoqda: ${R.mzWait.length} ta.`);
+    const mzRows = [...R.mzOpen, ...R.mzWait].sort((a, b) => drAge(b) - drAge(a));
+    if (mzRows.length) body += D.tableX(full([{ h: "Muammo", w: 0 }, { h: "Yubordi", w: 2200 }, { h: "Mas'ul", w: 2600 }, { h: "Holat", w: 2000 }, { h: "Necha kun", w: 1200, al: "center" }]),
+      mzRows.map(x => ({ cells: [drPostLine(x), nameOf(x.author_id), (x.assignees || []).map(nameOf).join(", ") || "—", x.status === "hal_qilindi" ? "tasdiq kutilmoqda" : x.status === "ochiq" ? "ko'rib chiqilmagan" : "jarayonda", { v: String(drAge(x)), b: 1, c: drAge(x) > MZ_NORM ? "A62626" : undefined }] })));
+    body += R.tklNew.length ? D.h3("Yangi takliflar", `${R.tklNew.length} ta`) + D.tableX(full([{ h: "Taklif", w: 0 }, { h: "Muallif", w: 2600 }, { h: "Qo'shilganlar", w: 1600, al: "center" }]),
+      R.tklNew.map(x => ({ cells: [drPostLine(x), nameOf(x.author_id), String((x.post_likes || []).length)] }))) : D.p("Davrda yangi taklif kelmagan.", { sz: 19, c: "6B7A90" });
+    // Xodimlar hisobotlari (kunlik)
+    if (isK) { const rs = T.filter(x => x.rep1);
+      if (rs.length) { body += pageBreak() + D.h2("Xodimlar hisobotlari");
+        rs.forEach(x => { const r = x.rep1, d = r.data || {}; const txt = [r.done, d.summary, d.note].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+          body += D.h3(x.p.full_name, `${titleOf(x.p)} · ${x.repAt || ""}`) + D.p(txt ? txt.slice(0, 900) : (x.dept === "akademik" ? `${x.les} ta dars kuzatildi.` : `${x.hol} ta holat qayd etildi.`), { sz: 19 })
+            + (r.problems ? D.p(`Kamchilik / muammo: ${String(r.problems).slice(0, 400)}`, { sz: 18, c: "8A5A00" }) : "") + (r.staff_note ? D.p(`Rahbar izohi: ${String(r.staff_note).slice(0, 300)}`, { sz: 18, c: "3B5B86" }) : ""); }); } }
+    const name = wFile("Bolim-hisoboti", isK ? "kunlik" : "haftalik", R.from);
+    return { blob: D.build(body, true, `Registon maktabi · Monitoring bo'limi · ${isK ? "Kunlik" : "Haftalik"} hisobot · ${R.label}`), name, cap: `📋 Monitoring bo'limi — ${isK ? "kunlik" : "haftalik"} hisobot · ${R.label}` };
+  }
+  // Filial rahbariga: faqat shu filial natijalari, xodim ismlarisiz
+  function filialRepWord(R, fils) {
+    const D = DOCX, isK = R.lvl === "kun", pv = v => v === null || v === undefined ? "—" : `${String(v).replace(".", ",")}%`;
+    const full = cols => { const sm = cols.reduce((a, x) => a + x.w, 0); const z = cols.find(x => x.w === 0); if (z) z.w = 15000 - sm; else cols[cols.length - 1].w += 15000 - sm; return cols; };
+    let body = "";
+    fils.forEach((f, fi) => {
+      const ob = R.obs.filter(o => (teacherById(o.teacher_id) || o).filial === f || o.filial === f), hl = R.hol.filter(h => h.filial === f);
+      const byT = {}; ob.forEach(o => (byT[o.teacher_id] = byT[o.teacher_id] || []).push(o));
+      const tl = Object.entries(byT).map(([id, a]) => { const t = teacherById(id); return t ? { t, n: a.length, sc: tScore(a, subjGroup(t.subject)), kun: a.some(o => +o.ib === IB_MAX) } : null; }).filter(Boolean);
+      const P = (() => { try { return planCalc(mStart(R.to), { at: R.to, subs: [], fil: f }); } catch (e) { return null; } })();
+      if (fi) body += pageBreak();
+      body += wPass(D, `${f} filiali — monitoring natijalari`, R.label, [["Filial", f], ["Davr", R.label], ["Tarkib", "akademik (dars kuzatuvi) va intizomiy monitoring natijalari"]]);
+      const ibA = avg(ob.map(o => o.ib)), K = [["Kuzatilgan darslar", String(ob.length)], ["Ko'rilgan ustozlar", String(tl.length)], ["O'rtacha intizomiy ball", ibA === null ? "—" : `${String(Math.round(ibA * 10) / 10).replace(".", ",")} / ${IB_MAX}`],
+        ["🏅 Kun ustozlari", String(tl.filter(z => z.kun).length)], ["Oylik reja", P ? pv(P.pct) : "—"], ["Intizomiy holatlar", String(hl.length)], ["Hal qilindi", String(hl.filter(h => h.res === "hal").length)]];
+      const kw = Math.floor(15000 / K.length);
+      body += D.h2("Umumiy xulosa") + D.tableX(K.map(([l]) => ({ h: l, w: kw, al: "center" })), [{ cells: K.map(([, v]) => ({ v, b: 1, sz: 26 })) }], { hshd: "EEF3FA", af: 60 });
+      // Akademik
+      body += D.h2("Akademik monitoring");
+      const fans = [...new Set(tl.map(z => canonSubj(z.t.subject) || "—"))].sort();
+      body += tl.length ? D.tableX(full([{ h: "Fan", w: 0 }, { h: "Ko'rilgan ustozlar", w: 2200, al: "center" }, { h: "Darslar", w: 1500, al: "center" }, { h: "O'rtacha natija", w: 2200, al: "center" }, { h: "Kun ustozi", w: 1600, al: "center" }]),
+        fans.map(fn => { const a = tl.filter(z => (canonSubj(z.t.subject) || "—") === fn), v = a.map(z => z.sc.total).filter(x => x !== null), m = v.length ? Math.round(v.reduce((x, y) => x + y, 0) / v.length * 10) / 10 : null;
+          return { cells: [{ v: fn, b: 1 }, String(a.length), String(a.reduce((x, z) => x + z.n, 0)), { v: pv(m), b: 1, ...(m === null ? {} : wPct(m / 100) || {}) }, String(a.filter(z => z.kun).length)] }; })) : D.p("Bu davrda filialda dars kuzatilmagan.", { c: "6B7A90" });
+      const kunT = tl.filter(z => z.kun); if (kunT.length) body += D.p(`🏅 Kun ustozlari: ${kunT.map(z => `${z.t.full_name} (${canonSubj(z.t.subject) || "—"})`).join("; ")}.`, { sz: 19 });
+      const low = tl.filter(z => z.sc.total !== null && z.sc.total < PROB_LOW).sort((a, b) => a.sc.total - b.sc.total);
+      if (low.length) body += D.h3(`E'tibor talab qiladigan ustozlar (natija ${PROB_LOW}% dan past)`, `${low.length} ta`) + D.tableX(full([{ h: "Ustoz", w: 0 }, { h: "Fan", w: 3200 }, { h: "Natija", w: 1800, al: "center" }]), low.map(z => ({ cells: [{ v: z.t.full_name, b: 1 }, canonSubj(z.t.subject) || "—", { v: `${z.sc.total}%`, b: 1, c: "A62626" }] })));
+      if (P && P.cur) body += D.p(`Oylik reja (${mLabel(P.ms)}): ${P.got} / ${P.sumPlan} kuzatuv — ${pv(P.pct)}. Bu oy hali ko'rilmagan ustozlar: ${P.zero} ta.`, { sz: 19 });
+      // Intizomiy
+      body += D.h2("Intizomiy monitoring");
+      if (!hl.length) body += D.p("Bu davrda filialda intizomiy holat qayd etilmagan.", { c: "1B6E36" });
+      else { const ty = {}; hl.forEach(h => { const k = h.t || "—"; const b = ty[k] = ty[k] || { n: 0, hal: 0, vada: 0, jav: 0 }; b.n++; if (b[h.res === "javobsiz" ? "jav" : h.res] !== undefined) b[h.res === "javobsiz" ? "jav" : h.res]++; });
+        body += D.tableX(full([{ h: "Holat turi", w: 0 }, { h: "Soni", w: 1400, al: "center" }, { h: "Hal qilindi", w: 1800, al: "center" }, { h: "Hal qilinmadi", w: 1900, al: "center" }, { h: "Javob berilmadi", w: 2000, al: "center" }]),
+          Object.entries(ty).sort((a, b) => b[1].n - a[1].n).map(([k, b]) => ({ cells: [{ v: k, b: 1 }, String(b.n), { v: String(b.hal), c: "1B6E36" }, { v: String(b.vada), c: b.vada ? "8A5A00" : undefined }, { v: String(b.jav), c: b.jav ? "A62626" : undefined }] })));
+        const op = hl.filter(h => h.res !== "hal");
+        if (op.length) body += D.h3("Hal qilinmagan holatlar", `${op.length} ta`) + D.tableX(full([{ h: "Sana", w: 1400, al: "center" }, { h: "Holat", w: 2800 }, { h: "Joy / izoh", w: 0 }, { h: "Kim (lavozim)", w: 2200 }, { h: "Natija", w: 2200 }]),
+          op.map(h => ({ cells: [fmtDate(h.day), { v: h.t || "—", b: 1 }, [h.place, h.room, h.note].filter(Boolean).join(" · ") || "—", h.who || "—", { v: (HOL_NAT.find(x => x[0] === h.res) || [, "—"])[1], c: h.res === "javobsiz" ? "A62626" : "8A5A00" }] })));
+        const rp = hl.filter(h => h.rep); if (rp.length) body += D.p(`Takrorlanayotgan holatlar (7 kun ichida qayta qayd etilgan): ${[...new Set(rp.map(h => h.t))].join(", ")}.`, { sz: 19, c: "A62626" }); }
+      body += D.p("Hisobot Registon Monitoring bo'limi portali ma'lumotlari asosida avtomatik tuzildi.", { sz: 17, c: "6B7A90", i: 1 });
+    });
+    const name = wFile("Filial-hisoboti", fils.length === 1 ? fils[0] : `${fils.length}-filial`, isK ? "kunlik" : "haftalik", R.from);
+    return { blob: D.build(body, true, `Registon maktabi · Monitoring bo'limi · Filial hisoboti · ${R.label}`), name, cap: `🏫 Filial rahbariga hisobot — ${fils.length === 1 ? fils[0] : fils.length + " ta filial"} · ${R.label}` };
+  }
+  function deptRepModal(kind) {
+    const U = S.ui.drW || {}, fil = kind === "filial";
+    const m = openModal(fil ? "🏫 Filial rahbariga hisobot" : "📋 Bo'lim hisoboti — Word", `
+      <div class="field"><label>Davr</label><div class="seg" id="dr-l">${[["kun", "Kunlik"], ["hafta", "Haftalik"]].map(([k, l]) => `<button type="button" data-drl="${k}" class="${k === (U.lvl || "kun") ? "active" : ""}">${l}</button>`).join("")}</div>
+        <div class="row" style="gap:8px;margin-top:8px;align-items:center"><span class="small muted">Sana (hafta uchun — shu sana tushgan hafta):</span><input type="date" id="dr-d" value="${today()}" max="${today()}" style="width:auto"></div></div>
+      ${fil ? `<div class="field"><label>Filiallar <span class="muted">(har biri alohida sahifada, xodim ismlarisiz)</span></label>${wFilBoxes(FILIALLAR, U.fil)}</div>` : `<p class="small muted" style="margin:0">To'liq hisobot: har bir xodimning kelgan vaqti, hisobot topshirgani, kuzatilgan darslar / holatlar, KPI, rahbar bahosi, topshiriqlar, takliflar va muammolar, filiallar bo'yicha holatlar${"" } va kunlik hisobotda — xodimlar hisobotlari matni. Xodim ismlari ochiq ko'rsatiladi.</p>`}
+      <div class="ok-text" id="dr-ok"></div><div class="err-text" id="dr-e"></div>`,
+      `<button class="btn" data-close>Yopish</button><button class="btn" id="dr-bot">🤖 Botga yuborish</button><button class="btn primary" id="dr-go">⬇ Word</button>`);
+    let lvl = U.lvl || "kun";
+    $$("[data-drl]", m).forEach(b => b.onclick = () => { lvl = b.dataset.drl; $$("[data-drl]", m).forEach(x => x.classList.toggle("active", x === b)); });
+    if (fil) wFilBind(m, () => {});
+    const make = async () => { const o = { lvl, d: $("#dr-d", m).value || today(), fil: fil ? wFilRead(m) : [] };
+      if (fil && !o.fil.length) throw new Error("Kamida bitta filialni belgilang");
+      S.ui.drW = { lvl: o.lvl, fil: o.fil.length ? o.fil : U.fil };
+      const R = await deptRepData(o.lvl, o.d); return fil ? filialRepWord(R, FILIALLAR.filter(f => o.fil.includes(f))) : deptRepWord(R); };
+    const run = async (btn, send) => { const er = $("#dr-e", m), ok = $("#dr-ok", m); er.textContent = ""; ok.textContent = ""; const t0 = btn.textContent; btn.disabled = true; btn.textContent = "Tayyorlanmoqda…";
+      try { const { blob, name, cap } = await make();
+        if (send) { await db.sendDoc(blob, name, window.yA ? window.yA(cap) : cap); ok.textContent = "✓ Fayl bot orqali Telegramingizga yuborildi — u yerdan «Uzatish» bilan istalgan odamga jo'nating."; }
+        else { closeModal(); wDeliver(blob, name, cap); } }
+      catch (x) { er.textContent = x.message || "Xatolik"; } finally { if (btn.isConnected) { btn.disabled = false; btn.textContent = t0; } } };
+    $("#dr-go", m).onclick = e => run(e.currentTarget, false);
+    $("#dr-bot", m).onclick = e => run(e.currentTarget, true);
+  }
+  // Bosh sahifa (Monitoring bo'limi rahbari): bugungi qisqa holat + hisobotlar
+  async function deptRepInsert(page) {
+    if (!S.me || S.me.role !== "asoschi") return;
+    const old = $("#dr-card", page); if (old) old.remove();
+    let R; try { R = await deptRepData("kun", today()); } catch (e) { return; }
+    if (!page.isConnected) return;
+    const T = R.staff.filter(x => x.wd), ak = T.filter(x => x.dept === "akademik"), iz = T.filter(x => x.dept === "intizomiy");
+    const cell = x => { const a = x.arrived; return a ? (a.excused ? `<span class="muted">sababli</span>` : a.absent ? `<b style="color:var(--bad)">kelmadi</b>` : `${a.arrived}${a.late > 10 ? ` <span style="color:var(--bad)">+${a.late}</span>` : ""}`) : `<span class="muted">—</span>`; };
+    const row = x => `<tr><td><b>${esc(x.p.full_name)}</b></td><td class="small">${cell(x)}</td><td class="small">${x.repAt ? `${x.repAt}${x.deadline && x.repAt > x.deadline ? ` <span style="color:var(--bad)">kech</span>` : " ✓"}` : `<span class="muted">yozilmagan</span>`}</td>
+      <td>${x.dept === "akademik" ? `${x.les} dars` : `${x.hol} holat`}</td><td>${x.kpi === null ? "—" : `<b>${x.kpi}%</b>`}</td><td class="hide-sm">${x.tOver.length ? pill("overdue", x.tOver.length) : "0"}</td></tr>`;
+    const tbl = (l, a) => a.length ? `<tr class="ku-tot"><td colspan="6"><b>${l}</b></td></tr>${a.sort((x, y) => (y.kpi ?? -1) - (x.kpi ?? -1)).map(row).join("")}` : "";
+    const fh = R.fil.filter(f => f.n);
+    const html = `<div class="card" id="dr-card" style="margin-bottom:16px"><div class="card-head"><h2>📋 Bo'lim bugungi hisoboti</h2><span class="spacer"></span>
+        <button class="btn sm" id="dr-w">⬇ Kunlik / haftalik (Word)</button><button class="btn sm" id="dr-f">🏫 Filial rahbariga</button></div>
+      <div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px">${stat("Darslar", R.obs.length)}${stat("🏅 Kun ustozi", R.kunList.length)}${stat("Oylik reja", R.pl ? (R.pl.pct ?? 0) + "%" : "—")}${stat("Holatlar", `${R.hol.length} <span class="small muted">· hal ${R.hol.filter(h => h.res === "hal").length}</span>`)}${stat("Muammolar", `${R.mzOpen.length} <span class="small muted">jarayonda</span>`)}${stat("Yangi takliflar", R.tklNew.length)}</div>
+      <div class="table-wrap"><table><thead><tr><th>Xodim</th><th>Keldi</th><th>Hisobot</th><th>Natija</th><th>KPI</th><th class="hide-sm">Kechikkan topshiriq</th></tr></thead><tbody>${tbl("Akademik bo'lim", ak)}${tbl("Intizomiy bo'lim", iz)}</tbody></table></div>
+      ${fh.length ? `<div class="small" style="margin-top:8px"><b>Filiallar:</b> ${fh.map(f => `${esc(f.f)} — ${f.n} (✅${f.hal} ⏳${f.vada} ❌${f.jav})`).join(" · ")}</div>` : ""}
+      <p class="small muted" style="margin:8px 0 0">Har ish kuni 20:00 da shu hisobot bot orqali sizga keladi. Word faylni «🤖 Botga yuborish» bilan istalgan payt olishingiz mumkin.</p></div>`;
+    const anchor = $(".stats", page) || $(".card", page); if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+    $("#dr-w", page).onclick = () => deptRepModal("bolim"); $("#dr-f", page).onclick = () => deptRepModal("filial");
+  }
   // ===== Rahbarlar reytingi — Word =====
   function crWord(RS, ms) {
     const D = DOCX, LC = { A: { shd: "D9F2E1", c: "1B6E36" }, B: { shd: "DCE9FB", c: "0B4FA3" }, C: { shd: "FFF1C9", c: "8A5A00" }, D: { shd: "FBDADA", c: "A62626" }, "—": {} };
