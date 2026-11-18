@@ -1218,6 +1218,8 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .mz-ev b { color: var(--text, inherit); }
 @media (max-width: 560px) { .mz-types { grid-template-columns: 1fr; } .mz-ev { flex-direction: column; gap: 0; } }
 .cr-bonus { font-size: .78em; font-weight: 700; color: var(--ok); margin-top: 2px; }
+.tk-like { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.na-row { padding: 8px 0; border-top: 1px solid var(--border); }
 
 </style>
 </head>
@@ -1770,8 +1772,8 @@ window.LESSONS = [
       async listPosts() {
         const m = me(); if (!m || !["asoschi", "ceo", "xodim"].includes(m.role)) return [];
         const d = load(); d.posts = d.posts || []; d.comments = d.comments || [];
-        const see = p => m.role === "asoschi" || p.author_id === m.id || (p.assignees || []).includes(m.id) || (p.followers || []).includes(m.id) || (p.recipients || []).includes(m.id);
-        return ok(d.posts.filter(see).map(p => ({ ...p, comment_count: d.comments.filter(c => c.post_id === p.id).length }))
+        const see = p => p.kind === "taklif" || m.role === "asoschi" || p.author_id === m.id || (p.assignees || []).includes(m.id) || (p.followers || []).includes(m.id) || (p.recipients || []).includes(m.id);
+        return ok(d.posts.filter(see).map(p => ({ ...p, comment_count: d.comments.filter(c => c.post_id === p.id).length, post_likes: (d.likes || []).filter(x => x.post_id === p.id) }))
           .sort((a, b) => a.created_at < b.created_at ? 1 : -1));
       },
       async createPost(p) {
@@ -1820,16 +1822,19 @@ window.LESSONS = [
       async deletePost(id) {
         const m = me(); const d = load(); const p = d.posts.find(x => x.id === id);
         if (!p || !(p.author_id === m.id || m.role === "asoschi")) return fail("Ruxsat yo'q");
+        if (p.kind === "taklif") return fail("Takliflar o'chirilmaydi");
         d.posts = d.posts.filter(x => x.id !== id); d.comments = d.comments.filter(c => c.post_id !== id); save(); return true;
       },
       async listComments(postId) { return ok((load().comments || []).filter(c => c.post_id === postId)); },
       async uploadImage(blob) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); },
       async signedUrls(paths) { return Object.fromEntries(paths.map(p => [p, p])); },
-      async addComment(postId, body, images) {
+      async addComment(postId, body, images, kind) {
         const m = me(); const d = load();
-        const c = { id: d.nextComment++, post_id: postId, author_id: m.id, body, images: images || [], created_at: new Date().toISOString() };
+        if (kind === "qilindi" && !["asoschi", "ceo"].includes(m.role)) return fail("Ruxsat yo'q");
+        const c = { id: d.nextComment++, post_id: postId, author_id: m.id, body, images: images || [], kind: kind || "izoh", created_at: new Date().toISOString() };
         d.comments.push(c); save(); return ok(c);
       },
+      async toggleLike(postId, on) { const m = me(); const d = load(); d.likes = (d.likes || []).filter(x => !(x.post_id === postId && x.user_id === m.id)); if (on) d.likes.push({ post_id: postId, user_id: m.id }); save(); return true; },
       async listVideos() {
         const m = me(); if (!m) return []; const d = load(); d.videos = d.videos || [];
         const c = m.ceo_id ? d.profiles.find(x => x.id === m.ceo_id) : null; const dept = "dept:" + ((m.role === "ceo" ? m.bolim : c && c.bolim) || "");
@@ -1910,6 +1915,8 @@ window.LESSONS = [
       async listTeacherReqs() { return ok(load().treq || []); },
       async sendTeacherReq(kind, tid, left_on, nm, fil, subj, kl, note) { const d = load(); d.treq = d.treq || []; const t = (d.teachers || []).find(x => x.id === tid);
         d.treq.unshift({ id: Date.now(), kind, author_id: me().id, teacher_id: tid, old_name: t ? t.full_name : "", left_on, new_name: nm, new_filial: t ? t.filial : fil, new_subject: t ? t.subject : subj, new_class: kl, note, status: "kutilmoqda", reply: "", created_at: new Date().toISOString() }); save(); return ok(1); },
+      async listNameAsks() { return ok(load().nameAsks || []); },
+      async nameAskOk(tid) { const d = load(); (d.nameAsks || []).forEach(a => { if (a.teacher_id === tid) a.done_at = new Date().toISOString(); }); save(); return true; },
       async sendNameReq(tid, nm) { const d = load(); d.treq = d.treq || []; const t = (d.teachers || []).find(x => x.id === tid); if (!t) return fail("Ustoz topilmadi");
         if (d.treq.some(r => r.kind === "ism" && r.teacher_id === tid && r.status === "kutilmoqda")) return ok(null); const id = Date.now();
         d.treq.push({ id, kind: "ism", teacher_id: tid, old_name: t.full_name, new_name: nm, new_filial: t.filial || "", new_subject: t.subject || "", author_id: me().id, status: "kutilmoqda", created_at: new Date().toISOString(), note: "", reply: "" }); save(); return ok(id); },
@@ -2257,6 +2264,8 @@ window.LESSONS = [
       async listTeacherReqs() { const r = await sb.from("teacher_requests").select("*").gte("created_at", new Date(Date.now() - 120 * 864e5).toISOString()).order("created_at", { ascending: false }); if (r.error) throw new Error(trErr(r.error.message)); return r.data; },
       async sendTeacherReq(k, tid, left_day, nm, fil, subj, kl, msg) { return chk(await sb.rpc("send_teacher_request", { k, tid, left_day: left_day || null, nm: nm || "", fil: fil || "", subj: subj || "", kl: kl || "", msg: msg || "" })); },
       async sendNameReq(tid, nm) { return chk(await sb.rpc("send_name_request", { tid, nm })); },
+      async listNameAsks() { return chk(await sb.from("name_asks").select("*")); },
+      async nameAskOk(tid) { chk(await sb.rpc("name_ask_ok", { tid })); return true; },
       async decideTeacherReq(rid, okk, msg, nm, fil, subj) { chk(await sb.rpc("decide_teacher_request", { rid, ok: okk, msg: msg || "", nm: nm || "", fil: fil || "", subj: subj || "" })); return true; },
       async cancelTeacherReq(rid) { chk(await sb.rpc("cancel_teacher_request", { rid })); return true; },
       async teachersByIds(ids) { const r = await sb.from("teachers").select("id,full_name,filial,subject").in("id", ids); return r.error ? [] : r.data.map(t => ({ ...t, filial: E(t.filial) })); },
@@ -2405,7 +2414,7 @@ window.LESSONS = [
         return r.data.signedUrl;
       },
       async listPosts() {
-        const rows = chk(await sb.from("posts").select("*, post_comments(count)").order("created_at", { ascending: false }).limit(300));
+        const rows = chk(await sb.from("posts").select("*, post_comments(count), post_likes(user_id)").order("created_at", { ascending: false }).limit(300));
         return rows.map(r => ({ ...r, comment_count: r.post_comments?.[0]?.count || 0 }));
       },
       async createPost(p) { return chk(await sb.from("posts").insert({ kind: p.kind || "muammo", ptype: p.ptype || null, priority: p.priority || "oddiy", body: p.body, link: p.link || "", images: p.images || [], author_id: meCache.id }).select().single()); },
@@ -2427,7 +2436,8 @@ window.LESSONS = [
       async updatePost(id, patch) { return chk(await sb.from("posts").update(patch).eq("id", id).select().single()); },
       async deletePost(id) { chk(await sb.from("posts").delete().eq("id", id)); return true; },
       async listComments(postId) { return chk(await sb.from("post_comments").select("*").eq("post_id", postId).order("created_at")); },
-      async addComment(postId, body, images) { return chk(await sb.from("post_comments").insert({ post_id: postId, body, images: images || [], author_id: meCache.id }).select().single()); },
+      async addComment(postId, body, images, kind) { return chk(await sb.from("post_comments").insert({ post_id: postId, body, images: images || [], author_id: meCache.id, kind: kind || "izoh" }).select().single()); },
+      async toggleLike(postId, on) { if (on) chk(await sb.from("post_likes").insert({ post_id: postId, user_id: meCache.id })); else chk(await sb.from("post_likes").delete().eq("post_id", postId).eq("user_id", meCache.id)); return true; },
       async reviewReport(id, status, note) {
         return chk(await sb.from("daily_reports").update({ status, reviewer_note: note || "" }).eq("id", id).select().single());
       }
@@ -2526,13 +2536,13 @@ window.METODISTLAR = [
   const PSTAT = { ochiq: "Ochiq", jarayonda: "Jarayonda", hal_qilindi: "Tasdiq kutilmoqda", tasdiqlandi: "Hal qilindi", qabul: "Qabul qilindi", rad: "Rad etildi", joriy: "Joriy etildi" };
   const PSTAT_CLS = { ochiq: "yangi", jarayonda: "jarayonda", hal_qilindi: "bajarildi", tasdiqlandi: "tasdiqlandi", qabul: "tasdiqlandi", rad: "qaytarildi", joriy: "tasdiqlandi" };
   const pStat = p => p.kind === "taklif" && p.status === "jarayonda" ? "Ko'rib chiqilmoqda" : (PSTAT[p.status] || p.status);
-  const postOpen = p => ["ochiq", "jarayonda"].includes(p.status);
-  const postLive = p => ["ochiq", "jarayonda", "hal_qilindi"].includes(p.status);
+  const postOpen = p => p.kind !== "taklif" && ["ochiq", "jarayonda"].includes(p.status);
+  const postLive = p => p.kind === "taklif" || ["ochiq", "jarayonda", "hal_qilindi"].includes(p.status);
   const postOverdue = p => postOpen(p) && p.due_at && new Date(p.due_at).getTime() < Date.now();
   const ptLabel = p => p.kind === "taklif" ? "Taklif" : `${(PTYPES[p.ptype] || PTYPES.boshqa)[0]} muammo`;
   const isPostMasul = (p, uid = S.me?.id) => (p.assignees || []).includes(uid);
   // Mendan harakat kutilayotgan masalalar: mas'ul sifatida yangi/muddati o'tgan, yuboruvchi sifatida tasdiqlash
-  const postNeedsMe = p => (isPostMasul(p) && (p.status === "ochiq" || postOverdue(p))) || (p.author_id === S.me?.id && p.status === "hal_qilindi");
+  const postNeedsMe = p => p.kind !== "taklif" && (isPostMasul(p) && (p.status === "ochiq" || postOverdue(p))) || (p.author_id === S.me?.id && p.status === "hal_qilindi");
   const { phoneDigits, pwFromBirth, LOGIN_DOMAIN } = window.loginUtil;
   const fmtPhone = d => { d = phoneDigits(d); return d.length === 12 ? `+${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5, 8)} ${d.slice(8, 10)} ${d.slice(10)}` : d; };
   const loginOf = p => p?.email?.endsWith("@" + LOGIN_DOMAIN) ? fmtPhone(p.email.split("@")[0]) : (p?.email || "");
@@ -3279,6 +3289,28 @@ window.METODISTLAR = [
     const st = $(".stats", page); if (!st) return;
     st.insertAdjacentHTML("beforebegin", `<div class="card risk-card" style="margin-bottom:16px"><div class="card-head"><h2>⚠ Bugun ball yo'qotmaslik uchun</h2><span class="spacer"></span><a href="#/kpi" class="btn sm">KPI</a></div>${out.map(x => `<div class="risk-it">${x}</div>`).join("")}</div>`);
   }
+  // 60: Ustozlarning to'liq ismi — mutaxassisga so'rov (familiya + ism shart, otasining ismi ixtiyoriy)
+  async function nameAskInsert(page) {
+    if (!S.me || !db.listNameAsks) return;
+    let rows; try { rows = (await db.listNameAsks()).filter(a => !a.done_at && (a.user_id === S.me.id)); } catch (e) { return; }
+    const old = $("#na-card", page); if (old) old.remove();
+    if (!rows.length || !page.isConnected) return;
+    const tOf = id => teacherById(id) || {};
+    const html = `<div class="card na-card" id="na-card" style="margin-bottom:16px"><div class="card-head"><h2>✏️ To'liq ism kerak (${rows.length})</h2></div>
+      <p class="small muted" style="margin-top:0">Siz ko'rgan quyidagi ustozlarning <b>familiyasi va ismini to'liq</b> yozing (avval familiya, keyin ism; otasining ismi — ixtiyoriy). Siz yozgan variantni Monitoring bo'limi rahbari tasdiqlaydi.</p>
+      ${rows.map(a => { const t = tOf(a.teacher_id); return `<div class="na-row" data-na="${a.teacher_id}">
+        <div class="small"><b>${esc(t.full_name || "—")}</b> · ${esc(t.subject || "")} · ${esc(t.filial || "")}${a.issue === "tartib" ? ` <span class="pill qaytarildi">familiya–ism tartibini tekshiring</span>` : ""}</div>
+        <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap"><input type="text" data-nan placeholder="Familiya Ism (Otasining ismi)" value="${a.issue === "tartib" ? esc((t.full_name || "").split(" ").reverse().join(" ")) : esc(t.full_name || "")}" style="flex:1;min-width:220px">
+          <button class="btn sm primary" data-nas>Yuborish</button>${a.issue === "tartib" ? `<button class="btn sm" data-nok title="Yozilishi to'g'ri — o'zgartirish shart emas">✓ To'g'ri</button>` : ""}</div></div>`; }).join("")}</div>`;
+    const anchor = $(".card", page) || page.firstElementChild; if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+    const c = $("#na-card", page);
+    $$(".na-row", c).forEach(r => { const tid = r.dataset.na;
+      $("[data-nas]", r).onclick = async e => { const v = $("[data-nan]", r).value.trim(); if (v.split(/\s+/).length < 2 || /(^|\s)\S{1,2}\.?(\s|$)/.test(v)) return toast("Familiya va ismni to'liq yozing (bosh harf bilan emas)", true);
+        e.target.disabled = true; try { await db.sendNameReq(tid, v); toast("Yuborildi — tasdiqlangach ism o'zgaradi"); nameAskInsert(page); } catch (x) { e.target.disabled = false; toast(x.message, true); } };
+      const ok = $("[data-nok]", r); if (ok) ok.onclick = async () => { ok.disabled = true; try { await db.nameAskOk(tid); toast("Belgilandi"); nameAskInsert(page); } catch (x) { ok.disabled = false; toast(x.message, true); } };
+    });
+  }
   async function kunInsert(page) {
     if (!S.me || !["asoschi", "ceo", "xodim"].includes(S.me.role) || !db.kunUstozlari) return;
     const t = today(), y = addD(t, -1), y2 = dowOf(y) === 7 ? addD(y, -1) : y;
@@ -3377,7 +3409,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -3423,7 +3455,7 @@ window.METODISTLAR = [
             ${active.length ? active.slice(0, 6).map(taskLine).join("") : `<div class="empty">Faol topshiriq yo'q</div>`}</div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page);
+    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page); nameAskInsert(page);
     const nb = $("#notif-on", page);
     if (nb) nb.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "Eslatmalar yoqildi" : "Eslatmalar yoqilmadi"); } catch (e) {} nb.remove(); };
   }
@@ -4381,7 +4413,17 @@ window.METODISTLAR = [
     if (ms < 0) { const h = Math.ceil(-ms / 36e5); return `<span class="mz-late">⏰ muddati ${h < 24 ? h + " soat" : Math.ceil(h / 24) + " kun"} o'tgan</span>`; }
     return `<span class="${ms < 864e5 ? "mz-soon" : ""}">⏳ ${lbl} gacha</span>`;
   }
+  // 59: takliflar — hammaga ochiq, muddatsiz; «Qo'shilaman» va muhokama
+  const likesOf = p => (p.post_likes || []).map(x => x.user_id);
+  function tkLine(p) {
+    const nw = isNewForMe("post", p), lk = likesOf(p), mine = lk.includes(S.me.id);
+    return `<div class="list-item click ${nw ? "unseen" : ""}" data-post="${p.id}">${postBadge(p)}
+      <div style="flex:1;min-width:0"><div class="row" style="gap:8px;flex-wrap:wrap"><span class="t">Taklif</span><span class="small muted">#${p.id} · ${fmtDate(p.created_at)}</span>${nw ? pill("yangi", "Yangi") : ""}</div>
+      <div class="small"><b>${esc(nameOf(p.author_id))}:</b> ${esc(p.body.length > 160 ? p.body.slice(0, 160) + "…" : p.body)}</div>
+      <div class="small muted" style="margin-top:4px">${mine ? "<b>👍 Siz qo'shilgansiz</b>" : "👍"} ${lk.length} kishi qo'shildi · 💬 ${p.comment_count || 0} izoh${(p.images || []).length ? ` · 📷 ${p.images.length}` : ""}</div></div></div>`;
+  }
   function postLine(p) {
+    if (p.kind === "taklif") return tkLine(p);
     const nw = isNewForMe("post", p); const need = postNeedsMe(p);
     const role = p.author_id === S.me.id ? "Siz yubordingiz" : isPostMasul(p) ? "Siz mas'ulsiz" : (p.followers || []).includes(S.me.id) ? "Siz qo'shilgansiz" : "";
     return `<div class="list-item click ${nw ? "unseen" : ""} ${postOverdue(p) ? "mz-od" : ""}" data-post="${p.id}">${postBadge(p)}
@@ -6708,9 +6750,9 @@ window.METODISTLAR = [
       root.innerHTML = `
         <div class="seg mz-kind"><button type="button" data-k="muammo" class="${F.kind === "muammo" ? "active" : ""}">🔧 Muammo</button><button type="button" data-k="taklif" class="${F.kind === "taklif" ? "active" : ""}">💡 Taklif</button></div>
         ${F.kind === "muammo" ? `<div class="field"><label>Muammo turi *</label><div class="mz-types">${Object.entries(PTYPES).map(([k, [l, col]]) => `<label class="mz-type ${F.ptype === k ? "on" : ""}" style="--c:${col}"><input type="radio" name="pt" value="${k}" ${F.ptype === k ? "checked" : ""}><b>${l}</b><span class="small muted">Mas'ul: ${esc(masulPreview("muammo", k))}</span></label>`).join("")}</div></div>`
-          : `<div class="note" style="margin:0 0 12px">Taklifni <b>${esc(masulPreview("taklif"))}</b> ko'rib chiqadi va qabul yoki rad etadi (sababi bilan).</div>`}
-        <div class="field"><label>Muhimlik</label><div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(PRIOS).map(([k, [l, t]]) => `<button type="button" class="btn sm ${F.priority === k ? "primary" : ""}" data-pr="${k}">${l} · ${t}</button>`).join("")}</div>
-          <div class="small muted" style="margin-top:4px">Mas'ul shu muddatda hal qilishi kerak. Muddat o'tsa — unga, yana 1 kun o'tsa — Monitoring bo'limi rahbariga xabar boradi.</div></div>
+          : `<div class="note" style="margin:0 0 12px">Taklifingiz <b>barcha xodim va rahbarlarga</b> ko'rinadi: ular muhokama qiladi, «Qo'shilaman» deydi; rahbarlar «Nima qilindi»ni yozib boradi. Taklif hech qachon o'chmaydi.</div>`}
+        ${F.kind === "taklif" ? "" : `<div class="field"><label>Muhimlik</label><div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(PRIOS).map(([k, [l, t]]) => `<button type="button" class="btn sm ${F.priority === k ? "primary" : ""}" data-pr="${k}">${l} · ${t}</button>`).join("")}</div>
+          <div class="small muted" style="margin-top:4px">Mas'ul shu muddatda hal qilishi kerak. Muddat o'tsa — unga, yana 1 kun o'tsa — Monitoring bo'limi rahbariga xabar boradi.</div></div>`}
         <div class="field"><label>${F.kind === "taklif" ? "Taklif matni" : "Muammo nimada? (filial, xona, nima ishlamayapti)"} *</label><textarea id="pf-b" style="min-height:120px" placeholder="${F.kind === "taklif" ? "Masalan: PD mashg'ulotlarini har ikki haftada o'tkazish…" : "Masalan: Farg'ona filiali 102-xona kamerasi ishlamayapti"}">${esc(F.body)}</textarea></div>
         <div id="pf-sim"></div>
         <div class="field"><label>Havola <span class="muted">(ixtiyoriy: video, hujjat)</span></label><input id="pf-l" type="url" placeholder="https://..." value="${esc(F.link)}"></div>
@@ -6760,9 +6802,46 @@ window.METODISTLAR = [
     muhimlik: "⚡ muhimlikni o'zgartirdi", tur: "🔀 turini o'zgartirdi", tqabul: "✅ taklifni qabul qildi", trad: "❌ taklifni rad etdi", joriy: "🚀 joriy etildi deb belgiladi",
     qayta_och: "🔁 qayta ochdi", qoshildi: "➕ ham shu muammoga duch keldi", muddat: "⏰ Muddat o'tdi — mas'ulga eslatildi", eskalatsiya: "🚨 Muddat 1 kundan ortiq o'tdi — Monitoring bo'limi rahbariga yuborildi" };
   const pevNote = ev => ev.act === "muhimlik" ? (PRIOS[ev.note]?.[0] || ev.note) : ev.act === "tur" ? (() => { const [k, ...r] = String(ev.note || "").split(" · "); return (PTYPES[k]?.[0] || k) + (r.length ? " · " + r.join(" · ") : ""); })() : ev.note;
+  // 59: Taklif — muhokama, «Qo'shilaman», «Nima qilindi» (o'chirilmaydi, muddat yo'q)
+  async function openTaklif(p) {
+    const id = p.id, me = S.me.id, isAu = p.author_id === me, canDo = ["asoschi", "ceo"].includes(S.me.role);
+    markSeen("post", p.id);
+    const comments = await db.listComments(p.id).catch(() => []);
+    const done = comments.filter(c => c.kind === "qilindi"), talk = comments.filter(c => c.kind !== "qilindi");
+    const lk = likesOf(p), mine = lk.includes(me);
+    const cmt = c => `<div class="list-item"><div style="flex:1;min-width:0"><b class="small">${esc(nameOf(c.author_id))}</b> <span class="small muted">${fmtDate(c.created_at)} ${tmOf(c.created_at)}</span><div style="white-space:pre-wrap">${linkify(c.body)}</div>${imgGallery(c.images, true)}</div></div>`;
+    const m = openModal(`💡 Taklif <span class="small muted">#${p.id}</span>`, `
+      <div class="row" style="gap:10px;margin-bottom:10px">${postBadge(p, 30)}<div><b>${esc(nameOf(p.author_id))}</b><div class="small muted">${fmtDate(p.created_at)} ${tmOf(p.created_at)}</div></div></div>
+      <div style="white-space:pre-wrap">${linkify(p.body)}</div>
+      ${imgGallery(p.images)}
+      ${p.link ? `<p><a class="btn sm" href="${esc(p.link)}" target="_blank" rel="noopener">Havolani ochish ↗</a></p>` : ""}
+      <div class="tk-like"><button class="btn sm ${mine ? "primary" : ""}" id="tk-like">👍 ${mine ? "Qo'shilganman" : "Shu fikrga qo'shilaman"}</button>
+        <span class="small muted">${lk.length ? `${lk.length} kishi qo'shildi: ${esc(lk.map(nameOf).join(", "))}` : "Hali hech kim qo'shilmagan"}</span></div>
+      <h3 style="margin-top:16px">📌 Nima qilindi</h3>
+      <div class="mz-hist">${done.length ? done.map(c => `<div class="mz-res" style="margin-top:6px"><b>${esc(nameOf(c.author_id))}</b> <span class="small muted">${fmtDate(c.created_at)}</span><div>${linkify(c.body)}</div>${imgGallery(c.images, true)}</div>`).join("") : `<p class="small muted">Hali yozuv yo'q</p>`}</div>
+      <h3 style="margin-top:16px">💬 Muhokama</h3>
+      <div class="mz-hist">${talk.map(cmt).join("") || `<p class="small muted">Birinchi bo'lib fikr bildiring</p>`}</div>
+      <div class="field" style="margin-top:10px"><textarea id="cbody" placeholder="Fikringizni yozing…" style="min-height:64px"></textarea><div id="c-img" style="margin-top:8px"></div>
+        ${canDo ? `<label class="row small" style="gap:6px;align-items:center;font-weight:400;margin-top:6px"><input type="checkbox" id="c-done" style="width:auto"> «Nima qilindi» yozuvi sifatida saqlash</label>` : ""}</div>`,
+      `${isAu ? `<button class="btn sm" id="p-edit">Tahrirlash</button>` : ""}<span class="spacer"></span><button class="btn primary" id="c-send">Yuborish</button>`);
+    hydrateImgs(m);
+    const getCImg = imgPicker($("#c-img", m), "Rasm");
+    $("#tk-like", m).onclick = async e => { e.target.disabled = true;
+      try { await db.toggleLike(p.id, !mine); await refresh(); render(); openTaklif(S.posts.find(x => x.id === id) || p); } catch (x) { e.target.disabled = false; toast(x.message, true); } };
+    $("#c-send", m).onclick = async e => {
+      const v = $("#cbody", m).value.trim(); e.target.disabled = true; let imgs = [];
+      try { imgs = await getCImg(); } catch (err) { e.target.disabled = false; return toast(err.message, true); }
+      if (!v && !imgs.length) { e.target.disabled = false; return toast("Matn yozing yoki rasm qo'shing", true); }
+      const kind = $("#c-done", m) && $("#c-done", m).checked ? "qilindi" : "izoh";
+      await act(() => db.addComment(p.id, v, imgs, kind), kind === "qilindi" ? "«Nima qilindi» qo'shildi" : "Fikringiz qo'shildi").catch(() => {});
+      await refresh(); render(); openTaklif(S.posts.find(x => x.id === id) || p);
+    };
+    if ($("#p-edit", m)) $("#p-edit", m).onclick = () => postForm(p);
+  }
   async function openPost(id) {
     let p = S.posts.find(x => x.id === id);
     if (!p) { toast("Bu masala sizga tegishli emas yoki o'chirilgan", true); return; }
+    if (p.kind === "taklif") return openTaklif(p);
     const me = S.me.id, isA = S.me.role === "asoschi", isM = isPostMasul(p), isAu = p.author_id === me;
     markSeen("post", p.id);
     const [comments, events] = await Promise.all([db.listComments(p.id).catch(() => []), db.listPostEvents ? db.listPostEvents(p.id).catch(() => []) : []]);
