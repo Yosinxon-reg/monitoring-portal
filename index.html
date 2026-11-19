@@ -1224,6 +1224,8 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .pr-hot{background:#fdecea;color:#a3271b}
 .ku-bar{display:inline-block;width:70px;height:6px;border-radius:3px;background:var(--line,#e3e8ef);vertical-align:middle;margin-left:6px;overflow:hidden}.ku-bar i{display:block;height:100%;background:#2f9e5b}
 .ku-tot td{background:#eef3fa}.ku-up{color:#1b6e36}.ku-dn{color:#a62626}.ku-tbl td,.ku-tbl th{white-space:nowrap}
+.rv-diff{margin:6px 0;display:grid;gap:6px}.rv-item{font-size:13px;padding:6px 8px;border-left:3px solid var(--line,#dde3ea);background:rgba(0,0,0,.02)}
+.rv-old{color:#a3271b;text-decoration:line-through;text-decoration-color:rgba(163,39,27,.35)}.rv-new{color:#1b6e36}
 
 </style>
 </head>
@@ -1740,7 +1742,8 @@ window.LESSONS = [
         if (!["xodim", "ceo", "asoschi"].includes(m.role)) return fail("Ruxsat yo'q");
         let ex = d.reports.find(x => x.author_id === m.id && x.report_date === r.report_date);
         if (ex) {
-          if (ex.grade !== null && ex.grade !== undefined && ex.grade !== "") return fail("Baholangan hisobotni o'zgartirib bo'lmaydi");
+          if (ex.grade !== null && ex.grade !== undefined && ex.grade !== "" && ex.rev_state !== "kutilmoqda") { ex.rev_old = { done: ex.done, problems: ex.problems, hours: ex.hours, data: JSON.parse(JSON.stringify(ex.data || {})) }; ex.rev_grade_old = ex.grade; }
+          if (ex.grade !== null && ex.grade !== undefined && ex.grade !== "") { ex.rev_state = "kutilmoqda"; ex.rev_at = new Date().toISOString(); }
           if (ex.written_by === m.id && Date.now() - new Date(ex.created_at).getTime() > 864e5) return fail("Hisobot yuborilganiga 24 soatdan oshdi — endi tahrirlab bo'lmaydi");
           Object.assign(ex, { edited_at: ex.written_by === m.id ? new Date().toISOString() : (ex.edited_at || null), done: r.done, problems: r.problems, plan: r.plan, hours: r.hours, data: r.data || {}, status: "yuborildi", written_by: m.id, updated_at: new Date().toISOString() });
         } else {
@@ -1750,6 +1753,7 @@ window.LESSONS = [
         }
         save(); return ok(ex);
       },
+      async repRevDecide(rid, okk, g, msg) { const d = load(); const r = d.reports.find(x => x.id === rid); if (!r) return fail("Topilmadi"); r.rev_state = okk ? "tasdiq" : "rad"; if (okk) r.grade = g; if (msg) r.staff_note = ((r.staff_note || "") + "\nTahrir bo'yicha: " + msg).trim(); save(); return ok(true); },
       async gradeReport(author_id, report_date, f) {
         const m = me(); const d = load();
         if (!(m.role === "asoschi" ? author_id !== m.id : isMember(author_id))) return fail("Ruxsat yo'q");
@@ -2199,11 +2203,11 @@ window.LESSONS = [
         const ex = chk(await sb.from("daily_reports").select("id,status,grade").eq("author_id", meCache.id).eq("report_date", r.report_date).maybeSingle());
         const body = { done: r.done, problems: r.problems, plan: r.plan, hours: r.hours, data: r.data || {} };
         if (ex) {
-          if (ex.grade !== null && ex.grade !== undefined) throw new Error("Baholangan hisobotni o'zgartirib bo'lmaydi");
           return chk(await sb.from("daily_reports").update(body).eq("id", ex.id).select().single());
         }
         return chk(await sb.from("daily_reports").insert({ ...body, author_id: meCache.id, report_date: r.report_date }).select().single());
       },
+      async repRevDecide(rid, okk, g, msg) { chk(await sb.rpc("rep_rev_decide", { rid, ok: okk, g: okk ? g : null, msg: msg || "" })); return true; },
       async gradeReport(author_id, report_date, f) {
         const ex = chk(await sb.from("daily_reports").select("id").eq("author_id", author_id).eq("report_date", report_date).maybeSingle());
         const body = { grade: f.grade, staff_note: f.staff_note || "", status: "tasdiqlandi" };
@@ -3486,7 +3490,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page); izInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page); izInsert(page); revInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -4106,7 +4110,7 @@ window.METODISTLAR = [
 
   function myReportForm(root) {
     const t = today(); const date = S.ui.myDate && S.ui.myDate <= t ? S.ui.myDate : t;
-    const kind = deptOf(S.me); const r = repOf(S.me, date); const eLeft = editLeft(r); const expired = !isGraded(r) && eLeft !== null && eLeft <= 0; const locked = isGraded(r) || expired;
+    const kind = deptOf(S.me); const r = repOf(S.me, date); const eLeft = editLeft(r); const expired = eLeft !== null && eLeft <= 0; const locked = expired;
     const d0 = (r && r.data && r.data.kind === kind) ? JSON.parse(JSON.stringify(r.data)) : {};
     const bOnly = kind === "akademik" && boshlOnly(); const bOk = bOnly && bogOk();
     const scSubs = kind === "akademik" ? mySubs() : [];
@@ -4135,8 +4139,10 @@ window.METODISTLAR = [
     const saveDraft = () => { clearTimeout(saveDraft._t);
       saveDraft._t = setTimeout(() => { try { localStorage.setItem(DKEY, JSON.stringify({ rows: F.rows, note: F.note, ts: Date.now(), ...(kind !== "akademik" ? { v2: 1, filials: F.filials, issues: F.issues, mgmt: F.mgmt, mgmt_note: F.mgmt_note } : {}) })); } catch (e) {} }, 400); };
     const head2 = `<div class="row" style="margin:4px 0 14px;gap:10px"><label class="small muted" style="margin:0">Sana:</label><input type="date" id="mr-d" value="${date}" max="${t}" style="width:auto">
-      ${locked ? (isGraded(r) ? `${gradePill(r.grade)} <span class="small muted">Rahbaringiz baholagan — o'zgartirib bo'lmaydi</span>` : `${pill("yangi", "Yuborilgan · " + tmOf(r.created_at || r.updated_at))} <span class="small muted">🔒 Yuborilganiga ${EDIT_H} soatdan oshdi — endi tahrirlab bo'lmaydi</span>`)
-        : isWritten(r) ? pill("yangi", `Yuborilgan · ${tmOf(r.created_at || r.updated_at)}${eLeft !== null ? ` — yana ${fmtLeft(eLeft)} tahrirlash mumkin` : ""} (baholanguncha)`) : pill("missing", "Hali yuborilmagan")}</div>`;
+      ${locked ? `${isGraded(r) ? gradePill(r.grade) + " " : ""}${pill("yangi", "Yuborilgan · " + tmOf(r.created_at || r.updated_at))} <span class="small muted">🔒 Yuborilganiga ${EDIT_H} soatdan oshdi — endi tahrirlab bo'lmaydi</span>`
+        : isWritten(r) ? (isGraded(r) ? `${gradePill(r.grade)} ${pill("yangi", `Yuborilgan · ${tmOf(r.created_at || r.updated_at)}${eLeft !== null ? ` — yana ${fmtLeft(eLeft)} tahrirlash mumkin` : ""}`)}${r.rev_state === "kutilmoqda" ? ` ${pill("jarayonda", "✏️ Tahrir rahbarga yuborilgan")}` : ""}`
+          : pill("yangi", `Yuborilgan · ${tmOf(r.created_at || r.updated_at)}${eLeft !== null ? ` — yana ${fmtLeft(eLeft)} tahrirlash mumkin` : ""}`)) : pill("missing", "Hali yuborilmagan")}</div>
+      ${!locked && isGraded(r) ? `<div class="note" style="margin:-4px 0 12px">Rahbaringiz bu hisobotni baholagan (${r.grade}/10). Yuborilganidan keyin ${EDIT_H} soat ichida tahrirlashingiz mumkin: o'zgartirsangiz, rahbaringizga nima o'zgargani haqida xabar boradi. U bahoni yangilashi yoki eskisini qoldirishi mumkin — har ikki holatda ham hisobotingiz tahrirlangan holida qoladi.</div>` : ""}`;
     if (locked) {
       root.innerHTML = head2 + `<div class="card">${reportView(r)}${r.staff_note ? `<div class="rc-note" style="margin-top:12px">💬 <b>Rahbar izohi:</b> ${esc(r.staff_note)}</div>` : ""}</div>`;
       $("#mr-d", root).onchange = e => { S.ui.myDate = e.target.value; myReportForm(root); }; return;
@@ -5418,6 +5424,41 @@ window.METODISTLAR = [
       catch (x) { $("#as-e", m).textContent = x.message; e.target.disabled = false; } };
   }
   // Oylik reja sahifasi: yo'naltirilganlar holati va tavsiyalar statistikasi
+  // ===== 68: Baholangan hisobot tahrirlandi — rahbar ko'rib chiqadi =====
+  const revRowTxt = x => [x.teacher || (teacherById(x.teacher_id) || {}).full_name, x.subject, x.filial, x.klass, x.soat ? x.soat + "-soat" : "", x.ib !== "" && x.ib != null ? `I: ${x.ib}` : "", x.ab !== "" && x.ab != null ? `A: ${x.ab}` : ""].filter(Boolean).join(" · ");
+  const revIssTxt = x => [x.filial, x.type === "Boshqa" ? (x.other || "Boshqa") : x.type, x.place, x.room, x.note, (HOL_NAT.find(h => h[0] === x.res) || [, ""])[1], x.sev === "jiddiy" ? "jiddiy" : ""].filter(Boolean).join(" · ");
+  function revDiffHtml(r) {
+    const o = r.rev_old || {}, od = o.data || {}, nd = r.data || {}, out = [];
+    const txt = (l, a, b) => { if ((a || "") !== (b || "")) out.push(`<div class="rv-item"><b>${l}</b><div class="rv-old">Avval: ${esc(a || "—")}</div><div class="rv-new">Hozir: ${esc(b || "—")}</div></div>`); };
+    txt("Hisobot matni", o.done, r.done); txt("Kamchilik / muammo", o.problems, r.problems);
+    if (String(o.hours ?? "") !== String(r.hours ?? "")) out.push(`<div class="rv-item"><b>Soatlar:</b> ${esc(o.hours ?? "—")} → ${esc(r.hours ?? "—")}</div>`);
+    const lst = (l, a, b, f) => { const A = (a || []).map(f), B = (b || []).map(f); const add = B.filter(x => !A.includes(x)), del = A.filter(x => !B.includes(x));
+      if (add.length || del.length) out.push(`<div class="rv-item"><b>${l}: ${A.length} → ${B.length}</b>${del.map(x => `<div class="rv-old">− ${esc(x)}</div>`).join("")}${add.map(x => `<div class="rv-new">+ ${esc(x)}</div>`).join("")}</div>`); };
+    lst("Kuzatilgan darslar", od.rows, nd.rows, revRowTxt); lst("Intizomiy holatlar", od.issues, nd.issues, revIssTxt);
+    if (!out.length) out.push(`<div class="small muted">Hisobotdagi qo'shimcha ma'lumotlar o'zgargan.</div>`);
+    return out.join("");
+  }
+  const revCanDecide = r => { const a = person(r.author_id); return !!a && (S.me.role === "asoschi" || (S.me.role === "ceo" && a.ceo_id === S.me.id)); };
+  async function revInsert(page) {
+    if (!S.me || !["ceo", "asoschi"].includes(S.me.role)) return;
+    const old = $("#rv-card", page); if (old) old.remove(); if (!page.isConnected) return;
+    const L = (S.reports || []).filter(r => r.rev_state === "kutilmoqda" && revCanDecide(r)).sort((a, b) => (a.rev_at || "") < (b.rev_at || "") ? -1 : 1);
+    if (!L.length) return;
+    const html = `<div class="card na-card" id="rv-card" style="margin-bottom:16px"><div class="card-head"><h2>✏️ Baholangan hisobotlar tahrirlandi (${L.length})</h2></div>
+      <p class="small muted" style="margin-top:0">Xodim siz baholagan hisobotni 24 soat ichida o'zgartirdi. O'zgarishni ko'rib, yangi baho qo'ying yoki eski baho qolsin. Tasdiqlamasangiz ham hisobot tahrirlangan holida qoladi, baho o'zgarmaydi.</p>
+      ${L.map(r => `<div class="na-row" data-rv="${r.id}"><div class="small"><b>${esc(nameOf(r.author_id))}</b> · ${fmtDate(r.report_date)} hisoboti · tahrir: ${tmOf(r.rev_at)} · joriy baho: <b>${r.grade}/10</b></div>
+        <div class="rv-diff">${revDiffHtml(r)}</div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><label class="small">Yangi baho:</label><input type="number" min="1" max="10" step="0.5" data-rvg value="${r.grade}" style="width:80px">
+          <input data-rvm placeholder="Izoh (ixtiyoriy)" style="flex:1;min-width:180px"><button class="btn sm primary" data-rvd="1">✓ Tasdiqlash — yangi baho</button><button class="btn sm" data-rvd="0">Eski baho qolsin</button></div></div>`).join("")}</div>`;
+    const anchor = $("#izd-card", page) || $("#sk-card", page) || $("#na-card", page) || $(".card", page) || page.firstElementChild; if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+    $$("[data-rv]", page).forEach(row => $$("[data-rvd]", row).forEach(b => b.onclick = async () => { const okk = b.dataset.rvd === "1", g = +$("[data-rvg]", row).value;
+      if (okk && !(g >= 1 && g <= 10)) return toast("Bahoni 1–10 oralig'ida kiriting", true);
+      $$("button", row).forEach(x => x.disabled = true);
+      try { await db.repRevDecide(+row.dataset.rv, okk, g, $("[data-rvm]", row).value.trim()); const r = (S.reports || []).find(x => x.id === +row.dataset.rv);
+        if (r) { r.rev_state = okk ? "tasdiq" : "rad"; if (okk) r.grade = g; } toast(okk ? "Yangi baho qo'yildi" : "Eski baho qoldi"); revInsert(page); }
+      catch (x) { $$("button", row).forEach(y => y.disabled = false); toast(x.message, true); } }));
+  }
   // ===== 65: Intizomiy xodimlar — haftalik «akademik yordam» rejasi (Akademik CEO qo'yadi) =====
   const IZ_MAXDED = 10;
   let IZC = { at: 0 };
