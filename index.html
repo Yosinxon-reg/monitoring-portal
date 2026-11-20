@@ -1226,6 +1226,34 @@ table.heat td.h4 { background: #c9302c; color: #fff; }
 .ku-tot td{background:#eef3fa}.ku-up{color:#1b6e36}.ku-dn{color:#a62626}.ku-tbl td,.ku-tbl th{white-space:nowrap}
 .rv-diff{margin:6px 0;display:grid;gap:6px}.rv-item{font-size:13px;padding:6px 8px;border-left:3px solid var(--line,#dde3ea);background:rgba(0,0,0,.02)}
 .rv-old{color:#a3271b;text-decoration:line-through;text-decoration-color:rgba(163,39,27,.35)}.rv-new{color:#1b6e36}
+/* 72: haftalik topshiriqlar */
+.wt-card{margin-bottom:14px}.wt-card .card-head{gap:10px}
+.wt-item{border-top:1px solid var(--border);padding:10px 0}.wt-item:first-of-type{border-top:0}
+.wt-top{display:flex;gap:10px;align-items:flex-start}.wt-t{font-weight:600}
+.wt-src{font-size:12px}.wt-src.a{color:var(--brand)}
+.wt-body summary{cursor:pointer;color:var(--muted);margin-top:4px}.wt-text{white-space:normal;font-size:13.5px;line-height:1.5;background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-top:6px}
+.wt-ans{margin-top:6px;font-size:13.5px;border-left:3px solid var(--brand);padding:4px 10px;background:var(--brand-soft);border-radius:0 8px 8px 0}
+.wt-act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:flex-start}.wt-act textarea{flex:1;min-width:220px}
+/* 73: chat */
+.ch-wrap{display:grid;gap:14px}.ch-wrap.adm{grid-template-columns:300px 1fr}
+.ch-list{padding:10px;max-height:72vh;overflow:auto}.ch-list input{margin-bottom:8px}
+.ch-peer{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;color:inherit;text-decoration:none}.ch-peer:hover{background:var(--surface-2)}.ch-peer.on{background:var(--brand-soft)}
+.ch-peer .avatar{width:34px;height:34px;flex:none}.ch-prev{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-main{display:flex;flex-direction:column;padding:0;min-height:60vh;max-height:78vh}
+.ch-head{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}.ch-head .avatar{width:32px;height:32px}
+.ch-back{display:none}
+.ch-msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.ch-m{display:flex}.ch-m.me{justify-content:flex-end}
+.ch-b{max-width:78%;background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:8px 12px;font-size:14px;line-height:1.45;position:relative}
+.ch-m.me .ch-b{background:var(--brand-soft);border-color:transparent;border-radius:14px 14px 4px 14px}
+.ch-m.q .ch-b{border-left:3px solid var(--brand)}
+.ch-t{display:block;text-align:right;font-size:11px;color:var(--muted);margin-top:2px}
+.ch-sys{align-self:center;font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:4px 10px;max-width:85%}.ch-sys span{opacity:.7;margin-left:4px}
+.ch-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.ch-opt{font-size:12.5px;border:1px solid var(--border);border-radius:16px;padding:4px 10px;background:var(--surface)}
+.ch-opt.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.ch-tx{display:flex;gap:6px;margin-top:8px}.ch-tx textarea{flex:1}
+.ch-in{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border)}.ch-in textarea{flex:1;resize:vertical}
+@media (max-width:760px){.ch-wrap.adm{grid-template-columns:1fr}.ch-wrap.adm.has .ch-list{display:none}.ch-wrap.adm:not(.has) .ch-main{display:none}.ch-back{display:inline-flex}.ch-b{max-width:90%}}
 
 </style>
 </head>
@@ -1986,6 +2014,31 @@ window.LESSONS = [
       async assignHelp(to, tids, due, msg) { const d = load(); d.helpreq = d.helpreq || []; to.forEach((u, k) => { const part = tids.filter((x, i) => i % to.length === k); if (part.length)
           d.helpreq.unshift({ id: Date.now() + k, from_id: me().id, to_id: u, teacher_ids: part, due, note: msg || "", status: "qabul", kind: "yonaltirish", reply: "", created_at: new Date().toISOString(), answered_at: new Date().toISOString() }); }); save(); return ok(to.length); },
       async listTeacherObs(from, subs, ids, to) { return ok((load().tobs || []).filter(o => o.day >= from && (!to || o.day <= to) && (!subs || !subs.length || subs.includes(o.subject)))); },
+      // 72: haftalik topshiriqlar (demo)
+      async listWeekTasks(from) { const m = me(); return ok((load().wtasks || []).filter(x => x.week >= from && (m.role === "asoschi" || (x.ceo_id === m.id && x.state === "yuborildi")))); },
+      async wtSave(id, ceo, week, title, body, due, weight) { const d = load(); d.wtasks = d.wtasks || []; if (!title || !title.trim()) return fail("Topshiriq nomini yozing");
+        const pub = Date.now() >= new Date(week + "T20:00:00+05:00").getTime() - 864e5;
+        if (!id) { const t = { id: Date.now(), week, ceo_id: ceo, src: "xos", kind: "xos", title: title.trim(), body: body || "", due, orig_due: due, weight: weight || 1, state: pub ? "yuborildi" : "loyiha", status: "yangi", answer: "", verdict: "", created_at: new Date().toISOString() }; d.wtasks.push(t); save(); return ok(t.id); }
+        const t = d.wtasks.find(x => x.id === id); if (!t) return fail("Topilmadi"); Object.assign(t, { title: title.trim(), body: body || "", due, weight: weight || t.weight, edited: true }); if (t.state === "loyiha") t.orig_due = due; save(); return ok(id); },
+      async wtRemove(id) { const d = load(); const t = (d.wtasks || []).find(x => x.id === id); if (t) t.state = "olib_tashlandi"; save(); return ok(true); },
+      async wtDone(id, ans) { const d = load(); const t = (d.wtasks || []).find(x => x.id === id); if (!t) return fail("Topilmadi"); t.answer = ans || "";
+        if (t.src === "auto") { const mn = (t.rule && t.rule.min) || 100; const okk = t.rule && t.rule.t === "text" ? t.answer.length >= mn : true;
+          if (okk) { t.status = "qabul"; t.done_at = new Date().toISOString(); t.checked_by = "auto"; t.verdict = "Javob yozildi — qabul qilindi"; } else t.verdict = `Javob juda qisqa: kamida ${mn} belgi kerak`;
+          save(); return ok({ ok: okk, msg: t.verdict, status: t.status }); }
+        t.status = "bajarildi"; t.done_at = new Date().toISOString(); save(); return ok({ ok: true, msg: "Yuborildi", status: t.status }); },
+      async wtDecide(id, okk, msg) { const d = load(); const t = (d.wtasks || []).find(x => x.id === id); if (!t) return fail("Topilmadi"); if (!okk && !(msg || "").trim()) return fail("Qaytarish sababini yozing");
+        t.status = okk ? "qabul" : "qaytarildi"; t.verdict = msg || (okk ? "Qabul qilindi" : ""); t.checked_by = "asoschi"; if (okk && !t.done_at) t.done_at = new Date().toISOString(); save(); return ok(true); },
+      async wtRegen() { return ok(0); },
+      // 73: chat (demo)
+      async listChat(from) { const m = me(); return ok((load().chat || []).filter(x => x.created_at >= from && (m.role === "asoschi" || x.peer === m.id))); },
+      async chatSend(peer, body) { const d = load(); const m = me(); d.chat = d.chat || []; if (!body || !body.trim()) return fail("Xabar bo'sh");
+        d.chat.push({ id: Date.now(), peer: m.role === "asoschi" ? peer : m.id, author: m.id, kind: "text", body: body.trim(), created_at: new Date().toISOString() }); save(); return ok(true); },
+      async chatAnswer(qid, choice, txt) { const d = load(); const q = (d.chat || []).find(x => x.id === qid); if (!q) return fail("Savol topilmadi"); const o = (q.opts || [])[choice]; if (!o) return fail("Variantni tanlang");
+        if ((o.a === "text" || o.a === "help") && (txt || "").trim().length < 3) return fail("Qisqacha yozib qoldiring");
+        q.answered_at = new Date().toISOString(); const now = Date.now();
+        d.chat.push({ id: now, peer: q.peer, author: q.peer, kind: "javob", body: o.l + (txt ? "\n" + txt : ""), qid, choice, created_at: new Date(now).toISOString() });
+        d.chat.push({ id: now + 1, peer: q.peer, author: null, kind: "tizim", body: o.r || "Rahmat", auto: true, created_at: new Date(now + 1).toISOString() }); save(); return ok({ reply: o.r }); },
+      async chatRead(peer) { const d = load(); const m = me(); (d.chat || []).forEach(x => { if (x.peer === (m.role === "asoschi" ? peer : m.id) && !x.read_at && (m.role === "asoschi" ? x.author === peer : x.author !== m.id && x.kind !== "savol")) x.read_at = new Date().toISOString(); }); save(); return ok(true); },
       async listObsChanged() { return []; },
       async obsDeletedSince() { return []; },
       async setStaffMain(uid, subs) { const d = load(); const p = d.profiles.find(x => x.id === uid); if (p) p.main_subjects = subs || []; save(); return ok(true); },
@@ -2291,6 +2344,18 @@ window.LESSONS = [
         const m = new Map(); lists.flat().forEach(t => m.set(t.id, t)); return [...m.values()].map(t => ({ ...t, filial: E(t.filial) }));
       },
       async listTeacherIds() { return (await pageAll(() => sb.from("teachers").select("id").order("id"))).map(x => x.id); },
+      // 72: haftalik topshiriqlar
+      async listWeekTasks(from) { const r = await sb.from("week_tasks").select("*").gte("week", from).neq("state", "olib_tashlandi").order("due"); if (r.error) throw new Error(trErr(r.error.message)); return r.data || []; },
+      async wtSave(id, ceo, week, title, body, due, weight) { return chk(await sb.rpc("wt_save", { p_id: id || null, p_ceo: ceo || null, p_week: week || null, p_title: title, p_body: body || "", p_due: due, p_weight: weight || 1 })); },
+      async wtRemove(id) { chk(await sb.rpc("wt_remove", { p_id: id })); return true; },
+      async wtDone(id, ans) { return chk(await sb.rpc("wt_done", { p_id: id, p_answer: ans || "" })); },
+      async wtDecide(id, okk, msg) { chk(await sb.rpc("wt_decide", { p_id: id, p_ok: !!okk, p_msg: msg || "" })); return true; },
+      async wtRegen(wk) { return chk(await sb.rpc("wt_regen", { wk })); },
+      // 73: chat
+      async listChat(from) { const r = await sb.from("chat_msgs").select("*").gte("created_at", from).order("created_at").limit(5000); if (r.error) throw new Error(trErr(r.error.message)); return r.data || []; },
+      async chatSend(peer, body) { return chk(await sb.rpc("chat_send", { p_peer: peer || null, p_body: body })); },
+      async chatAnswer(qid, choice, txt) { return chk(await sb.rpc("chat_answer", { p_qid: qid, p_choice: choice, p_text: txt || "" })); },
+      async chatRead(peer) { chk(await sb.rpc("chat_read", { p_peer: peer || null })); return true; },
       async listObsChanged(since, from) { return (await pageAll(() => sb.from("teacher_obs").select("*").gt("updated_at", since).gte("day", from).order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
       async obsDeletedSince(since) { const r = await sb.rpc("obs_deleted_since", { ts: since }); if (r.error) return []; return (r.data || []).map(x => typeof x === "object" ? Object.values(x)[0] : x); },
       async listObsOfTeachers(ids, from) { if (!ids.length) return []; return (await pageAll(() => sb.from("teacher_obs").select("*").in("teacher_id", ids).gte("day", from).order("day").order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
@@ -3007,6 +3072,7 @@ window.METODISTLAR = [
         db.listHelpReqs ? db.listHelpReqs().catch(() => S.help || []) : Promise.resolve([]), tqLoad()]);
       S.plans = pl || []; if (isManager()) S.creps = cr || []; S.help = hp || [];
       if (deptOf(S.me) === "intizomiy" || canMetAdmin()) { try { await izLoad(); } catch (e) {} }
+      try { await Promise.all([wtLoad(), chatLoad()]); } catch (e) {}
       if (db.amalAccess) { try { S.amalAcc = await db.amalAccess(); } catch (e) {} }
       if (db.listRecs) { try { const [rc, nl] = await Promise.all([db.listRecs(addD(w0, -7), addD(w0, 13)), db.listNoLesson()]);
         const keep = (S.recs || []).filter(o => o.day < addD(w0, -7) || o.day > addD(w0, 13)); S.recs = keep.concat(recFix(rc)); S.nolesson = nl || []; } catch (e) {} }
@@ -3044,6 +3110,8 @@ window.METODISTLAR = [
       const toConf = isManager() ? S.dtasks.reduce((a, t) => a + recipientsOf(t).filter(p => canRate(p) && dtStatus(t, p).status === "kutilmoqda" && dtStatus(t, p).self_done).length, 0) : 0;
       const toAcc = isManager() ? S.tasks.filter(x => x.status === "bajarildi" && canManageTask(x)).length : 0;
       items.push({ id: "masalalar", label: "Masalalar", icon: "chat", sec: "Ish", badge: unseenMine().length || "", badge2: (toConf + toAcc + S.posts.filter(postNeedsMe).length) || "", b2t: "Sizdan javob kutilmoqda: tasdiqlash, qabul qilish yoki mas'ul sifatida hal qilish" });
+      if (wtOn()) items.push({ id: "haftalik", label: r === "asoschi" ? "Haftalik topshiriqlar" : "Haftalik topshiriqlarim", icon: "task", badge: wtBadge() });
+      if (chatOn()) items.push({ id: "chat", label: "Chat", icon: "bell", badge: chatBadge() });
       const myRepDue = isSelfReporter(S.me) && isWorkday(S.me) && ["due", "late"].includes(dueState(S.me)) && !isWritten(repOf(S.me, today()));
       GB.hisobotlar = myRepDue ? "!" : r === "ceo" ? (toGrade().length || "") : (toReview || "");
       if (r === "asoschi" || rhKindOf(S.me)) {
@@ -3497,7 +3565,7 @@ window.METODISTLAR = [
           </div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page); izInsert(page); revInsert(page);
+    bindTaskLines(page); bindPostLines(page); bindCeoRepCard(page); bindSelfLogCard(page); todayInsert(page); kunInsert(page); nameAskInsert(page); skipInsert(page); deptRepInsert(page); izInsert(page); revInsert(page); wtInsert(page); chatInsert(page);
     $$("[data-info]", page).forEach(el => el.onclick = () => infoModal(person(el.dataset.info)));
     $$("[data-wrep]", page).forEach(el => el.onclick = () => openStaffReport(person(el.dataset.wrep), t));
   }
@@ -3543,7 +3611,7 @@ window.METODISTLAR = [
             ${active.length ? active.slice(0, 6).map(taskLine).join("") : `<div class="empty">Faol topshiriq yo'q</div>`}</div>
         </div>
       </div>${recentPosts()}`;
-    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page); nameAskInsert(page); skipInsert(page); izInsert(page);
+    bindTaskLines(page); bindPostLines(page); todayInsert(page); kunInsert(page); riskInsert(page); nameAskInsert(page); skipInsert(page); izInsert(page); chatInsert(page);
     const nb = $("#notif-on", page);
     if (nb) nb.onclick = async () => { try { const r = await Notification.requestPermission(); toast(r === "granted" ? "Eslatmalar yoqildi" : "Eslatmalar yoqilmadi"); } catch (e) {} nb.remove(); };
   }
@@ -5541,6 +5609,232 @@ window.METODISTLAR = [
     $$("[data-izq]", c).forEach(r => { $("[data-izqs]", r).onclick = async e => { const v = $("[data-izqt]", r).value.trim(); if (v.length < 3) return toast("Sababini yozing", true); e.target.disabled = true;
       try { await db.intzMissReason(r.dataset.izq, v); await izLoad(true); toast("Yuborildi — Akademik bo'lim rahbari hal qiladi"); izInsert(page); } catch (x) { e.target.disabled = false; toast(x.message, true); } }; });
   }
+  // ===== 72: Haftalik topshiriqlar — bo'lim rahbarlariga (Monitoring bo'limi rahbari beradi + avtomatik) =====
+  const DOW_UZ = ["dushanba", "seshanba", "chorshanba", "payshanba", "juma", "shanba", "yakshanba"];
+  let WTC = { at: 0 };
+  const wtOn = () => !!S.me && !!db.listWeekTasks && ["asoschi", "ceo"].includes(S.me.role);
+  async function wtLoad(force) { if (!wtOn()) return; if (!force && Date.now() - WTC.at < 45e3) return;
+    try { S.wtasks = await db.listWeekTasks(addD(weekOf(today()), -7 * 14)); WTC.at = Date.now(); } catch (e) { S.wtasks = S.wtasks || []; } }
+  const wkS = w => String(w || "").slice(0, 10);
+  const wtWl = w => `${fmtDate(w)} – ${fmtDate(addD(w, 5))}`;
+  const wtDue = ts => { const d = localOf(ts); return `${DOW_UZ[dowOf(d) - 1]}, ${fmtDate(d)} ${tmOf(ts)}`; };
+  const wtPub = w => Date.now() >= new Date(addD(w, -1) + "T20:00:00+05:00").getTime();
+  const wtCeos = () => (S.profiles || []).filter(p => p.role === "ceo" && p.active && !p.archived && ["akademik", "intizomiy"].includes(deptOf(p))).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const wtOf = (w, ceo) => (S.wtasks || []).filter(t => wkS(t.week) === w && t.state !== "olib_tashlandi" && (!ceo || t.ceo_id === ceo)).sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.id - b.id));
+  // ball: o'z vaqtida qabul — 1; har kechikkan kun −20%; bajarilmagan — 0; muddati kelmagan ochiq — hisobga olinmaydi
+  function wtPts(t) {
+    const now = Date.now(), od = new Date(t.orig_due || t.due).getTime();
+    if (t.status === "qabul") { const late = Math.ceil((new Date(t.done_at || t.checked_at || now).getTime() - od) / 864e5); return late <= 0 ? 1 : Math.max(0, 1 - 0.2 * late); }
+    if (t.status === "rad") return 0;
+    if (now > od) return Math.max(0, 1 - 0.2 * Math.ceil((now - od) / 864e5));
+    return null;
+  }
+  function wtRate(ceo, from, to) {
+    const L = (S.wtasks || []).filter(t => t.ceo_id === ceo && t.state === "yuborildi" && localOf(t.orig_due || t.due) >= from && localOf(t.orig_due || t.due) <= to);
+    const part = src => { const a = L.filter(t => t.src === src).map(t => ({ t, p: wtPts(t) })).filter(x => x.p !== null); const w = a.reduce((s, x) => s + (src === "xos" ? +x.t.weight || 1 : 1), 0);
+      return { n: a.length, r: w ? a.reduce((s, x) => s + x.p * (src === "xos" ? +x.t.weight || 1 : 1), 0) / w : null }; };
+    const X = part("xos"), A = part("auto");
+    const r = X.r !== null && A.r !== null ? 0.7 * X.r + 0.3 * A.r : X.r !== null ? X.r : A.r;
+    const done = L.filter(t => t.status === "qabul").length, late = L.filter(t => t.status === "qabul" && wtPts(t) < 1).length;
+    return { r, n: L.length, why: r === null ? (L.length ? "muddati kelgan topshiriq hali yo'q" : "shu davrda topshiriq berilmagan") : `${done} / ${L.length} bajarildi${late ? ` (${late} tasi kechikib)` : ""} · xos ${X.r === null ? "—" : Math.round(X.r * 100) + "%"}, avtomatik ${A.r === null ? "—" : Math.round(A.r * 100) + "%"}` };
+  }
+  function wtSt(t) {
+    if (t.state === "loyiha") return pill("yangi", "loyiha");
+    if (t.status === "qabul") return wtPts(t) >= 1 ? pill("tasdiqlandi", "✓ bajarildi") : pill("jarayonda", "✓ kechikib bajarildi");
+    if (t.status === "rad") return pill("qaytarildi", "bajarilmadi");
+    if (t.status === "bajarildi") return pill("bajarildi", "tekshiruvda");
+    if (t.status === "qaytarildi") return pill("qaytarildi", "qaytarildi");
+    return Date.now() > new Date(t.due).getTime() ? pill("qaytarildi", "muddati o'tdi") : pill("jarayonda", "jarayonda");
+  }
+  const wtSrc = t => t.src === "auto" ? `<span class="wt-src a" title="Ma'lumotlar asosida avtomatik tuzilgan, bajarilishini tizim o'zi tekshiradi">🤖 avtomatik</span>` : `<span class="wt-src x">✍️ Monitoring bo'limi rahbari</span>`;
+  function wtItem(t, adm) {
+    const open = !["qabul", "rad"].includes(t.status), mine = S.me.role === "ceo" && t.ceo_id === S.me.id;
+    const savol = t.rule && t.rule.savol;
+    return `<div class="wt-item" data-wt="${t.id}"><div class="wt-top"><div style="min-width:0;flex:1"><div class="wt-t">${savol ? "❓ " : ""}${esc(t.title)}</div>
+        <div class="small muted">${wtSrc(t)} · ⏰ ${esc(wtDue(t.due))}${t.weight > 1 ? ` · muhimlik ${t.weight}` : ""}${adm && t.edited ? " · tahrirlangan" : ""}</div></div>${wtSt(t)}</div>
+      <details class="wt-body" ${mine && ["yangi", "qaytarildi"].includes(t.status) ? "open" : ""}><summary class="small">Topshiriq matni</summary><div class="wt-text">${esc(t.body || "").replace(/\n/g, "<br>")}</div></details>
+      ${t.answer ? `<div class="wt-ans"><b class="small">Rahbar javobi:</b><div>${esc(t.answer).replace(/\n/g, "<br>")}</div></div>` : ""}
+      ${t.verdict ? `<div class="small ${t.status === "qabul" ? "ok-text" : t.status === "rad" || t.status === "qaytarildi" || t.miss_at ? "err-text" : "muted"}" style="margin-top:4px">${t.checked_by === "auto" ? "🤖 " : t.checked_by === "asoschi" ? "💬 " : ""}${esc(t.verdict)}</div>` : ""}
+      ${mine && ["yangi", "qaytarildi"].includes(t.status) ? `<div class="wt-act"><textarea data-wta rows="${t.rule && t.rule.t === "text" ? 5 : 2}" placeholder="${t.rule && t.rule.t === "text" ? `Javobingizni shu yerga yozing${t.rule.min ? ` (kamida ${t.rule.min} belgi)` : ""}` : t.src === "auto" ? "Izoh (ixtiyoriy) — bajarilishini tizim o'zi tekshiradi" : "Nima qilindi — qisqa hisobot"}">${esc(t.answer || "")}</textarea>
+        <button class="btn sm primary" data-wtd>${t.src === "auto" && !(t.rule && t.rule.t === "text") ? "✓ Bajarildi — tekshirish" : t.rule && t.rule.t === "text" ? "📨 Javobni yuborish" : "✓ Bajarildi"}</button></div>` : ""}
+      ${adm && t.status === "bajarildi" ? `<div class="wt-act"><input data-wtm placeholder="Izoh (qaytarishda majburiy)" style="flex:1;min-width:180px"><button class="btn sm primary" data-wtok="1">✓ Qabul qilish</button><button class="btn sm" data-wtok="0">↩ Qaytarish</button></div>` : ""}
+      ${adm && open ? `<div class="wt-act"><button class="btn sm ghost" data-wte>✏️ Tahrirlash</button><button class="btn sm ghost" data-wtx>🗑 Olib tashlash</button></div>` : ""}</div>`;
+  }
+  function wtBind(root, rerun) {
+    $$("[data-wt]", root).forEach(el => { const id = +el.dataset.wt, t = (S.wtasks || []).find(x => x.id === id); if (!t) return;
+      const d = $("[data-wtd]", el); if (d) d.onclick = async () => { d.disabled = true;
+        try { const r = await db.wtDone(id, $("[data-wta]", el).value.trim()); await wtLoad(true); toast(r && r.msg ? r.msg : "Yuborildi", r && r.ok === false); rerun(); } catch (x) { d.disabled = false; toast(x.message, true); } };
+      $$("[data-wtok]", el).forEach(b => b.onclick = async () => { const okk = b.dataset.wtok === "1", m = $("[data-wtm]", el).value.trim(); if (!okk && m.length < 3) return toast("Qaytarish sababini yozing", true);
+        b.disabled = true; try { await db.wtDecide(id, okk, m); await wtLoad(true); toast(okk ? "Qabul qilindi — rahbarga xabar ketdi" : "Qaytarildi — rahbarga xabar ketdi"); rerun(); } catch (x) { b.disabled = false; toast(x.message, true); } });
+      const e = $("[data-wte]", el); if (e) e.onclick = () => wtModal(t, rerun);
+      const x = $("[data-wtx]", el); if (x) x.onclick = async () => { if (!confirm2(el, x)) return; x.disabled = true;
+        try { await db.wtRemove(id); await wtLoad(true); toast("Olib tashlandi"); rerun(); } catch (z) { x.disabled = false; toast(z.message, true); } }; });
+  }
+  // ikki bosishda tasdiqlash (brauzer dialogisiz)
+  function confirm2(el, b) { if (b.dataset.sure) return true; b.dataset.sure = "1"; const o = b.textContent; b.textContent = "Rostdan ham? Yana bosing"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = o; } }, 3500); return false; }
+  function wtModal(t, rerun, preset = {}) {
+    const ceos = wtCeos(); const w0 = weekOf(today());
+    const weeks = [w0, addD(w0, 7), addD(w0, 14), addD(w0, 21)];
+    const wk = t ? wkS(t.week) : preset.week || addD(w0, 7);
+    const dl = t ? localOf(t.due) : addD(wk, 5), tm = t ? tmOf(t.due) : "18:00";
+    const ceo = t ? t.ceo_id : preset.ceo || (ceos[0] && ceos[0].id);
+    const tpl = c => { const p = person(c); return `${p ? p.full_name.split(" ")[0] + " aka" : ""}, assalomu alaykum.\n\n\n\nHurmat bilan,\nYosinxon Ahmadxonov\nMonitoring bo'limi rahbari`; };
+    const m = openModal(t ? "✏️ Topshiriqni tahrirlash" : "+ Haftalik topshiriq", `
+      <div class="grid2"><div class="field"><label>Bo'lim rahbari</label><select id="wt-c" ${t ? "disabled" : ""}>${ceos.map(p => `<option value="${p.id}" ${p.id === ceo ? "selected" : ""}>${esc(p.full_name)} — ${esc(deptOf(p) === "akademik" ? "Akademik" : "Intizomiy")}</option>`).join("")}</select></div>
+        <div class="field"><label>Hafta</label><select id="wt-w" ${t ? "disabled" : ""}>${(t && !weeks.includes(wk) ? [wk, ...weeks] : weeks).map((w, i) => `<option value="${w}" ${w === wk ? "selected" : ""}>${wtWl(w)}${w === w0 ? " (joriy)" : w === addD(w0, 7) ? " (kelasi)" : ""}</option>`).join("")}</select></div></div>
+      <div class="field"><label>Topshiriq (qisqa nomi) *</label><input id="wt-t" value="${esc(t ? t.title : "")}" placeholder="Masalan: Bog'cha ustozlari bo'yicha oylik tahlil tayyorlash"></div>
+      <div class="field"><label>Batafsil matn — rahbarga shu ko'rinishda boradi</label><textarea id="wt-b" rows="9">${esc(t ? t.body : tpl(ceo))}</textarea></div>
+      <div class="grid2"><div class="field"><label>Muddat — kun</label><select id="wt-d"></select></div><div class="field"><label>Soat</label><input id="wt-h" type="time" value="${esc(tm)}"></div></div>
+      <div class="field"><label>Muhimlik</label><select id="wt-p">${[1, 2, 3].map(v => `<option value="${v}" ${(t ? +t.weight : 1) === v ? "selected" : ""}>${v === 1 ? "Oddiy" : v === 2 ? "Muhim (×2)" : "Juda muhim (×3)"}</option>`).join("")}</select></div>
+      <p class="small muted" id="wt-i"></p><div class="err-text" id="wt-e"></div>`,
+      `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="wt-s">${t ? "Saqlash" : "Qo'shish"}</button>`);
+    const fillD = () => { const w = $("#wt-w", m).value; $("#wt-d", m).innerHTML = [0, 1, 2, 3, 4, 5].map(i => { const d = addD(w, i); return `<option value="${d}" ${d === dl ? "selected" : ""}>${DOW_UZ[i]}, ${fmtDate(d)}</option>`; }).join("");
+      if (!$("#wt-d", m).value) $("#wt-d", m).value = addD(w, 5);
+      $("#wt-i", m).textContent = wtPub(w) ? "Bu hafta topshiriqlari allaqachon yuborilgan — yangi topshiriq rahbarga darhol boradi, muddati kamida 48 soatdan keyin bo'lishi kerak." : `Loyiha: ${fmtDate(addD(w, -1))} (yakshanba) soat 20:00 da avtomatik yuboriladi. Ungacha istalgan vaqtda o'zgartirishingiz mumkin.`; };
+    fillD(); $("#wt-w", m).onchange = fillD;
+    if (!t) $("#wt-c", m).onchange = e => { const b = $("#wt-b", m); if (!b.dataset.ed) b.value = tpl(e.target.value); };
+    $("#wt-b", m).oninput = e => { e.target.dataset.ed = "1"; };
+    $("#wt-s", m).onclick = async e => { const title = $("#wt-t", m).value.trim(); if (title.length < 3) { $("#wt-e", m).textContent = "Topshiriq nomini yozing"; return; }
+      const due = `${$("#wt-d", m).value}T${$("#wt-h", m).value || "18:00"}:00+05:00`; e.target.disabled = true;
+      try { await db.wtSave(t ? t.id : null, $("#wt-c", m).value, $("#wt-w", m).value, title, $("#wt-b", m).value, due, +$("#wt-p", m).value); closeModal(); await wtLoad(true);
+        toast(t ? "Saqlandi" : wtPub($("#wt-w", m).value) ? "Qo'shildi — rahbarga yuborildi" : "Qo'shildi — yakshanba 20:00 da yuboriladi"); rerun(); }
+      catch (x) { e.target.disabled = false; $("#wt-e", m).textContent = x.message; } };
+  }
+  function wtWord(list, w, ceoIds) {
+    const D = DOCX; let body = "";
+    ceoIds.forEach((cid, i) => { const p = person(cid); const L = list.filter(t => t.ceo_id === cid); if (!p) return;
+      if (i) body += pageBreak();
+      body += wPass(D, "Haftalik topshiriqlar", `${p.full_name} — ${wtWl(w)}`, [["Bo'lim rahbari", `${p.full_name} (${deptOf(p) === "akademik" ? "Akademik" : "Intizomiy"} monitoring bo'limi)`], ["Hafta", wtWl(w)],
+        ["Topshiriqlar", `${L.length} ta — Monitoring bo'limi rahbaridan: ${L.filter(t => t.src !== "auto").length}, avtomatik: ${L.filter(t => t.src === "auto").length}`],
+        ["Tartib", "Avtomatik topshiriqlar bajarilishini tizim o'zi tekshiradi. Har bir kechikkan kun uchun ball 20% ga kamayadi. Haftalik topshiriqlar — bo'lim rahbari reytingining 20%."]], null, 9900);
+      L.forEach((t, k) => { body += D.h3(`${k + 1}. ${t.title}`, `⏰ ${wtDue(t.due)}`);
+        body += D.p(`${t.src === "auto" ? "Avtomatik topshiriq" : "Monitoring bo'limi rahbari topshirig'i"}${t.weight > 1 ? ` · muhimlik ${t.weight}` : ""} · holati: ${t.state === "loyiha" ? "loyiha" : t.status === "qabul" ? (wtPts(t) >= 1 ? "bajarildi" : "kechikib bajarildi") : t.status === "rad" ? "bajarilmadi" : t.status === "bajarildi" ? "tekshiruvda" : t.status === "qaytarildi" ? "qaytarildi" : "jarayonda"}`, { sz: 17, c: "6B7A90", i: 1 });
+        body += D.p(t.body || "", { sz: 20, af: 80 });
+        if (t.answer) body += D.p("Javob: " + t.answer, { sz: 19, c: "1B6E36", af: 60 });
+        if (t.verdict) body += D.p("Tekshiruv: " + t.verdict, { sz: 18, c: "4A5A70", af: 120 }); });
+      if (!L.length) body += D.p("Bu hafta uchun topshiriq yo'q.", { i: 1 }); });
+    const one = ceoIds.length === 1 ? person(ceoIds[0]) : null;
+    return { blob: D.build(body, false, `Monitoring bo'limi · Haftalik topshiriqlar · ${wtWl(w)}`), name: wFile("Haftalik-topshiriqlar", one ? one.full_name : "rahbarlar", w), cap: `📌 Haftalik topshiriqlar — ${one ? one.full_name + ", " : ""}${wtWl(w)}` };
+  }
+  PAGES.haftalik = async page => {
+    if (!wtOn()) return PAGES.bosh(page);
+    const adm = S.me.role === "asoschi", w0 = weekOf(today());
+    const weeks = []; for (let i = adm ? 3 : 1; i >= -10; i--) weeks.push(addD(w0, 7 * i));
+    const wk = weeks.includes(S.ui.wtW) ? S.ui.wtW : adm ? addD(w0, 7) : w0;
+    page.innerHTML = head(adm ? "Haftalik topshiriqlar" : "Haftalik xos topshiriqlarim", adm ? "Bo'lim rahbarlariga topshiriqlar doim KELASI hafta uchun yoziladi: shanba 20:00 da tizim avtomatik topshiriqlar loyihasini tuzadi, yakshanba 18:00 gacha tahrirlaysiz, 20:00 da hammasi rahbarlarga yuboriladi (portal + Telegram). Avtomatik topshiriqlarni tizim o'zi tekshiradi; sizniki — siz qabul qilasiz (48 soatda tekshirilmasa — avtomatik qabul). 1-dekabrdan — rahbar reytingining 20%." : "Monitoring bo'limi rahbaridan keladigan topshiriqlar: kelasi hafta topshiriqlari har yakshanba 20:00 da keladi. Avtomatik topshiriqlar bajarilishini tizim o'zi tekshiradi. Har kechikkan kun uchun ball 20% ga kamayadi. 1-dekabrdan — reytingingizning 20%.",
+      `<div class="row" style="gap:8px;flex-wrap:wrap"><select id="wt-wk" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === wk ? "selected" : ""}>${wtWl(w)}${w === w0 ? " (joriy)" : w === addD(w0, 7) ? " (kelasi)" : ""}</option>`).join("")}</select>
+        ${adm ? `<button class="btn primary" id="wt-add">+ Topshiriq</button>${!wtPub(wk) ? `<button class="btn" id="wt-gen" title="Ma'lumotlar asosida avtomatik topshiriqlarni hozir qayta tuzish (sizning tahrirlaringiz saqlanadi)">🔄 Avtomatik loyihani yangilash</button>` : ""}` : ""}
+        <button class="btn" id="wt-doc">⬇ Word</button></div>`) + `<div id="wt-body"><div class="card empty">Yuklanmoqda…</div></div>`;
+    await wtLoad(true); if (route() !== "haftalik") return;
+    const rerun = () => PAGES.haftalik(page);
+    $("#wt-wk", page).onchange = e => { S.ui.wtW = e.target.value; rerun(); };
+    const ceos = adm ? wtCeos() : [S.me];
+    const body = $("#wt-body", page), pub = wtPub(wk);
+    const stateTxt = pub ? (wk > w0 ? "Yuborilgan — rahbarlar ko'rmoqda" : wk === w0 ? "Joriy hafta" : "O'tgan hafta") : `Loyiha — ${fmtDate(addD(wk, -1))} (yakshanba) soat 20:00 da avtomatik yuboriladi`;
+    body.innerHTML = `<div class="note" style="margin-bottom:12px">📅 <b>${wtWl(wk)}</b> · ${esc(stateTxt)}</div>` + ceos.map(c => { const L = wtOf(wk, c.id); const R = wtRate(c.id, wk, addD(wk, 6));
+      return `<div class="card wt-card"><div class="card-head">${avatar(c.full_name, photoOf(c))}<div style="min-width:0"><h2 style="margin:0">${esc(c.full_name)}</h2><div class="small muted">${esc(titleOf(c))} · ${L.length} ta topshiriq${R.r !== null ? ` · bajarilish: <b>${Math.round(R.r * 100)}%</b>` : ""}</div></div><span class="spacer"></span>
+        ${adm ? `<button class="btn sm" data-wtadd="${c.id}">+ Qo'shish</button>` : ""}</div>
+        ${L.length ? L.map(t => wtItem(t, adm)).join("") : `<div class="muted small" style="padding:8px 0">${adm ? (pub ? "Bu hafta topshiriq yuborilmagan." : "Hozircha topshiriq yo'q — qo'shing yoki avtomatik loyihani yangilang.") : wk > w0 ? "Kelasi hafta topshiriqlari yakshanba soat 20:00 da keladi." : "Bu hafta uchun topshiriq yo'q."}</div>`}</div>`; }).join("");
+    wtBind(body, rerun);
+    $$("[data-wtadd]", body).forEach(b => b.onclick = () => wtModal(null, rerun, { ceo: b.dataset.wtadd, week: wk }));
+    const add = $("#wt-add", page); if (add) add.onclick = () => wtModal(null, rerun, { week: wk });
+    const gen = $("#wt-gen", page); if (gen) gen.onclick = async () => { gen.disabled = true; try { const n = await db.wtRegen(wk); await wtLoad(true); toast(`Avtomatik loyiha yangilandi: ${n} ta`); rerun(); } catch (x) { gen.disabled = false; toast(x.message, true); } };
+    $("#wt-doc", page).onclick = () => { const L = wtOf(wk); const r = wtWord(L, wk, ceos.map(c => c.id)); wDeliver(r.blob, r.name, r.cap); };
+  };
+  // Bosh sahifa: rahbarga — joriy hafta topshiriqlari; asoschiga — tekshirish kutayotganlari
+  async function wtInsert(page) {
+    if (!wtOn()) return; await wtLoad();
+    const old = $("#wt-ins", page); if (old) old.remove(); if (!page.isConnected) return;
+    const w0 = weekOf(today()); let html = "";
+    if (S.me.role === "ceo") { const L = wtOf(w0, S.me.id).filter(t => t.state === "yuborildi"); if (!L.length) return;
+      const open = L.filter(t => !["qabul", "rad"].includes(t.status));
+      html = `<div class="card na-card" id="wt-ins" style="margin-bottom:16px"><div class="card-head"><h2>📌 Haftalik xos topshiriqlarim (${wtWl(w0)})</h2><span class="spacer"></span><a class="btn sm" href="#/haftalik">Barchasi →</a></div>
+        <div class="small muted" style="margin:-4px 0 8px">${L.length} ta topshiriq · bajarildi: ${L.filter(t => t.status === "qabul").length} · ochiq: ${open.length}</div>
+        ${open.slice(0, 6).map(t => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div><div class="small muted">${t.src === "auto" ? "🤖 avtomatik" : "✍️ Monitoring bo'limi rahbari"} · ⏰ ${esc(wtDue(t.due))}</div></div>${wtSt(t)}</div>`).join("")}</div>`; }
+    else { const P = (S.wtasks || []).filter(t => t.status === "bajarildi" && t.state === "yuborildi"); if (!P.length) return;
+      html = `<div class="card na-card" id="wt-ins" style="margin-bottom:16px"><div class="card-head"><h2>📝 Haftalik topshiriqlar — tekshirishingiz kutilmoqda (${P.length})</h2><span class="spacer"></span><a class="btn sm" href="#/haftalik">Ochish →</a></div>
+        ${P.map(t => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div><div class="small muted">${esc(nameOf(t.ceo_id))} · bajarildi: ${fmtDate(localOf(t.done_at))} ${tmOf(t.done_at)} · 48 soatda tekshirilmasa — avtomatik qabul</div></div></div>`).join("")}</div>`; }
+    const anchor = $("#rv-card", page) || $("#izd-card", page) || $("#sk-card", page) || $("#na-card", page) || $(".card", page) || page.firstElementChild; if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+  }
+  const wtBadge = () => { if (!wtOn()) return ""; const w0 = weekOf(today());
+    return S.me.role === "asoschi" ? ((S.wtasks || []).filter(t => t.status === "bajarildi" && t.state === "yuborildi").length || "")
+      : ((S.wtasks || []).filter(t => t.ceo_id === S.me.id && t.state === "yuborildi" && ["yangi", "qaytarildi"].includes(t.status) && wkS(t.week) <= w0).length || ""); };
+
+  // ===== 73: Chat — Monitoring bo'limi rahbari bilan shaxsiy yozishma =====
+  let CHC = { at: 0 };
+  const chatOn = () => !!S.me && !!db.listChat && isStaff();
+  async function chatLoad(force) { if (!chatOn()) return; if (!force && Date.now() - CHC.at < 30e3) return;
+    try { S.chat = await db.listChat(new Date(Date.now() - 60 * 864e5).toISOString()); CHC.at = Date.now(); } catch (e) { S.chat = S.chat || []; } }
+  const chatPeers = () => (S.profiles || []).filter(p => p.active && !p.archived && ["ceo", "xodim"].includes(p.role));
+  const chatUnread = peer => (S.chat || []).filter(m => S.me.role === "asoschi" ? (m.peer === peer && m.author === peer && !m.read_at) : (m.peer === S.me.id && !m.read_at && m.author !== S.me.id && m.kind !== "savol")).length;
+  const chatPendQ = uid => (S.chat || []).filter(m => m.peer === uid && m.kind === "savol" && !m.answered_at).length;
+  const chatBadge = () => { if (!chatOn()) return ""; if (S.me.role === "asoschi") return chatPeers().reduce((a, p) => a + chatUnread(p.id), 0) || ""; return (chatUnread() + chatPendQ(S.me.id)) || ""; };
+  const chatTime = ts => { const d = localOf(ts); return (d === today() ? "" : fmtDate(d) + " ") + tmOf(ts); };
+  function chatMsg(m, adm) {
+    const mine = m.author === S.me.id && !(m.kind === "savol" && !adm), sys = !m.author;
+    if (sys) return `<div class="ch-sys">🤖 ${esc(m.body)} <span>${chatTime(m.created_at)}</span></div>`;
+    if (m.kind === "savol") {
+      const ans = (S.chat || []).find(x => x.qid === m.id && x.kind === "javob");
+      const opts = (m.opts || []).map((o, i) => adm || m.answered_at ? `<span class="ch-opt ${ans && ans.choice === i ? "on" : ""}">${esc(o.l)}</span>`
+        : `<button type="button" class="ch-opt btn sm" data-cho="${i}" data-a="${esc(o.a || "ok")}">${esc(o.l)}</button>`).join("");
+      return `<div class="ch-m ${adm ? "me" : ""} q" data-chq="${m.id}"><div class="ch-b"><div class="small muted">❓ Savol${m.auto ? " · avtomatik" : ""}</div>${esc(m.body).replace(/\n/g, "<br>")}
+        <div class="ch-opts">${opts}</div>${!adm && !m.answered_at ? `<div class="ch-tx" hidden><textarea rows="2" placeholder="Qisqacha yozing…"></textarea><button class="btn sm primary" data-chs>Yuborish</button></div>` : ""}
+        ${adm && !m.answered_at ? `<div class="small muted">javob kutilmoqda</div>` : ""}<span class="ch-t">${chatTime(m.created_at)}</span></div></div>`;
+    }
+    return `<div class="ch-m ${mine ? "me" : ""}"><div class="ch-b">${m.kind === "javob" ? `<div class="small muted">↪ savolga javob</div>` : ""}${esc(m.body).replace(/\n/g, "<br>")}<span class="ch-t">${chatTime(m.created_at)}${mine && m.read_at && adm ? " ✓✓" : ""}</span></div></div>`;
+  }
+  PAGES.chat = async page => {
+    if (!chatOn()) return PAGES.bosh(page);
+    const adm = S.me.role === "asoschi";
+    const qs = new URLSearchParams((location.hash.split("?")[1] || "")); if (qs.get("u")) S.ui.chatU = qs.get("u");
+    await chatLoad(true); if (route() !== "chat") return;
+    const rerun = () => PAGES.chat(page);
+    const peers = chatPeers();
+    const last = id => (S.chat || []).filter(m => m.peer === id).slice(-1)[0];
+    let cur = adm ? (peers.some(p => p.id === S.ui.chatU) ? S.ui.chatU : null) : S.me.id;
+    const thread = id => (S.chat || []).filter(m => m.peer === id).sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+    const listHtml = () => { const q = (S.ui.chatQ || "").toLowerCase();
+      return peers.filter(p => !q || p.full_name.toLowerCase().includes(q)).map(p => ({ p, l: last(p.id), u: chatUnread(p.id), pq: chatPendQ(p.id) }))
+        .sort((a, b) => (b.u - a.u) || ((b.l ? b.l.created_at : "") > (a.l ? a.l.created_at : "") ? 1 : -1) || a.p.full_name.localeCompare(b.p.full_name))
+        .map(({ p, l, u, pq }) => `<a class="ch-peer ${p.id === cur ? "on" : ""}" data-chp="${p.id}">${avatar(p.full_name, photoOf(p))}<div style="min-width:0;flex:1"><b>${esc(p.full_name)}</b><div class="small muted ch-prev">${l ? esc((l.author === S.me.id ? "Siz: " : "") + l.body.split("\n")[0]).slice(0, 70) : esc(titleOf(p))}</div></div>${u ? `<span class="badge">${u}</span>` : pq ? `<span class="badge soft" title="Javob kutilmoqda">?${pq}</span>` : ""}</a>`).join(""); };
+    const pp = cur ? person(cur) : null;
+    page.innerHTML = head("Chat", adm ? "Har bir xodim bilan shaxsiy yozishma — boshqalar ko'rmaydi. Har ish kuni 11:00 da har bir javobgarga sizning nomingizdan ma'lumotga asoslangan 1 ta avtomatik savol boradi; variant tanlansa — platforma o'zi javob qaytaradi, yozma javoblarni siz ko'rib javob berasiz." : "Monitoring bo'limi rahbari Yosinxon Ahmadxonov bilan shaxsiy yozishma — boshqalar ko'rmaydi. Savollarga bitta tugmani bosib javob berishingiz mumkin.")
+      + `<div class="ch-wrap ${adm ? "adm" : ""} ${adm && cur ? "has" : ""}">${adm ? `<div class="ch-list card"><input id="ch-q" placeholder="🔎 Qidirish" value="${esc(S.ui.chatQ || "")}"><div id="ch-ls">${listHtml()}</div></div>` : ""}
+        <div class="ch-main card">${cur ? `<div class="ch-head">${adm ? `<button class="btn sm ghost ch-back" id="ch-back">←</button>` : ""}${adm ? avatar(pp.full_name, photoOf(pp)) : ""}<b>${esc(adm ? pp.full_name : "Yosinxon Ahmadxonov")}</b><span class="small muted">${esc(adm ? titleOf(pp) : "Monitoring bo'limi rahbari")}</span></div>
+          <div class="ch-msgs" id="ch-msgs">${thread(cur).map(m => chatMsg(m, adm)).join("") || `<div class="muted small" style="text-align:center;padding:30px">Hali xabar yo'q</div>`}</div>
+          <div class="ch-in"><textarea id="ch-t" rows="2" placeholder="Xabar yozing…"></textarea><button class="btn primary" id="ch-s">Yuborish</button></div>` : `<div class="empty" style="padding:40px">Chap tomondan xodimni tanlang</div>`}</div></div>`;
+    const ms = $("#ch-msgs", page); if (ms) ms.scrollTop = ms.scrollHeight;
+    if (cur && (adm ? chatUnread(cur) : chatUnread())) { db.chatRead(adm ? cur : null).then(() => { (S.chat || []).forEach(m => { if (m.peer === cur && !m.read_at && (adm ? m.author === cur : m.author !== S.me.id && m.kind !== "savol")) m.read_at = new Date().toISOString(); }); updateNav(); }).catch(() => {}); }
+    $$("[data-chp]", page).forEach(a => a.onclick = () => { S.ui.chatU = a.dataset.chp; history.replaceState(null, "", "#/chat"); rerun(); });
+    const qi = $("#ch-q", page); if (qi) qi.oninput = e => { S.ui.chatQ = e.target.value; $("#ch-ls", page).innerHTML = listHtml(); $$("[data-chp]", page).forEach(a => a.onclick = () => { S.ui.chatU = a.dataset.chp; rerun(); }); };
+    const bk = $("#ch-back", page); if (bk) bk.onclick = () => { S.ui.chatU = null; rerun(); };
+    const sb2 = $("#ch-s", page); if (sb2) { const ta = $("#ch-t", page);
+      const send = async () => { const v = ta.value.trim(); if (!v) return; sb2.disabled = true; try { await db.chatSend(adm ? cur : null, v); ta.value = ""; await chatLoad(true); rerun(); } catch (x) { sb2.disabled = false; toast(x.message, true); } };
+      sb2.onclick = send; ta.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); }; }
+    $$("[data-chq]", page).forEach(q => { const qid = +q.dataset.chq; let pick = null;
+      const go = async (i, txt) => { $$("button", q).forEach(b => b.disabled = true); try { const r = await db.chatAnswer(qid, i, txt || ""); await chatLoad(true); toast(r && r.reply ? r.reply : "Javob yuborildi"); rerun(); } catch (x) { $$("button", q).forEach(b => b.disabled = false); toast(x.message, true); } };
+      $$("[data-cho]", q).forEach(b => b.onclick = () => { const i = +b.dataset.cho; if (["text", "help"].includes(b.dataset.a)) { pick = i; $$("[data-cho]", q).forEach(x => x.classList.toggle("on", x === b)); const tx = $(".ch-tx", q); tx.hidden = false; $("textarea", tx).focus(); } else go(i); });
+      const s = $("[data-chs]", q); if (s) s.onclick = () => { const v = $(".ch-tx textarea", q).value.trim(); if (pick === null) return; if (v.length < 3) return toast("Qisqacha yozib qoldiring", true); go(pick, v); }; });
+    // yangi xabarlar — har 20 soniyada (sahifa ochiq bo'lsa)
+    clearInterval(PAGES.chat._iv); PAGES.chat._iv = setInterval(async () => { if (route() !== "chat" || document.hidden) return; const n0 = (S.chat || []).length; await chatLoad(true);
+      if ((S.chat || []).length !== n0 && !($("#ch-t", page) && $("#ch-t", page).value) && !$$(".ch-tx:not([hidden]) textarea", page).some(t => t.value)) rerun(); updateNav(); }, 20000);
+  };
+
+  // Bosh sahifa: javob kutayotgan savol (xodim/rahbar) yoki o'qilmagan xabarlar (asoschi)
+  async function chatInsert(page) {
+    if (!chatOn()) return; await chatLoad();
+    const old = $("#ch-ins", page); if (old) old.remove(); if (!page.isConnected) return;
+    let html = "";
+    if (S.me.role === "asoschi") { const L = chatPeers().map(p => ({ p, u: chatUnread(p.id) })).filter(x => x.u); if (!L.length) return;
+      html = `<div class="card na-card" id="ch-ins" style="margin-bottom:16px"><div class="card-head"><h2>💬 Chat — yangi xabarlar (${L.reduce((a, x) => a + x.u, 0)})</h2><span class="spacer"></span><a class="btn sm" href="#/chat">Ochish →</a></div>
+        <div class="small">${L.map(x => `<a href="#/chat?u=${x.p.id}">${esc(x.p.full_name)}</a> (${x.u})`).join(" · ")}</div></div>`; }
+    else { const Q = (S.chat || []).filter(m => m.peer === S.me.id && m.kind === "savol" && !m.answered_at); const u = chatUnread(); if (!Q.length && !u) return;
+      html = `<div class="card na-card" id="ch-ins" style="margin-bottom:16px"><div class="card-head"><h2>💬 Yosinxon Ahmadxonovdan ${Q.length ? "savol" : "xabar"}</h2><span class="spacer"></span><a class="btn sm primary" href="#/chat">${Q.length ? "Javob berish →" : "O'qish →"}</a></div>
+        ${Q.length ? `<div class="small">${esc(Q[Q.length - 1].body)}</div>` : `<div class="small muted">${u} ta yangi xabar</div>`}</div>`; }
+    const anchor = $("#wt-ins", page) || $("#rv-card", page) || $("#izd-card", page) || $("#sk-card", page) || $("#na-card", page) || $(".card", page) || page.firstElementChild; if (!anchor) return;
+    anchor.insertAdjacentHTML("beforebegin", html);
+  }
   function directedCard() {
     const list = (S.help || []).filter(h => h.kind === "yonaltirish" && h.due >= addD(today(), -7)); if (!list.length) return "";
     const rows = []; list.forEach(h => (h.teacher_ids || []).forEach(id => { const since = String(h.answered_at || h.created_at).slice(0, 10);
@@ -5719,10 +6013,17 @@ window.METODISTLAR = [
   const CR3 = {
     intizomiy: [["intizom", 15], ["tezlik", 10], ["oz", 10], ["natija", 25], ["topshiriq", 10], ["masala", 10], ["javob", 10], ["kirit", 10]],
     akademik: [["intizom", 15], ["tezlik", 10], ["oz", 5], ["natija", 20], ["topshiriq", 10], ["masala", 10], ["javob", 5], ["kirit", 10], ["kuzat", 15]] };
-  const crItems = (ms, c) => {
+  // 72: dekabrdan — «Haftalik topshiriqlar» 20 ball (xos 70% + avtomatik 30%); «Topshiriqlar muddatida» shunga qo'shildi
+  const CR4_FROM = "2026-12-01";
+  const CR4 = {
+    intizomiy: [["intizom", 10], ["tezlik", 10], ["oz", 5], ["natija", 25], ["hafta", 20], ["masala", 10], ["javob", 10], ["kirit", 10]],
+    akademik: [["intizom", 10], ["tezlik", 10], ["oz", 5], ["natija", 20], ["hafta", 20], ["masala", 10], ["javob", 5], ["kirit", 10], ["kuzat", 10]] };
+  const CR_H = { k: "hafta", l: "Haftalik topshiriqlar", d: "Monitoring bo'limi rahbari bergan (70%) va avtomatik (30%) haftalik topshiriqlar: o'z vaqtida bajarilgani — to'liq ball, har kechikkan kun −20%, bajarilmagani — 0" };
+  const crItems = (ms, c, v4) => {
     if (ms < CR3_FROM) return ms >= "2026-11-01" ? CR_ITEMS2 : CR_ITEMS;
     const ak = c && deptOf(c) === "akademik";
-    return CR3[ak ? "akademik" : "intizomiy"].map(([k, max]) => {
+    return (v4 ? CR4 : CR3)[ak ? "akademik" : "intizomiy"].map(([k, max]) => {
+      if (k === "hafta") return { ...CR_H, max };
       const b = k === "javob" ? CR_J : k === "kirit" ? { ...CR_K, d: ak ? "Har ish kuni xodimlar davomati (o'sha kuni 22:00 gacha) va haftalik baholash/tahlil/tashabbus ballari (shanba 22:00 gacha)" : "2 haftalik bosqich ballari — etika va kreativ (bosqichning 2-shanbasi 22:00 gacha)" }
         : k === "kuzat" ? CR_O : k === "masala" ? CR_ITEMS2.find(x => x.k === "masala") : CR_BASE(k);
       return { ...b, max }; });
@@ -5800,7 +6101,9 @@ window.METODISTLAR = [
     // 6) asoschi bahosi
     const rr = (ctx.rates || []).find(x => x.ceo_id === c.id && String(x.month).slice(0, 10) === ms);
     R.asoschi = rr && rr.score !== null && rr.score !== undefined ? { r: +rr.score / 15, why: rr.note || "" } : { r: null, why: "hali qo'yilmagan" };
-    const items = (v3 ? crItems(CR3_FROM, c) : crItems(ms < CR3_FROM ? ms : "2026-11-01", c)).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
+    // 72: haftalik topshiriqlar
+    { const W = wtRate(c.id, from, me); R.hafta = { r: W.r, why: W.why }; }
+    const items = (v3 ? crItems(CR3_FROM, c, ms >= CR4_FROM) : crItems(ms < CR3_FROM ? ms : "2026-11-01", c)).map(it => { const x = R[it.k]; return { it, r: x.r, why: x.why, v: x.r === null ? null : rnd(Math.max(0, Math.min(1, x.r)) * it.max) }; });
     const av = items.filter(x => x.v !== null), sum = rnd(av.reduce((a, x) => a + x.v, 0)), maxA = av.reduce((a, x) => a + x.it.max, 0);
     const final = maxA ? rnd(sum / maxA * 100) : null;
     const auto3 = v3;
