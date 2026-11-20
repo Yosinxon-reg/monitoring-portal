@@ -1986,6 +1986,8 @@ window.LESSONS = [
       async assignHelp(to, tids, due, msg) { const d = load(); d.helpreq = d.helpreq || []; to.forEach((u, k) => { const part = tids.filter((x, i) => i % to.length === k); if (part.length)
           d.helpreq.unshift({ id: Date.now() + k, from_id: me().id, to_id: u, teacher_ids: part, due, note: msg || "", status: "qabul", kind: "yonaltirish", reply: "", created_at: new Date().toISOString(), answered_at: new Date().toISOString() }); }); save(); return ok(to.length); },
       async listTeacherObs(from, subs, ids, to) { return ok((load().tobs || []).filter(o => o.day >= from && (!to || o.day <= to) && (!subs || !subs.length || subs.includes(o.subject)))); },
+      async listObsChanged() { return []; },
+      async obsDeletedSince() { return []; },
       async setStaffMain(uid, subs) { const d = load(); const p = d.profiles.find(x => x.id === uid); if (p) p.main_subjects = subs || []; save(); return ok(true); },
       async setStaffSubjects(uid, subs) { const d = load(); const m = me(); if (!m || !(m.role === "asoschi" || (m.role === "ceo" && m.bolim === "akademik"))) return fail("Ruxsat yo'q");
         const p = d.profiles.find(x => x.id === uid); if (p) p.subjects = subs || []; save(); return ok(true); },
@@ -2273,8 +2275,10 @@ window.LESSONS = [
       async listTeacherObs(from, subs, ids, to) {
         const base = () => { let q = sb.from("teacher_obs").select("*").gte("day", from); if (to) q = q.lte("day", to); return q.order("day").order("id"); };
         if (!subs || !subs.length) return (await pageAll(base)).map(o => ({ ...o, filial: E(o.filial) }));
-        const [a, c] = await Promise.all([pageAll(() => base().in("subject", subs)), ids && ids.length ? pageAll(() => base().in("teacher_id", ids)) : Promise.resolve([])]);
-        const m = new Map(); [...a, ...c].forEach(o => m.set(o.id, o));
+        // 71: dars fani ustoz fanidan farq qilsa ham (masalan Tarix ustozida «Tarbiya» darsi) — ustoz fani bo'yicha ham olinadi
+        const viaT = () => { let q = sb.from("teacher_obs").select("*, teachers!inner(subject)").gte("day", from).in("teachers.subject", subs); if (to) q = q.lte("day", to); return q.order("day").order("id"); };
+        const [a, c, v] = await Promise.all([pageAll(() => base().in("subject", subs)), ids && ids.length ? pageAll(() => base().in("teacher_id", ids)) : Promise.resolve([]), pageAll(viaT).catch(() => [])]);
+        const m = new Map(); [...a, ...c, ...v.map(({ teachers, ...o }) => o)].forEach(o => m.set(o.id, o));
         return [...m.values()].sort((x, y) => x.day < y.day ? -1 : x.day > y.day ? 1 : x.id - y.id).map(o => ({ ...o, filial: E(o.filial) }));
       },
       onChange(tables, cb, st) { try { const ch = sb.channel("mp-live-" + Math.random().toString(36).slice(2, 8)); tables.forEach(t => ch.on("postgres_changes", { event: "*", schema: "public", table: t }, cb)); ch.subscribe(x => st && st(x)); return () => sb.removeChannel(ch); } catch (e) { return () => {}; } },
@@ -2287,6 +2291,8 @@ window.LESSONS = [
         const m = new Map(); lists.flat().forEach(t => m.set(t.id, t)); return [...m.values()].map(t => ({ ...t, filial: E(t.filial) }));
       },
       async listTeacherIds() { return (await pageAll(() => sb.from("teachers").select("id").order("id"))).map(x => x.id); },
+      async listObsChanged(since, from) { return (await pageAll(() => sb.from("teacher_obs").select("*").gt("updated_at", since).gte("day", from).order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
+      async obsDeletedSince(since) { const r = await sb.rpc("obs_deleted_since", { ts: since }); if (r.error) return []; return (r.data || []).map(x => typeof x === "object" ? Object.values(x)[0] : x); },
       async listObsOfTeachers(ids, from) { if (!ids.length) return []; return (await pageAll(() => sb.from("teacher_obs").select("*").in("teacher_id", ids).gte("day", from).order("day").order("id"))).map(o => ({ ...o, filial: E(o.filial) })); },
       async listTeacherReqs() { const r = await sb.from("teacher_requests").select("*").gte("created_at", new Date(Date.now() - 120 * 864e5).toISOString()).order("created_at", { ascending: false }); if (r.error) throw new Error(trErr(r.error.message)); return r.data; },
       async sendTeacherReq(k, tid, left_day, nm, fil, subj, kl, msg) { return chk(await sb.rpc("send_teacher_request", { k, tid, left_day: left_day || null, nm: nm || "", fil: fil || "", subj: subj || "", kl: kl || "", msg: msg || "" })); },
@@ -5060,7 +5066,7 @@ window.METODISTLAR = [
     async get(k) { const d = this.db || (this.db = await this.open()); if (!d) return null; return new Promise(res => { try { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); },
     async set(k, v) { const d = this.db || (this.db = await this.open()); if (!d) return; try { d.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch (e) {} },
   };
-  const tcKey = () => `tc3:${S.me.id}:${mySubs().join(",")}`;
+  const tcKey = () => `tc4:${S.me.id}:${mySubs().join(",")}`;
   // Kuzatuvlar odatda joriy va o'tgan oy uchun; yillik tarix — faqat kerak bo'lganda (ensureHistory)
   const obsFrom = () => mStart(addD(mStart(today()), -1));
   const tVisible = t => { const subs = mySubs(); return !subs.length || subs.includes(canonSubj(t.subject)) || !String(t.subject || "").trim() || grantedIds().has(t.id); };
@@ -5070,7 +5076,7 @@ window.METODISTLAR = [
     if (!db.listTeachers) return;
     try {
       const now = Date.now(), cut = addD(today(), -OBS_WIN), base = obsFrom(), subs = mySubs(), gids = [...grantedIds()];
-      if (!TC) { const c = db.listTeachersSince ? await IDB.get(tcKey()) : null; if (c && c.v === 3) TC = c; }
+      if (!TC) { const c = db.listTeachersSince ? await IDB.get(tcKey()) : null; if (c && c.v === 4) TC = c; }
       let full = !TC || now - TC.full >= FULL_EVERY || !db.listTeachersSince;
       const tAtNew = new Date(now - 60e3).toISOString();
       // 1) Ustozlar
@@ -5095,8 +5101,14 @@ window.METODISTLAR = [
       let tobs;
       if (full) tobs = await db.listTeacherObs(from, subs, gids);
       else {
-        const [fresh, extra] = await Promise.all([db.listTeacherObs(cut, subs, gids), (() => { const newG = gids.filter(id => !(TC.gids || []).includes(id)); return newG.length ? db.listObsOfTeachers(newG, from) : Promise.resolve([]); })()]);
+        const since = TC.oAt || new Date(TC.full).toISOString();
+        const [fresh, extra, chg, del] = await Promise.all([db.listTeacherObs(cut, subs, gids), (() => { const newG = gids.filter(id => !(TC.gids || []).includes(id)); return newG.length ? db.listObsOfTeachers(newG, from) : Promise.resolve([]); })(),
+          db.listObsChanged ? db.listObsChanged(since, from).catch(() => []) : Promise.resolve([]), db.obsDeletedSince ? db.obsDeletedSince(since).catch(() => []) : Promise.resolve([])]);
         const m = new Map(TC.tobs.filter(x => x.day < cut).map(x => [x.id, x])); extra.forEach(x => { if (x.day < cut) m.set(x.id, x); });
+        // 71: eski darslarga kiritilgan tuzatishlar (fan, ustoz, ball) va o'chirilganlar — darhol
+        const tids = new Set(teachers.map(x => x.id)), gs = new Set(gids);
+        chg.forEach(x => { if (x.day >= cut) return; if (!subs.length || subs.includes(x.subject) || tids.has(x.teacher_id) || gs.has(x.teacher_id)) m.set(x.id, x); else m.delete(x.id); });
+        (del || []).forEach(id => m.delete(+id));
         tobs = sortObs([...m.values()].concat(fresh));
       }
       // 3) Kichik ro'yxatlar (har 6 soatda)
@@ -5106,7 +5118,7 @@ window.METODISTLAR = [
       }
       S.teachers = teachers; S.tobs = tobs; TS.o = now;
       try { await skipLoad(); } catch (e) {}
-      TC = { v: 3, full: full ? now : TC.full, from, tAt: tAtNew, teachers, tobs, gids };
+      TC = { v: 4, full: full ? now : TC.full, from, tAt: tAtNew, oAt: new Date(now - 300e3).toISOString(), teachers, tobs, gids };
       IDB.set(tcKey(), TC);
     }
     catch (e) { console.warn("teachReload", e); S.teachers = S.teachers || (TC && TC.teachers) || []; S.tobs = S.tobs || (TC && TC.tobs) || []; }
