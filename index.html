@@ -2376,7 +2376,8 @@ window.LESSONS = [
       async setSetting(key, value) { chk(await sb.from("portal_settings").upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" })); return true; },
       async saveAkademikObs(day, rows) { const r = chk(await sb.rpc("save_akademik_obs", { d: day, rows }));
         const miss = (Array.isArray(r) ? r : []).filter(x => x && typeof x === "object" && x.miss).map(x => x.miss + (x.filial ? ` (${x.filial})` : ""));
-        return { miss }; },
+        const dup = (Array.isArray(r) ? r : []).filter(x => x && typeof x === "object" && x.dup).map(x => x.dup);
+        return { miss, dup }; },
       async listTeacherEditors() { const r = await sb.from("teacher_editors").select("*"); return r.error ? [] : r.data; },
       async setTeacherKind(id, kind) { chk(await sb.rpc("set_teacher_kind", { tid: id, kind })); return true; },
       async setTeacherLead(id, v) { chk(await sb.rpc("set_teacher_lead", { tid: id, klass: v })); return true; },
@@ -4996,6 +4997,8 @@ window.METODISTLAR = [
   }
   // Hisobot saqlangach: bazadan topilmagan ustozlar haqida aniq xabar (qolgan qatorlar saqlangan)
   function obsMissWarn(sv) {
+    const dup = (sv && sv.dup) || [];
+    if (dup.length) toast(`${dup.length} ta qator oldin kiritilgan darsning takrori — qayta yozilmadi: ${dup.join("; ")}. Qolgan darslar saqlandi; takror qatorni hisobotdan o'chirib qo'ying.`, true);
     const miss = (sv && sv.miss) || []; if (!miss.length) return;
     toast(`${miss.length} ta qator ustozlar bazasiga tushmadi — ustoz topilmadi: ${miss.join(", ")}. Hisobotni tahrirlab, ustozni ro'yxatdan tanlang (qolgan qatorlar saqlandi).`, true);
   }
