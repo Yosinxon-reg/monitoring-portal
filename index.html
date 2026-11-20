@@ -5655,8 +5655,8 @@ window.METODISTLAR = [
       <details class="wt-body" ${mine && ["yangi", "qaytarildi"].includes(t.status) ? "open" : ""}><summary class="small">Topshiriq matni</summary><div class="wt-text">${esc(t.body || "").replace(/\n/g, "<br>")}</div></details>
       ${t.answer ? `<div class="wt-ans"><b class="small">Rahbar javobi:</b><div>${esc(t.answer).replace(/\n/g, "<br>")}</div></div>` : ""}
       ${t.verdict ? `<div class="small ${t.status === "qabul" ? "ok-text" : t.status === "rad" || t.status === "qaytarildi" || t.miss_at ? "err-text" : "muted"}" style="margin-top:4px">${t.checked_by === "auto" ? "🤖 " : t.checked_by === "asoschi" ? "💬 " : ""}${esc(t.verdict)}</div>` : ""}
-      ${mine && ["yangi", "qaytarildi"].includes(t.status) ? `<div class="wt-act"><textarea data-wta rows="${t.rule && t.rule.t === "text" ? 5 : 2}" placeholder="${t.rule && t.rule.t === "text" ? `Javobingizni shu yerga yozing${t.rule.min ? ` (kamida ${t.rule.min} belgi)` : ""}` : t.src === "auto" ? "Izoh (ixtiyoriy) — bajarilishini tizim o'zi tekshiradi" : "Nima qilindi — qisqa hisobot"}">${esc(t.answer || "")}</textarea>
-        <button class="btn sm primary" data-wtd>${t.src === "auto" && !(t.rule && t.rule.t === "text") ? "✓ Bajarildi — tekshirish" : t.rule && t.rule.t === "text" ? "📨 Javobni yuborish" : "✓ Bajarildi"}</button></div>` : ""}
+      ${mine && ["yangi", "qaytarildi"].includes(t.status) ? `<div class="wt-act"><textarea data-wta rows="${t.rule && t.rule.t === "text" ? 5 : 2}" placeholder="${t.rule && t.rule.t === "text" ? `Javobingizni shu yerga yozing${t.rule.min ? ` (kamida ${t.rule.min} belgi)` : ""}` : t.rule && t.rule.t ? "Izoh (ixtiyoriy) — bajarilishini tizim o'zi tekshiradi" : "Nima qilindi — qisqa hisobot"}">${esc(t.answer || "")}</textarea>
+        <button class="btn sm primary" data-wtd>${t.rule && t.rule.t && t.rule.t !== "text" ? "✓ Bajarildi — tekshirish" : t.rule && t.rule.t === "text" ? "📨 Javobni yuborish" : "✓ Bajarildi"}</button></div>` : ""}
       ${adm && t.status === "bajarildi" ? `<div class="wt-act"><input data-wtm placeholder="Izoh (qaytarishda majburiy)" style="flex:1;min-width:180px"><button class="btn sm primary" data-wtok="1">✓ Qabul qilish</button><button class="btn sm" data-wtok="0">↩ Qaytarish</button></div>` : ""}
       ${adm && open ? `<div class="wt-act"><button class="btn sm ghost" data-wte>✏️ Tahrirlash</button><button class="btn sm ghost" data-wtx>🗑 Olib tashlash</button></div>` : ""}</div>`;
   }
@@ -5720,7 +5720,7 @@ window.METODISTLAR = [
     if (!wtOn()) return PAGES.bosh(page);
     const adm = S.me.role === "asoschi", w0 = weekOf(today());
     const weeks = []; for (let i = adm ? 3 : 1; i >= -10; i--) weeks.push(addD(w0, 7 * i));
-    const wk = weeks.includes(S.ui.wtW) ? S.ui.wtW : adm ? addD(w0, 7) : w0;
+    const wk = weeks.includes(S.ui.wtW) ? S.ui.wtW : adm ? addD(w0, 7) : (!wtOf(w0, S.me.id).length && (S.wtasks || []).some(t => wkS(t.week) === addD(w0, 7)) ? addD(w0, 7) : w0);
     page.innerHTML = head(adm ? "Haftalik topshiriqlar" : "Haftalik xos topshiriqlarim", adm ? "Bo'lim rahbarlariga topshiriqlar doim KELASI hafta uchun yoziladi: shanba 20:00 da tizim avtomatik topshiriqlar loyihasini tuzadi, yakshanba 18:00 gacha tahrirlaysiz, 20:00 da hammasi rahbarlarga yuboriladi (portal + Telegram). Avtomatik topshiriqlarni tizim o'zi tekshiradi; sizniki — siz qabul qilasiz (48 soatda tekshirilmasa — avtomatik qabul). 1-dekabrdan — rahbar reytingining 20%." : "Monitoring bo'limi rahbaridan keladigan topshiriqlar: kelasi hafta topshiriqlari har yakshanba 20:00 da keladi. Avtomatik topshiriqlar bajarilishini tizim o'zi tekshiradi. Har kechikkan kun uchun ball 20% ga kamayadi. 1-dekabrdan — reytingingizning 20%.",
       `<div class="row" style="gap:8px;flex-wrap:wrap"><select id="wt-wk" style="width:auto">${weeks.map(w => `<option value="${w}" ${w === wk ? "selected" : ""}>${wtWl(w)}${w === w0 ? " (joriy)" : w === addD(w0, 7) ? " (kelasi)" : ""}</option>`).join("")}</select>
         ${adm ? `<button class="btn primary" id="wt-add">+ Topshiriq</button>${!wtPub(wk) ? `<button class="btn" id="wt-gen" title="Ma'lumotlar asosida avtomatik topshiriqlarni hozir qayta tuzish (sizning tahrirlaringiz saqlanadi)">🔄 Avtomatik loyihani yangilash</button>` : ""}` : ""}
@@ -5746,11 +5746,11 @@ window.METODISTLAR = [
     if (!wtOn()) return; await wtLoad();
     const old = $("#wt-ins", page); if (old) old.remove(); if (!page.isConnected) return;
     const w0 = weekOf(today()); let html = "";
-    if (S.me.role === "ceo") { const L = wtOf(w0, S.me.id).filter(t => t.state === "yuborildi"); if (!L.length) return;
+    if (S.me.role === "ceo") { const nx = addD(w0, 7), L = [...wtOf(w0, S.me.id), ...wtOf(nx, S.me.id)].filter(t => t.state === "yuborildi"); if (!L.length) return;
       const open = L.filter(t => !["qabul", "rad"].includes(t.status));
-      html = `<div class="card na-card" id="wt-ins" style="margin-bottom:16px"><div class="card-head"><h2>📌 Haftalik xos topshiriqlarim (${wtWl(w0)})</h2><span class="spacer"></span><a class="btn sm" href="#/haftalik">Barchasi →</a></div>
+      html = `<div class="card na-card" id="wt-ins" style="margin-bottom:16px"><div class="card-head"><h2>📌 Haftalik xos topshiriqlarim</h2><span class="spacer"></span><a class="btn sm" href="#/haftalik">Barchasi →</a></div>
         <div class="small muted" style="margin:-4px 0 8px">${L.length} ta topshiriq · bajarildi: ${L.filter(t => t.status === "qabul").length} · ochiq: ${open.length}</div>
-        ${open.slice(0, 6).map(t => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div><div class="small muted">${t.src === "auto" ? "🤖 avtomatik" : "✍️ Monitoring bo'limi rahbari"} · ⏰ ${esc(wtDue(t.due))}</div></div>${wtSt(t)}</div>`).join("")}</div>`; }
+        ${open.slice(0, 8).map(t => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div><div class="small muted">${wkS(t.week) > w0 ? "kelasi hafta · " : ""}${t.src === "auto" ? "🤖 avtomatik" : "✍️ Monitoring bo'limi rahbari"} · ⏰ ${esc(wtDue(t.due))}</div></div>${wtSt(t)}</div>`).join("")}</div>`; }
     else { const P = (S.wtasks || []).filter(t => t.status === "bajarildi" && t.state === "yuborildi"); if (!P.length) return;
       html = `<div class="card na-card" id="wt-ins" style="margin-bottom:16px"><div class="card-head"><h2>📝 Haftalik topshiriqlar — tekshirishingiz kutilmoqda (${P.length})</h2><span class="spacer"></span><a class="btn sm" href="#/haftalik">Ochish →</a></div>
         ${P.map(t => `<div class="list-item"><div style="flex:1;min-width:0"><div class="t">${esc(t.title)}</div><div class="small muted">${esc(nameOf(t.ceo_id))} · bajarildi: ${fmtDate(localOf(t.done_at))} ${tmOf(t.done_at)} · 48 soatda tekshirilmasa — avtomatik qabul</div></div></div>`).join("")}</div>`; }
@@ -5759,7 +5759,7 @@ window.METODISTLAR = [
   }
   const wtBadge = () => { if (!wtOn()) return ""; const w0 = weekOf(today());
     return S.me.role === "asoschi" ? ((S.wtasks || []).filter(t => t.status === "bajarildi" && t.state === "yuborildi").length || "")
-      : ((S.wtasks || []).filter(t => t.ceo_id === S.me.id && t.state === "yuborildi" && ["yangi", "qaytarildi"].includes(t.status) && wkS(t.week) <= w0).length || ""); };
+      : ((S.wtasks || []).filter(t => t.ceo_id === S.me.id && t.state === "yuborildi" && ["yangi", "qaytarildi"].includes(t.status) && wkS(t.week) <= addD(w0, 7)).length || ""); };
 
   // ===== 73: Chat — Monitoring bo'limi rahbari bilan shaxsiy yozishma =====
   let CHC = { at: 0 };
