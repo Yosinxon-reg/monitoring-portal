@@ -5482,7 +5482,7 @@ window.METODISTLAR = [
       e.target.disabled = true;
       try { await db.recDecide(o.id, false, why, note); recLocal(o, "rad"); o.reason = why; o.note = note;
         if (why === "dars_yoq") { S.nolesson = S.nolesson || []; S.nolesson.push({ teacher_id: o.teacher_id, dow: dowOf(o.day) }); }
-        closeModal(); toast("Rad etildi — o'rniga boshqa ustoz tavsiya qilinadi"); done && done(); }
+        closeModal(); toast("Rad etildi — ballingiz kamaymaydi, o'rniga boshqa ustoz tavsiya qilinadi"); done && done(); }
       catch (x) { err.textContent = x.message; e.target.disabled = false; } };
   }
   // Haftalik rejada: «Tanlangan kuzatuvlar» (KPI'dagi «reja bajarildi» hisobiga ta'sir qilmaydi)
@@ -5551,7 +5551,9 @@ window.METODISTLAR = [
     const from = addD(weekOf(today()), -7 * 10);
     try { const [a, b] = await Promise.all([db.listIntzPlans(from), db.listIntzMiss(from)]); S.izp = a || []; S.izm = b || []; IZC.at = Date.now(); } catch (e) {} }
   const izPlan = (uid, wk) => (S.izp || []).find(x => x.user_id === uid && String(x.week).slice(0, 10) === wk && +x.lessons > 0) || null;
-  const izDone = (uid, wk) => (S.tobs || []).filter(o => o.author_id === uid && o.day >= wk && o.day <= addD(wk, 5)).length;
+  // 2026-11-23: sabab bilan rad etilgan tavsiya ham bajarilgan hisoblanadi — rad etish ballni kamaytirmaydi
+  const izDone = (uid, wk) => (S.tobs || []).filter(o => o.author_id === uid && o.day >= wk && o.day <= addD(wk, 5)).length
+    + (S.recs || []).filter(o => o.user_id === uid && o.status === "rad" && o.day >= wk && o.day <= addD(wk, 5)).length;
   const izMy = () => !!S.me && deptOf(S.me) === "intizomiy" && S.me.role === "xodim" ? izPlan(S.me.id, weekOf(today())) : null;
   const izStaff = () => (S.profiles || []).filter(p => p.active && !p.archived && p.role === "xodim" && deptOf(p) === "intizomiy").sort((a, b) => a.full_name.localeCompare(b.full_name));
   // KPI: tasdiqlangan minus ballar (hafta — to'liq, 2 haftalik bosqich — yarmi)
@@ -6328,7 +6330,9 @@ window.METODISTLAR = [
     return cd === addD(d, 1) ? 0.5 : 0;
   }
   // Hisobotni to'liq ball bilan topshirish chegarasi: 2-bosqichdan — ish tugaganidan 30 daqiqa keyin; oldin — 18:00
-  const repDeadline = (p, d) => d >= AK_V2 ? minsToHM(Math.min(23 * 60 + 59, toMins(sched(p).end) + 30)) : "18:00";
+  // 2026-11-23 dan: kamida 19:00 gacha — kechikkan hisoblanmaydi
+  const REP_19 = "2026-11-23";
+  const repDeadline = (p, d) => d >= AK_V2 ? minsToHM(Math.min(23 * 60 + 59, Math.max(d >= REP_19 ? 19 * 60 : 0, toMins(sched(p).end) + 30))) : "18:00";
   // 53: Davomat — CEO kiritgan kelgan vaqt (kpi_attend). { ded: ayiriladigan ball, late: daqiqa, absent, excused, arrived }
   const attRec = (uid, d) => (S.att && S.att.get(uid + "|" + d)) || null;
   function attDed(late) { return late <= 10 ? 0 : late <= 60 ? Math.min(5, Math.ceil((late - 10) / 10)) : 7; }
@@ -7652,7 +7656,7 @@ window.METODISTLAR = [
       { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlik va haftalikda — hisobot bahosidan. Haftalik rejadagi filialga bormagan kun — 0 (rahbar ruxsat bersa — maksimal). CEO o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 30, d: "Rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi" },
       { k: "tahlil", l: "Tahlil va metodik tavsiya sifati", s: "Tahlil", max: 15, d: "Konkret holat, pedagogik xulosa, bajarilishi mumkin bo'lgan tavsiya" },
-      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 18:00 gacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
+      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 19:00 gacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
       { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 10, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "tashabbus", l: "Asosli tashabbus va yaxshilashga hissa", s: "Tashab.", max: 5, hint: "taklif", d: "Amalda foydali taklif yoki sifatni yaxshilashga hujjatli hissa" }] },
@@ -7660,7 +7664,7 @@ window.METODISTLAR = [
     akademik: { title: "Akademik kuzatuv xodimlari", items: [
       { k: "reja", l: "Dars kuzatuvlari rejasini bajarish", s: "Reja", max: 20, auto: "reja", d: "Har kuni. 2 haftalik bosqichda — oylik reja (har ustoz 3, bog'cha 4 marta) bajarilish sur'atidan avtomatik; kunlikda — hisobot bahosidan. Haftalik rejadagi filialga bormagan kun — 0 (rahbar ruxsat bersa — maksimal). CEO o'zgartira oladi" },
       { k: "davomat", l: "Davomat — ishga o'z vaqtida kelish", s: "Davomat", max: 10, auto: "davomat", d: "Har kuni CEO kelgan vaqtini yozadi. Ish grafigidagi boshlanish vaqtidan: 10 daqiqagacha kechikish kechiriladi; 1 soatgacha har 10 daqiqaga −1 (1 soat — −5); 1 soatdan ko'p — −7; kelmasa — 0 ball. «Sababli» kun hisobga olinmaydi" },
-      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot ish tugaganidan keyin 30 daqiqagacha — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
+      { k: "hisobot", l: "Hisobot va hujjatlashtirish", s: "Hisobot", max: 10, auto: "vaqt", d: "Avtomatik: kunlik hisobot 19:00 gacha (ish kechroq tugasa — tugaganidan keyin 30 daqiqagacha) — to'liq, shu kuni kechroq — 75%, ertasi kuni — 50%, yuborilmasa — 0. Rahbar o'zgartira oladi" },
       { k: "etika", l: "Korporativ intizom va kasbiy etika", s: "Etika", max: 10, auto: "topsh", d: "Avtomatik: topshiriqlarni muddatida bajarish, yangi topshiriqni tez ochish va «jarayonda»ga o'tkazish, ish kunlari portalda faollik. Rahbar o'zgartira oladi" },
       { k: "qayta", l: "Qayta kuzatuv va o'zgarishni qayd etish", s: "Qayta", max: 5, auto: "qayta", d: "Avtomatik: uzoq (joriy oyda 7 kundan ko'p) ko'rilmagan ustozlarga e'tibor va past ball olgan ustozni 14 kun ichida qayta ko'rish. Rahbar o'zgartira oladi" },
       { k: "baholash", l: "Darslarni xolis va aniq baholash", s: "Baholash", max: 25, per: "hafta", d: "Haftada bir marta CEO qo'yadi: rubrikaga mos ball, dalilli izoh, qayta baholash muvofiqligi. Portal xodim qo'ygan ballar taqsimotini ko'rsatadi («yumshoq baholash» belgisi)" },
