@@ -5252,6 +5252,8 @@ window.METODISTLAR = [
     const upto = me < t ? me : t, cur = ms <= t && t <= me;
     const total = schoolDays(ms, me), passed = ms > t ? 0 : schoolDays(ms, upto), left = me <= t ? 0 : schoolDays(addD(t, 1), me);
     const pace = total ? passed / total : 1;
+    // 2026-11-25: 10 kunlik qoida — 10-sanagacha har ustoz kamida 1 marta, 20-sanagacha 2 marta, oy oxirigacha 3 marta (rejaga mutanosib)
+    const dd = +String(upto).slice(8, 10), dek = me <= t ? 3 : dd > 20 ? 2 : dd > 10 ? 1 : 0;
     const gset = o.subs ? new Set() : grantedIds();
     const teachers = (S.teachers || []).filter(x => !tArch(x) && !tPool(x) && (inSubs(subs, x.subject) || gset.has(x.id)) && (!o.fil || x.filial === o.fil) && (!o.subj || canonSubj(x.subject) === o.subj)
       && (o.bog === "all" || (o.bog ? isBogT(x) : !isBogT(x))));
@@ -5264,15 +5266,16 @@ window.METODISTLAR = [
       const pf = tPlanFor(tt, ms); const n = days.length, plan = pf.plan, need = Math.max(0, plan - n), last = lastAll[tt.id] || null;
       const lo = tt.off_from && tt.off_to ? schoolDays(tt.off_from > addD(t, 1) ? tt.off_from : addD(t, 1), tt.off_to < me ? tt.off_to : me) : 0, leftT = Math.max(0, left - lo);
       const gap = last ? schoolDays(addD(last.day, 1), t) : null;
-      const behind = n < Math.floor(plan * pace + 1e-9), tight = need > 0 && (need - 1) * GAP_DAYS + 1 > leftT;
-      const risk = cur && need > 0 && !tOff(tt, t) && (tight || (behind && pace >= 0.34));
-      return { t: tt, n, plan, need, days, last, gap, risk, over: n > OVER_N, obsN: ob.length,
+      const lagNeed = Math.min(plan, Math.ceil(plan * dek / 3 - 1e-9)), lag = !tOff(tt, t) && n < lagNeed;
+      const behind = lag, tight = need > 0 && (need - 1) * GAP_DAYS + 1 > leftT;
+      const risk = cur && need > 0 && !tOff(tt, t) && (tight || behind);
+      return { t: tt, n, plan, need, days, last, gap, risk, lag, lagNeed, over: n > OVER_N, obsN: ob.length,
         authors: [...new Set(ob.map(x => x.author_id))], st: n >= plan ? "done" : n ? "part" : "zero", ov: !!pf.ov, off: !!pf.off, offNow: tOff(tt, t) }; }).filter(r => r.plan > 0 || r.n > 0);
     const sumPlan = rows.reduce((a, r) => a + r.plan, 0), got = rows.reduce((a, r) => a + Math.min(r.n, r.plan), 0);
     const by = {}; rows.forEach(r => (byT[r.t.id] || []).forEach(x => { const b = by[x.author_id] = by[x.author_id] || { id: x.author_id, n: 0, t: new Set() }; b.n++; b.t.add(x.teacher_id); }));
     return { ms, me, at: t, total, passed, left, pace, cur, rows, sumPlan, got, pct: hpct(got, sumPlan),
       done: rows.filter(r => r.st === "done").length, part: rows.filter(r => r.st === "part").length, zero: rows.filter(r => r.st === "zero").length,
-      risk: rows.filter(r => r.risk), over: rows.filter(r => r.over),
+      dek, lag: rows.filter(r => r.lag), risk: rows.filter(r => r.risk), over: rows.filter(r => r.over),
       byAuthor: Object.values(by).map(b => ({ id: b.id, n: b.n, tn: b.t.size })).sort((a, b) => b.n - a.n) };
   }
   const plStCls = r => r.st === "done" ? "ok" : r.st === "part" ? "mid" : "no";
@@ -5894,7 +5897,7 @@ window.METODISTLAR = [
     const P = subj ? planCalc(ms, { fil, subj }) : allP;
     const q = S.ui.plQ || "all";
     const exp = Math.round(P.pace * 100);
-    const flt = { all: () => true, zero: r => r.st === "zero", part: r => r.st === "part", done: r => r.st === "done", risk: r => r.risk, over: r => r.over };
+    const flt = { all: () => true, zero: r => r.st === "zero", part: r => r.st === "part", done: r => r.st === "done", risk: r => r.risk, lag: r => r.lag, over: r => r.over };
     const ord = { zero: 0, part: 1, done: 2 };
     const list = P.rows.filter(flt[q] || flt.all).sort((a, b) => (b.risk - a.risk) || (ord[a.st] - ord[b.st]) || (a.n - b.n) || a.t.full_name.localeCompare(b.t.full_name));
     const scopeTxt = subs.length ? `Siz kuzatadigan fan: <b>${subs.map(esc).join(", ")}</b> · ` : "";
@@ -5909,7 +5912,7 @@ window.METODISTLAR = [
         <select id="pl-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
         ${subjList.length > 1 ? `<select id="pl-s" style="width:auto"><option value="">Barcha fanlar</option>${subjList.map(s => `<option ${s === subj ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>` : ""}
         <span class="spacer"></span>${canPlanPdf() ? `<button class="btn" id="pl-pdf">⬇ Word</button>` : ""}</div>
-      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir ustoz oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi. Bo'shagan ustozlar rejada yo'q, vaqtincha ishlamaganlarning rejasi ishlamagan kunlariga qarab kamayadi${canPlanAdmin() ? " (⚙ — holati va rejani o'zgartirish)" : ""}.</p>
+      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir ustoz oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi. <b>10 kunlik qoida:</b> 10-sanagacha har ustoz kamida 1 marta, 20-sanagacha 2 marta, oy oxirigacha 3 marta ko'rilishi kerak — ulgurmaganlar «Rejadan ortda». Bo'shagan ustozlar rejada yo'q, vaqtincha ishlamaganlarning rejasi ishlamagan kunlariga qarab kamayadi${canPlanAdmin() ? " (⚙ — holati va rejani o'zgartirish)" : ""}.</p>
       ${!P.rows.length ? `<div class="card empty">Bu tanlov bo'yicha bazada ustoz yo'q</div>` : `
       <div class="pl-top">
         <div class="card pl-main"><div class="small muted">Oylik reja bajarilishi — ${mLabel(ms)}</div>
@@ -5917,7 +5920,7 @@ window.METODISTLAR = [
           <div class="pl-bar"><i style="width:${Math.min(100, P.pct || 0)}%"></i>${P.cur ? `<u style="left:${exp}%" title="Bugungacha kutilgan: ${exp}%"></u>` : ""}</div>
           <div class="small muted"><b>${P.got}</b> ta kuzatuv bajarildi, oylik rejada <b>${P.sumPlan}</b> ta (${P.rows.length} ta ustoz, har biri oyiga ${PLAN_BASE} martadan${P.rows.some(r => isBogT(r.t)) ? `, bog'cha ${PLAN_BOG}` : ""})${P.cur ? `. Bugungacha <b>${exp}%</b> bajarilgan bo'lishi kerak edi — ${(P.pct ?? 0) >= exp ? "reja bo'yicha ketyapmiz ✅" : `<b style="color:var(--bad)">${Math.max(0, Math.round(P.sumPlan * P.pace) - P.got)} ta kuzatuv orqadamiz</b>`}. Oy oxirigacha <b>${P.left}</b> ish kuni.` : ". Oy yakunlangan."}</div>${P.cur && canMetAdmin() ? planRecLine(P, t) : ""}</div>
         <div class="stats st5 pl-stats">
-          ${sBtn("done", "Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${sBtn("part", "Qisman", `<span class="pl-c mid">${P.part}</span>`)}${sBtn("zero", "Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}
+          ${sBtn("done", "Reja bajarildi", `<span class="pl-c ok">${P.done}</span>`)}${sBtn("part", "Qisman", `<span class="pl-c mid">${P.part}</span>`)}${sBtn("zero", "Umuman ko'rilmagan", `<span class="pl-c no">${P.zero}</span>`)}${P.dek ? sBtn("lag", "Rejadan ortda", `<span class="pl-c no">${P.lag.length}</span>`) : ""}
           ${P.cur ? sBtn("risk", "Xavf ostida", `<span class="pl-c no">${P.risk.length}</span>`) : stat("Xavf ostida", `<span class="pl-c no">—</span>`)}${sBtn("over", "Ortiqcha ko'rilgan", `<span class="pl-c">${P.over.length}</span>`)}</div></div>
       ${P.cur && P.risk.length ? `<div class="card pl-risk"><div class="card-head"><h2>⏳ Rejaga ulgurmasligi mumkin</h2><span class="spacer"></span><span class="small muted">Oy oxirigacha ${P.left} ish kuni qoldi · oraliq ${GAP_DAYS} ish kuni hisobida</span></div>
         ${canPlanAdmin() ? `<div class="row" style="gap:8px;margin:0 0 8px;flex-wrap:wrap"><label class="row" style="gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="as-all" style="width:auto"> Hammasini belgilash (${P.risk.length})</label><span class="spacer"></span><button type="button" class="btn sm primary" id="as-go2">🧭 Intizomiy bo'limga yordamga berish</button></div>` : ""}
@@ -5928,9 +5931,9 @@ window.METODISTLAR = [
         <p class="small" style="margin:0 0 8px">Bu ustozlar oyida ${OVER_N} martadan ko'p ko'rilgan${P.zero ? `, shu paytda <b>${P.zero} ta</b> ustoz hali umuman ko'rilmagan` : ""}.</p>
         ${P.over.map(r => `<div class="list-item"><div style="flex:1"><b>${esc(r.t.full_name)}</b> <span class="small muted">${esc([canonSubj(r.t.subject), r.t.filial].filter(Boolean).join(" · "))}</span></div>${plCount(r)}</div>`).join("")}</div>` : ""}
       <div class="card" id="pl-list"><div class="card-head"><h2>Ustozlar</h2><span class="spacer"></span>
-        <div class="chips">${chip("all", "Hammasi", P.rows.length)}${chip("zero", "Ko'rilmagan", P.zero)}${chip("part", "Qisman", P.part)}${chip("done", "Bajarilgan", P.done)}${P.cur ? chip("risk", "Xavf", P.risk.length) : ""}${P.over.length ? chip("over", "Ortiqcha", P.over.length) : ""}</div></div>
+        <div class="chips">${chip("all", "Hammasi", P.rows.length)}${chip("zero", "Ko'rilmagan", P.zero)}${chip("part", "Qisman", P.part)}${chip("done", "Bajarilgan", P.done)}${P.dek ? chip("lag", "Rejadan ortda", P.lag.length) : ""}${P.cur ? chip("risk", "Xavf", P.risk.length) : ""}${P.over.length ? chip("over", "Ortiqcha", P.over.length) : ""}</div></div>
         <div class="table-wrap"><table class="pl-tbl"><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Bu oy</th><th class="hide-sm">Holat</th><th>Oxirgi kuzatuv</th><th class="hide-sm">Kim ko'rgan</th></tr></thead><tbody>
-        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2">reja: ${r.plan}</span>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${skipBadge(r.t, ms)}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
+        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.lag ? ` <span class="pl-tag">ortda ${r.n}/${r.lagNeed}</span>` : r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2">reja: ${r.plan}</span>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${skipBadge(r.t, ms)}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
           <td>${plCount(r)}</td><td class="hide-sm">${plDots(r)}</td><td>${r.last ? `${fmtDate(r.last.day)} <span class="small muted">· ${esc(shortName(r.last.author_id))}</span>` : `<span class="muted">—</span>`}</td>
           <td class="hide-sm small">${r.authors.map(a => esc(shortName(a))).join(", ") || "—"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">Bu filtr bo'yicha ustoz yo'q</td></tr>`}</tbody></table></div></div>
       ${canPlanPdf() && P.byAuthor.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Xodimlar bo'yicha — ${mLabel(ms)}</h2></div>
@@ -6711,16 +6714,22 @@ window.METODISTLAR = [
     const fil = S.ui.tfil || "", q = S.ui.prq || "all";
     const all = problemTeachers().filter(z => !fil || z.t.filial === fil);
     const list = all.filter(z => q === "all" || (q === "low" ? z.low : z.flat));
+    const LP = planCalc(mStart(today()), { fil, bog: "all" }), lagL = LP.lag.slice().sort((a, b) => (a.n - b.n) || a.t.full_name.localeCompare(b.t.full_name));
+    const lagHtml = () => `<p class="small muted" style="margin:0 0 12px"><b>10 kunlik qoida:</b> 10-sanagacha har ustoz kamida 1 marta, 20-sanagacha 2 marta, oy oxirigacha 3 marta ko'rilishi kerak (bog'cha — rejaga mutanosib). Bugungi holat bo'yicha talabga yetmaganlar.</p>
+      <div class="card">${lagL.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Bu oy / kerak</th><th>Oxirgi kuzatuv</th></tr></thead><tbody>
+        ${lagL.map((r, i) => `<tr><td>${i + 1}</td><td><b class="click" data-tid="${r.t.id}">${esc(r.t.full_name)}</b></td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
+          <td><b style="color:var(--bad)">${r.n} / ${r.lagNeed}</b> <span class="small muted">(oylik ${r.plan})</span></td><td>${r.last ? `${fmtDate(r.last.day)} <span class="small muted">· ${esc(shortName(r.last.author_id))}</span>` : `<span class="muted">bu oy ko'rilmagan</span>`}</td></tr>`).join("")}</tbody></table></div>`
+        : `<div class="empty">${LP.dek ? "Rejadan ortda qolgan ustoz yo'q ✓" : "10-sanagacha hali talab yo'q"}</div>`}</div>`;
     const chip = (k, l, n) => `<button type="button" class="chip-btn sm ${q === k ? "on" : ""}" data-prq="${k}">${l} <b>${n}</b></button>`;
     root.innerHTML = `<div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap"><select id="tx-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
-        <div class="chips">${chip("all", "Hammasi", all.length)}${chip("low", `${PROB_LOW}% dan past`, all.filter(z => z.low).length)}${chip("flat", "Natija o'smayapti", all.filter(z => z.flat).length)}</div></div>
-      <p class="small muted" style="margin:0 0 12px">Muammoli ustoz: oxirgi oydagi umumiy natijasi <b>${PROB_LOW}% dan past</b> yoki natijasi <b>2 va undan ko'p oy ketma-ket o'smagan</b> (oyma-oy o'sish ${PROB_FLAT}% dan kam; ${PROB_TOP}% va undan yuqori natijalilar bu mezonga kirmaydi). Hisob joriy yoki o'tgan oyda ko'rilgan ustozlar bo'yicha.</p>
+        <div class="chips">${chip("all", "Hammasi", all.length)}${chip("low", `${PROB_LOW}% dan past`, all.filter(z => z.low).length)}${chip("flat", "Natija o'smayapti", all.filter(z => z.flat).length)}${chip("lag", "⏳ Rejadan ortda", lagL.length)}</div></div>
+      ${q === "lag" ? lagHtml() : `<p class="small muted" style="margin:0 0 12px">Muammoli ustoz: oxirgi oydagi umumiy natijasi <b>${PROB_LOW}% dan past</b> yoki natijasi <b>2 va undan ko'p oy ketma-ket o'smagan</b> (oyma-oy o'sish ${PROB_FLAT}% dan kam; ${PROB_TOP}% va undan yuqori natijalilar bu mezonga kirmaydi). Hisob joriy yoki o'tgan oyda ko'rilgan ustozlar bo'yicha.</p>
       <div class="card">${list.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Oxirgi natija</th><th>Sabab</th><th class="hide-sm">Oyma-oy</th><th class="hide-sm">Oxirgi ko'rgan</th></tr></thead><tbody>
         ${list.map((z, i) => `<tr><td>${i + 1}</td><td><b class="click" data-tid="${z.t.id}">${esc(z.t.full_name)}</b>${skipBadge(z.t, mStart(today()))}</td><td>${esc(canonSubj(z.t.subject) || "—")}</td><td>${esc(z.t.filial || "—")}</td>
           <td><b style="color:${z.last.total < PROB_LOW ? "var(--bad)" : "inherit"}">${z.last.total}%</b> <span class="small muted">${esc(OYLAR_B[+z.last.m.slice(5, 7) - 1])}</span></td>
           <td>${z.low ? `<span class="pl-tag">${PROB_LOW}% dan past</span> ` : ""}${z.flat ? `<span class="pl-tag2 ${z.streak >= 4 ? "pr-hot" : ""}">${z.streak} oy o'smagan</span>` : ""}</td>
           <td class="hide-sm small">${z.vals.map(v => `<span title="${esc(OYLAR_B[+v.m.slice(5, 7) - 1])}: ${v.n} ta kuzatuv">${v.total}%</span>`).join(" → ")}</td>
-          <td class="hide-sm small">${z.by ? esc(shortName(z.by)) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Bu tanlov bo'yicha muammoli ustoz yo'q ✓</div>`}</div>`;
+          <td class="hide-sm small">${z.by ? esc(shortName(z.by)) : "—"}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Bu tanlov bo'yicha muammoli ustoz yo'q ✓</div>`}</div>`}`;
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachProblem(root); };
     $$("[data-prq]", root).forEach(b => b.onclick = () => { S.ui.prq = b.dataset.prq; teachProblem(root); });
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
