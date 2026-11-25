@@ -5270,7 +5270,7 @@ window.METODISTLAR = [
       const behind = lag, tight = need > 0 && (need - 1) * GAP_DAYS + 1 > leftT;
       const risk = cur && need > 0 && !tOff(tt, t) && (tight || behind);
       return { t: tt, n, plan, need, days, last, gap, risk, lag, lagNeed, over: n > OVER_N, obsN: ob.length,
-        authors: [...new Set(ob.map(x => x.author_id))], st: n >= plan ? "done" : n ? "part" : "zero", ov: !!pf.ov, off: !!pf.off, offNow: tOff(tt, t) }; }).filter(r => r.plan > 0 || r.n > 0);
+        authors: [...new Set(ob.map(x => x.author_id))], st: n >= plan ? "done" : n ? "part" : "zero", ov: !!pf.ov, ovNote: pf.note || "", ovBy: pf.by, ovAt: pf.at, off: !!pf.off, offNow: tOff(tt, t) }; }).filter(r => r.plan > 0 || r.n > 0);
     const sumPlan = rows.reduce((a, r) => a + r.plan, 0), got = rows.reduce((a, r) => a + Math.min(r.n, r.plan), 0);
     const by = {}; rows.forEach(r => (byT[r.t.id] || []).forEach(x => { const b = by[x.author_id] = by[x.author_id] || { id: x.author_id, n: 0, t: new Set() }; b.n++; b.t.add(x.teacher_id); }));
     return { ms, me, at: t, total, passed, left, pace, cur, rows, sumPlan, got, pct: hpct(got, sumPlan),
@@ -5933,7 +5933,7 @@ window.METODISTLAR = [
       <div class="card" id="pl-list"><div class="card-head"><h2>Ustozlar</h2><span class="spacer"></span>
         <div class="chips">${chip("all", "Hammasi", P.rows.length)}${chip("zero", "Ko'rilmagan", P.zero)}${chip("part", "Qisman", P.part)}${chip("done", "Bajarilgan", P.done)}${P.dek ? chip("lag", "Rejadan ortda", P.lag.length) : ""}${P.cur ? chip("risk", "Xavf", P.risk.length) : ""}${P.over.length ? chip("over", "Ortiqcha", P.over.length) : ""}</div></div>
         <div class="table-wrap"><table class="pl-tbl"><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Bu oy</th><th class="hide-sm">Holat</th><th>Oxirgi kuzatuv</th><th class="hide-sm">Kim ko'rgan</th></tr></thead><tbody>
-        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.lag ? ` <span class="pl-tag">ortda ${r.n}/${r.lagNeed}</span>` : r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2">reja: ${r.plan}</span>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${skipBadge(r.t, ms)}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
+        ${list.map((r, i) => `<tr class="${r.risk ? "pl-r-risk" : ""}"><td>${i + 1}</td><td><b>${esc(r.t.full_name)}</b>${r.lag ? ` <span class="pl-tag">ortda ${r.n}/${r.lagNeed}</span>` : r.risk ? ` <span class="pl-tag">xavf</span>` : ""}${r.ov ? ` <span class="pl-tag2" title="${esc(`Reja qo'lda o'zgartirilgan${r.ovBy ? ": " + nameOf(r.ovBy) : ""}${r.ovAt ? ", " + fmtDate(String(r.ovAt).slice(0, 10)) : ""}`)}">reja: ${r.plan}</span><div class="small muted">✎ ${r.ovNote ? `sabab: «${esc(r.ovNote)}»` : `<span style="color:var(--bad)">sababi yozilmagan</span>`}${r.ovBy ? ` · ${esc(shortName(r.ovBy))}` : ""}${r.ovAt ? `, ${fmtDate(String(r.ovAt).slice(0, 10))}` : ""}</div>` : ""}${r.offNow || r.off ? ` <span class="pl-tag2">${r.offNow ? "⏸ ishlamayapti" : "⏸ qisman ishlamagan"}</span>` : ""}${skipBadge(r.t, ms)}${canPlanAdmin() ? ` <button type="button" class="btn sm ghost pl-gear" data-tst="${r.t.id}" title="Holati va oylik reja">⚙</button>` : ""}</td><td>${esc(canonSubj(r.t.subject) || "—")}</td><td>${esc(r.t.filial || "—")}</td>
           <td>${plCount(r)}</td><td class="hide-sm">${plDots(r)}</td><td>${r.last ? `${fmtDate(r.last.day)} <span class="small muted">· ${esc(shortName(r.last.author_id))}</span>` : `<span class="muted">—</span>`}</td>
           <td class="hide-sm small">${r.authors.map(a => esc(shortName(a))).join(", ") || "—"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">Bu filtr bo'yicha ustoz yo'q</td></tr>`}</tbody></table></div></div>
       ${canPlanPdf() && P.byAuthor.length ? `<div class="card" style="margin-top:16px"><div class="card-head"><h2>Xodimlar bo'yicha — ${mLabel(ms)}</h2></div>
@@ -6250,7 +6250,7 @@ window.METODISTLAR = [
   function tPlanFor(t, ms) {
     const me = mEndOf(ms);
     const ov = (S.tplan || []).find(x => x.teacher_id === t.id && String(x.month).slice(0, 10) === ms);
-    if (ov && ov.plan !== null && ov.plan !== undefined && ov.plan !== "") return { plan: +ov.plan, ov: true, note: ov.note || "" };
+    if (ov && ov.plan !== null && ov.plan !== undefined && ov.plan !== "") return { plan: +ov.plan, ov: true, note: ov.note || "", by: ov.updated_by || null, at: ov.updated_at || null };
     const base = canonSubj(t.subject) === BOG ? PLAN_BOG : PLAN_BASE;
     if (t.off_from && t.off_to && t.off_from <= me && t.off_to >= ms) {
       const tot = schoolDays(ms, me); let off = 0;
@@ -6274,7 +6274,7 @@ window.METODISTLAR = [
         <p class="small muted" style="margin:0">Ustoz bazadan o'chmaydi — arxivga o'tadi, eski kuzatuvlari va reytingdagi natijalari saqlanadi. Istalgan vaqt qayta tiklash mumkin.</p></div>
       <div class="field" style="margin-top:14px"><label>Shu ustozning oylik ko'rish rejasi <span class="muted">(bo'sh — avtomatik: ${canonSubj(t.subject) === BOG ? PLAN_BOG : PLAN_BASE} marta)</span></label>
         <div class="grid2">${[ms0, ms1].map((ms, i) => { const ov = ovOf(ms); return `<div class="row" style="gap:8px"><span class="small" style="min-width:110px">${mLabel(ms)}${i ? "" : " (joriy)"}</span><input type="number" min="0" max="15" class="num" data-tsp="${ms}" value="${ov && ov.plan !== null ? ov.plan : ""}" placeholder="${tPlanFor(t, ms).plan}" style="width:80px"><span class="small muted">marta</span></div>`; }).join("")}</div>
-        <input id="ts-pn" value="${esc((ovOf(ms0) || ovOf(ms1) || {}).note || "")}" placeholder="Izoh (ixtiyoriy): nima uchun reja o'zgardi" style="margin-top:8px"></div>
+        <input id="ts-pn" value="${esc((ovOf(ms0) || ovOf(ms1) || {}).note || "")}" placeholder="Sababi (majburiy): nima uchun reja o'zgardi" style="margin-top:8px"></div>
       ${skipOf(t.id, ms0) !== null ? `<div class="note" style="margin-top:10px">🚫 Bu oy kuzatilmaydi — sababi: «${esc(skipOf(t.id, ms0))}»</div>` : `<div class="row" style="margin-top:10px"><button type="button" class="btn sm" id="ts-skip">🚫 Bu oy kuzatmaymiz…</button><span class="small muted">sababi bilan — ustoz shu oy rejadan chiqadi, ro'yxatda qoladi</span></div>`}
       <div class="err-text" id="ts-err"></div>`,
       `<button class="btn" data-close>Bekor qilish</button><button class="btn primary" id="ts-ok">Saqlash</button>`);
@@ -6289,6 +6289,10 @@ window.METODISTLAR = [
       else if (st === "tatil") { const f = $("#ts-f", m).value, to = $("#ts-t", m).value; if (!f || !to) return er("Muddatni kiriting (qachondan — qachongacha)"); if (to < f) return er("Tugash sanasi boshlanishidan oldin bo'lmasin");
         patch = { status: "faol", off_from: f, off_to: to, off_reason: $("#ts-r", m).value, left_at: null }; }
       else patch = { status: "arxiv", off_from: null, off_to: null, off_reason: $("#ts-lr", m).value, left_at: $("#ts-l", m).value || today() };
+      { const note0 = $("#ts-pn", m).value.trim();
+        const chg = $$("[data-tsp]", m).some(inp => { const v = inp.value.trim(), ov = ovOf(inp.dataset.tsp); const nv = v === "" ? null : Math.max(0, Math.min(15, Math.round(+v)));
+          return nv !== null && (nv !== (ov && ov.plan !== null && ov.plan !== undefined ? +ov.plan : null) || note0 !== (ov?.note || "")); });
+        if (chg && note0.length < 3) { $("#ts-pn", m).focus(); return er("Oylik rejani o'zgartirish sababini yozing — sababsiz o'zgartirib bo'lmaydi"); } }
       e.target.disabled = true;
       try {
         await db.updateTeacher(t.id, patch);
