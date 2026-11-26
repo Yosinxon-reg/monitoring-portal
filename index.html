@@ -5780,12 +5780,14 @@ window.METODISTLAR = [
   const chatTime = ts => { const d = localOf(ts); return (d === today() ? "" : fmtDate(d) + " ") + tmOf(ts); };
   function chatMsg(m, adm) {
     const mine = m.author === S.me.id && !(m.kind === "savol" && !adm), sys = !m.author;
-    if (sys) return `<div class="ch-sys">🤖 ${esc(m.body)} <span>${chatTime(m.created_at)}</span></div>`;
+    // 2026-11-26: xodim uchun avtomatik javoblar ham Yosinxon Ahmadxonovning oddiy xabari ko'rinishida (robot belgisi faqat rahbar ko'rinishida)
+    if (sys) return adm ? `<div class="ch-sys">🤖 ${esc(m.body)} <span>${chatTime(m.created_at)}</span></div>`
+      : `<div class="ch-m"><div class="ch-b">${esc(m.body).replace(/\n/g, "<br>")}<span class="ch-t">${chatTime(m.created_at)}</span></div></div>`;
     if (m.kind === "savol") {
       const ans = (S.chat || []).find(x => x.qid === m.id && x.kind === "javob");
       const opts = (m.opts || []).map((o, i) => adm || m.answered_at ? `<span class="ch-opt ${ans && ans.choice === i ? "on" : ""}">${esc(o.l)}</span>`
         : `<button type="button" class="ch-opt btn sm" data-cho="${i}" data-a="${esc(o.a || "ok")}">${esc(o.l)}</button>`).join("");
-      return `<div class="ch-m ${adm ? "me" : ""} q" data-chq="${m.id}"><div class="ch-b"><div class="small muted">❓ Savol${m.auto ? " · avtomatik" : ""}</div>${esc(m.body).replace(/\n/g, "<br>")}
+      return `<div class="ch-m ${adm ? "me" : ""} q" data-chq="${m.id}"><div class="ch-b">${adm ? `<div class="small muted">❓ Savol${m.auto ? " · avtomatik" : ""}</div>` : ""}${esc(m.body).replace(/\n/g, "<br>")}
         <div class="ch-opts">${opts}</div>${!adm && !m.answered_at ? `<div class="ch-tx" hidden><textarea rows="2" placeholder="Qisqacha yozing…"></textarea><button class="btn sm primary" data-chs>Yuborish</button></div>` : ""}
         ${adm && !m.answered_at ? `<div class="small muted">javob kutilmoqda</div>` : ""}<span class="ch-t">${chatTime(m.created_at)}</span></div></div>`;
     }
@@ -5806,7 +5808,7 @@ window.METODISTLAR = [
         .sort((a, b) => (b.u - a.u) || ((b.l ? b.l.created_at : "") > (a.l ? a.l.created_at : "") ? 1 : -1) || a.p.full_name.localeCompare(b.p.full_name))
         .map(({ p, l, u, pq }) => `<a class="ch-peer ${p.id === cur ? "on" : ""}" data-chp="${p.id}">${avatar(p.full_name, photoOf(p))}<div style="min-width:0;flex:1"><b>${esc(p.full_name)}</b><div class="small muted ch-prev">${l ? esc((l.author === S.me.id ? "Siz: " : "") + l.body.split("\n")[0]).slice(0, 70) : esc(titleOf(p))}</div></div>${u ? `<span class="badge">${u}</span>` : pq ? `<span class="badge soft" title="Javob kutilmoqda">?${pq}</span>` : ""}</a>`).join(""); };
     const pp = cur ? person(cur) : null;
-    page.innerHTML = head("Chat", adm ? "Har bir xodim bilan shaxsiy yozishma — boshqalar ko'rmaydi. Har ish kuni 11:00 da har bir javobgarga sizning nomingizdan ma'lumotga asoslangan 1 ta avtomatik savol boradi; variant tanlansa — platforma o'zi javob qaytaradi, yozma javoblarni siz ko'rib javob berasiz." : "Monitoring bo'limi rahbari Yosinxon Ahmadxonov bilan shaxsiy yozishma — boshqalar ko'rmaydi. Savollarga bitta tugmani bosib javob berishingiz mumkin.")
+    page.innerHTML = head("Chat", adm ? "Har bir xodim bilan shaxsiy yozishma — boshqalar ko'rmaydi. Har ish kuni 11:00 da har bir javobgarga sizning nomingizdan ma'lumotga asoslangan 1 ta avtomatik savol boradi; variant tanlansa — platforma o'zi javob qaytaradi, yozma javoblarni siz ko'rib javob berasiz." : "Monitoring bo'limi rahbari Yosinxon Ahmadxonov bilan shaxsiy yozishma — boshqalar ko'rmaydi.")
       + `<div class="ch-wrap ${adm ? "adm" : ""} ${adm && cur ? "has" : ""}">${adm ? `<div class="ch-list card"><input id="ch-q" placeholder="🔎 Qidirish" value="${esc(S.ui.chatQ || "")}"><div id="ch-ls">${listHtml()}</div></div>` : ""}
         <div class="ch-main card">${cur ? `<div class="ch-head">${adm ? `<button class="btn sm ghost ch-back" id="ch-back">←</button>` : ""}${adm ? avatar(pp.full_name, photoOf(pp)) : ""}<b>${esc(adm ? pp.full_name : "Yosinxon Ahmadxonov")}</b><span class="small muted">${esc(adm ? titleOf(pp) : "Monitoring bo'limi rahbari")}</span>${adm && db.setMurojaat ? `<span class="spacer"></span><label class="small muted" style="margin:0" title="Avtomatik savollar va topshiriqlarda shu shaklda murojaat qilinadi">Murojaat:</label><input id="ch-mj" value="${esc(pp.murojaat || "")}" placeholder="${esc(pp.full_name.split(" ")[0])}" style="width:150px;padding:4px 8px"><button class="btn sm" id="ch-mjs">Saqlash</button>` : ""}</div>
           <div class="ch-msgs" id="ch-msgs">${thread(cur).map(m => chatMsg(m, adm)).join("") || `<div class="muted small" style="text-align:center;padding:30px">Hali xabar yo'q</div>`}</div>
