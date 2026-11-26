@@ -2417,6 +2417,7 @@ window.LESSONS = [
       async listSkips(ms) { const r = await sb.from("teacher_skip").select("*, teachers(full_name, subject, filial)").gte("month", ms); return r.error ? [] : r.data; },
       async skipRequest(tid, ms, choice, txt) { return chk(await sb.rpc("skip_request", { tid, ms, choice, txt })); },
       async skipDecide(sid, ok, msg) { chk(await sb.rpc("skip_decide", { sid, ok, msg: msg || "" })); return true; },
+      async listObsExtra() { const r = await sb.from("obs_extra").select("teacher_id,day,extra"); return r.error ? [] : r.data; },
       async listTeacherPlans() { const r = await sb.from("teacher_plan").select("*").gte("month", new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)); return r.error ? [] : r.data; },
       async setTeacherPlan(teacher_id, month, plan, note) { if (plan === null || plan === undefined) { chk(await sb.from("teacher_plan").delete().eq("teacher_id", teacher_id).eq("month", month)); return true; }
         chk(await sb.from("teacher_plan").upsert({ teacher_id, month, plan, note: note || "", updated_at: new Date().toISOString() }, { onConflict: "teacher_id,month" })); return true; },
@@ -4427,6 +4428,7 @@ window.METODISTLAR = [
       if (kind === "akademik") {
         const rows = collectRows(); if (!rows) return;
         if (!rows.length && !F.note.trim()) return fail("Kamida bitta baholangan darsni kiriting yoki izoh yozing");
+        { const cl = obsDayClash(rows, date); if (cl) return fail(cl); }
         data = { kind, rows, note: F.note.trim() };
       } else {
         if (!F.filials.length) return fail("Qaysi filialni kuzatganingizni tanlang");
@@ -4437,6 +4439,7 @@ window.METODISTLAR = [
         const ans = issues.filter(h => h.res !== "javobsiz").length;
         if (!F.mgmt) return fail("Rahbariyat qanday ishlaganini belgilang");
         const rows = F.helpOn ? collectRows() : []; if (!rows) return;
+        { const cl = obsDayClash(rows, date); if (cl) return fail(cl); }
         if (!F.note.trim()) return fail("Bugungi ish kuni haqida izoh yozing", "#mr-note");
         data = { kind, v: 2, filials: F.filials, issues, topics, answered: ans, mgmt: F.mgmt, mgmt_note: F.mgmt_note.trim(), note: F.note.trim(), rows };
       }
@@ -5185,6 +5188,7 @@ window.METODISTLAR = [
       if (force || full || now - TS.t > SYNC_FULL || !S.teditors) {
         const [e, tp] = await Promise.all([db.listTeacherEditors ? db.listTeacherEditors() : (S.teditors || []), db.listTeacherPlans ? db.listTeacherPlans().catch(() => S.tplan || []) : Promise.resolve(S.tplan || [])]);
         S.teditors = e; S.tplan = tp || []; TS.t = now;
+        if (db.listObsExtra) db.listObsExtra().then(x => { S.obsExtra = Object.fromEntries((x || []).map(r => [r.teacher_id + "|" + String(r.day).slice(0, 10), +r.extra || 0])); }).catch(() => {});
       }
       S.teachers = teachers; S.tobs = tobs; TS.o = now;
       try { await skipLoad(); } catch (e) {}
@@ -5247,6 +5251,21 @@ window.METODISTLAR = [
   const isSchoolDay = iso => dowOf(iso) !== 7;
   function schoolDays(a, b) { let n = 0; for (let d = a; d <= b; d = addD(d, 1)) if (isSchoolDay(d)) n++; return n; }
   // o: { subs, fil, subj, at }  — at: qaysi kun holatiga (standart: bugun)
+  // 2026-11-26: reja — bir ustoz bir kunda 1 marta ko'riladi (kunlar sanaladi). Avval bir kunda ko'rilgan har xil darslar
+  //   «obs_extra» jadvalida qo'shimcha sifatida hisobga olinadi (Monitoring bo'limi rahbari qarori)
+  const obsExtraOf = (tid, day) => (S.obsExtra && S.obsExtra[tid + "|" + day]) || 0;
+  const lessonN = l => { const ds = new Set((l || []).map(x => x.teacher_id + "|" + x.day)); let n = ds.size; ds.forEach(k => { n += (S.obsExtra && S.obsExtra[k]) || 0; }); return n; };
+  // hisobot qatorlari: shu kuni bu ustoz boshqa hisobotda / boshqa qatorda ko'rilganmi
+  function obsDayClash(rows, rdate) {
+    const seen = new Set();
+    for (const x of rows || []) { if (!x || !x.teacher_id) continue; const d = x.date || rdate, k = x.teacher_id + "|" + d;
+      if (seen.has(k)) return `«${x.teacher}» ${fmtDate(d)} kuni ikki marta yozilgan. Bir ustozning bir kunda faqat 1 ta darsi ko'riladi — ikkinchisiga boshqa kunni belgilang yoki qatorni o'chiring.`;
+      seen.add(k);
+      if (obsExtraOf(x.teacher_id, d)) continue;
+      const o = (S.tobs || []).find(z => z.teacher_id === x.teacher_id && z.day === d && !(z.author_id === S.me.id && z.report_date === rdate));
+      if (o) return `«${x.teacher}» ${fmtDate(d)} kuni allaqachon ko'rilgan (${shortName(o.author_id)}${o.klass ? ", " + o.klass : ""}${o.soat ? ", " + o.soat + "-soat" : ""}). Bir ustozning bir kunda faqat 1 ta darsi ko'riladi — boshqa kunni belgilang.`; }
+    return "";
+  }
   function planCalc(ms, o = {}) {
     const me = mEndOf(ms), t = o.at || today(), subs = o.subs || mySubs();
     const upto = me < t ? me : t, cur = ms <= t && t <= me;
@@ -5263,7 +5282,7 @@ window.METODISTLAR = [
       if (x.day >= ms) (byT[x.teacher_id] = byT[x.teacher_id] || []).push(x);
       if (!lastAll[x.teacher_id] || x.day > lastAll[x.teacher_id].day) lastAll[x.teacher_id] = x; });
     const rows = teachers.map(tt => { const ob = byT[tt.id] || []; const days = [...new Set(ob.map(x => x.day))].sort();
-      const pf = tPlanFor(tt, ms); const n = days.length, plan = pf.plan, need = Math.max(0, plan - n), last = lastAll[tt.id] || null;
+      const pf = tPlanFor(tt, ms); const n = lessonN(ob), plan = pf.plan, need = Math.max(0, plan - n), last = lastAll[tt.id] || null;
       const lo = tt.off_from && tt.off_to ? schoolDays(tt.off_from > addD(t, 1) ? tt.off_from : addD(t, 1), tt.off_to < me ? tt.off_to : me) : 0, leftT = Math.max(0, left - lo);
       const gap = last ? schoolDays(addD(last.day, 1), t) : null;
       const lagNeed = Math.min(plan, Math.ceil(plan * dek / 3 - 1e-9)), lag = !tOff(tt, t) && n < lagNeed;
@@ -5286,7 +5305,7 @@ window.METODISTLAR = [
     if (!tt) return "";
     const t = today(), ms = mStart(t), mine = x => x.author_id === S.me?.id && x.day === t;
     const ob = (S.tobs || []).filter(x => x.teacher_id === tt.id && !mine(x));
-    const n = new Set(ob.filter(x => x.day >= ms).map(x => x.day)).size, plan = tPlanFor(tt, ms).plan;
+    const n = lessonN(ob.filter(x => x.day >= ms)), plan = tPlanFor(tt, ms).plan;
     if (tOff(tt, t)) return ` · <span class="th-warn">${tStatusTxt(tt, t)}</span>`;
     if (skipOf(tt.id, ms) !== null) return ` ·${skipBadge(tt, ms)}`;
     const last = ob.reduce((a, x) => !a || x.day > a.day ? x : a, null);
@@ -5914,7 +5933,7 @@ window.METODISTLAR = [
         <select id="pl-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
         ${subjList.length > 1 ? `<select id="pl-s" style="width:auto"><option value="">Barcha fanlar</option>${subjList.map(s => `<option ${s === subj ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>` : ""}
         <span class="spacer"></span>${canPlanPdf() ? `<button class="btn" id="pl-pdf">⬇ Word</button>` : ""}</div>
-      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir ustoz oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi. <b>10 kunlik qoida:</b> 10-sanagacha har ustoz kamida 1 marta, 20-sanagacha 2 marta, oy oxirigacha 3 marta ko'rilishi kerak — ulgurmaganlar «Rejadan ortda». Bo'shagan ustozlar rejada yo'q, vaqtincha ishlamaganlarning rejasi ishlamagan kunlariga qarab kamayadi${canPlanAdmin() ? " (⚙ — holati va rejani o'zgartirish)" : ""}.</p>
+      <p class="small muted" style="margin:0 0 12px">${scopeTxt}Reja: har bir ustoz oyiga <b>${PLAN_BASE} marta</b>, bog'cha ustozlari <b>${PLAN_BOG} marta</b> ko'riladi. Bir ustozning bir kunda faqat 1 ta darsi ko'riladi — bir kunda ikkinchi marta kiritib bo'lmaydi. <b>10 kunlik qoida:</b> 10-sanagacha har ustoz kamida 1 marta, 20-sanagacha 2 marta, oy oxirigacha 3 marta ko'rilishi kerak — ulgurmaganlar «Rejadan ortda». Bo'shagan ustozlar rejada yo'q, vaqtincha ishlamaganlarning rejasi ishlamagan kunlariga qarab kamayadi${canPlanAdmin() ? " (⚙ — holati va rejani o'zgartirish)" : ""}.</p>
       ${!P.rows.length ? `<div class="card empty">Bu tanlov bo'yicha bazada ustoz yo'q</div>` : `
       <div class="pl-top">
         <div class="card pl-main"><div class="small muted">Oylik reja bajarilishi — ${mLabel(ms)}</div>
@@ -8485,6 +8504,7 @@ window.METODISTLAR = [
         if (ib !== null && (ib < 0 || ib > IB_MAX)) return fail(`${n}-qator: intizomiy ball 0 dan ${IB_MAX} gacha bo'ladi`, q("ib"));
         if (ab !== null && (ab < 0 || ab > abMax(subj))) return fail(`${n}-qator: akademik ball 0 dan ${abMax(subj)} gacha bo'ladi`, q("ab"));
         mineRows.push({ teacher: tt ? tt.full_name : x.teacher.trim(), teacher_id: tt ? tt.id : "", subject: subj, filial: x.filial, klass: (x.klass || "").trim().toUpperCase().replace(/\s+/g, ""), soat: x.soat ? +x.soat : null, ib, ab, lesson: subj === BOSHL ? x.lesson || "" : "", lead: "", date }); }
+      { const cl = obsDayClash(mineRows, date); if (cl) return fail(cl); }
       if (mineRows.length) { data.mine = mineRows.length; const me = staff.find(s => s.id === S.me.id); if (me && !me.absent && (+me.hours || 0) < mineRows.length) me.hours = mineRows.length; }
       const summary = F.summary.trim();
       if (!summary) return fail("«Siz bugun nimalar qildingiz?» qismini to'ldiring", "#rh-sum");
@@ -9763,7 +9783,7 @@ window.METODISTLAR = [
         ${line(pts("ab", mx), "#2f6fdf")}${line(pts("ib", IB_MAX), "#e08a1e")}</svg>
       <div class="small muted"><i class="lg-dot" style="background:#2f6fdf"></i>Akademik (max ${mx}) &nbsp; <i class="lg-dot" style="background:#e08a1e"></i>Intizomiy (max ${IB_MAX})</div>
       <h3 style="margin:14px 0 6px">Oylar bo'yicha (reja: oyiga ${plan} marta)</h3>
-      <div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(months).reverse().map(([k, l]) => { const n = new Set(l.map(o => o.day)).size; return `<span class="chip ${n >= plan ? "ok" : n ? "warn" : "bad"}">${esc(mLabel(k + "-01"))}: <b>${n}/${plan}</b> · ${avg(l.map(o => o.ab)) ?? "—"}</span>`; }).join("")}</div></div>`;
+      <div class="row" style="gap:6px;flex-wrap:wrap">${Object.entries(months).reverse().map(([k, l]) => { const n = lessonN(l); return `<span class="chip ${n >= plan ? "ok" : n ? "warn" : "bad"}">${esc(mLabel(k + "-01"))}: <b>${n}/${plan}</b> · ${avg(l.map(o => o.ab)) ?? "—"}</span>`; }).join("")}</div></div>`;
   }
 
   // ---- Kuzatuv jadvali (faqat tavsiya — amal qilinmasa KPI'ga ta'sir qilmaydi)
@@ -10468,7 +10488,7 @@ window.METODISTLAR = [
       ...(curM ? [kc("Xavf ostida", String(A.risk), { c: "A62626" })] : []), kc("Ortiqcha", String(A.over))];
     const kw = Math.floor(15000 / K.length);
     body += D.h2("Umumiy xulosa") + D.tableX(K.map(k => ({ h: k.l, w: kw, al: "center" })), [{ cells: K.map(k => ({ v: k.v, b: 1, sz: 26, ...(k.col || {}) })) }], { hshd: "EEF3FA", af: 60 })
-      + D.p(`Rang: bajarilish 90% va yuqori — yashil, 50–89% — sariq, 50% dan past — qizil. Bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi.${curM ? ` Xavf ostida — oy oxirigacha ${P.left} ish kuni qolgan, kuzatuvlar oralig'i ${GAP_DAYS} ish kuni hisobida rejaga ulgurmasligi mumkin bo'lganlar.` : ""}`, { sz: 17, c: "6B7A90", i: 1, af: 160 });
+      + D.p(`Rang: bajarilish 90% va yuqori — yashil, 50–89% — sariq, 50% dan past — qizil. Bir ustozning bir kunda faqat 1 ta darsi ko'riladi — bir kunda ikkinchi marta kiritib bo'lmaydi.${curM ? ` Xavf ostida — oy oxirigacha ${P.left} ish kuni qolgan, kuzatuvlar oralig'i ${GAP_DAYS} ish kuni hisobida rejaga ulgurmasligi mumkin bo'lganlar.` : ""}`, { sz: 17, c: "6B7A90", i: 1, af: 160 });
     const gCols = n => [{ h: n, w: 3000 }, { h: "Ustozlar", w: 1400, al: "center" }, { h: "Kuzatuv / reja", w: 1900, al: "center" }, { h: "Bajarilish", w: 1600, al: "center" }, { h: "Bajarildi", w: 1500, al: "center" },
       { h: "Qisman", w: 1500, al: "center" }, { h: "Ko'rilmagan", w: 1700, al: "center" }, ...(curM ? [{ h: "Xavf ostida", w: 1700, al: "center" }] : [])];
     const gRow = (k, a, bold) => ({ b: bold, shd: bold ? "EAF0F8" : undefined, cells: [{ v: k, b: 1 }, String(a.n), `${a.got} / ${a.plan}`, { v: `${a.pct ?? 0}%`, b: 1, ...(wPct((a.pct ?? 0) / 100) || {}) }, String(a.done), String(a.part),
@@ -10717,7 +10737,7 @@ window.METODISTLAR = [
      "Manba: Registon Monitoring bo'limi portali. Barcha raqamlar xodimlar va bo'lim rahbarlari portalga kiritgan ma'lumotlardan avtomatik hisoblandi; qo'lda tuzatish kiritilmagan.",
      `Akademik monitoring — Akademik bo'lim xodimlari darsga kirib, ustozni ikki yo'nalishda baholaydi: intizomiy mezonlar (maksimal ${IB_MAX} ball) va akademik mezonlar (maksimal ${AB_MAX} ball; akademik ball faqat Boshlang'ich ta'lim, Ingliz tili, Rus tili, Arab tili va Matematikada qo'yiladi). «Umumiy natija» — shu ikki ballning maksimalga nisbati foizda.`,
      `«Kun ustozi» — kuzatilgan darsida intizomiy mezonlar bo'yicha to'liq ${IB_MAX}/${IB_MAX} ball olgan ustoz.`,
-     `Oylik reja — har bir ustoz oyiga ${PLAN_BASE} marta (bog'cha ustozlari ${PLAN_BOG} marta) kuzatilishi kerak; bir kunda bir necha dars ko'rilsa — 1 marta hisoblanadi.`,
+     `Oylik reja — har bir ustoz oyiga ${PLAN_BASE} marta (bog'cha ustozlari ${PLAN_BOG} marta) kuzatilishi kerak; bir ustozning bir kunda faqat 1 ta darsi ko'riladi.`,
      "Intizomiy monitoring — Intizomiy bo'lim xodimlari 7 ta filialda qayd etgan holatlar (o'quvchi va o'qituvchi davomati, darsga kechikish, kiyinish qoidasi, tozalik, xavfsizlik va boshqalar). Har holat natijasi: «hal qilindi» — joyida bartaraf etildi; «hal qilinmadi» — va'da berildi, lekin hal qilinmadi; «javob berilmadi» — mas'ul javob bermadi. «Takroriy» — shu filialda shu holat 7 kun ichida yana qayd etilgan.",
      "KPI — xodimlar bo'lim mezonlari bo'yicha har kuni/haftada baholanadi; 2 haftalik bosqich yakunida bo'limlar ichida o'rinlar aniqlanadi. Davomat — bo'lim rahbari kiritgan kelgan vaqti (10 daqiqagacha kechikish kechiriladi).",
      "Masalalar — xodimlar portal orqali yuborgan muammolar (mas'ul hal qiladi, yuboruvchi tasdiqlaydi) va takliflar (hammaga ochiq, muhokama qilinadi).",
@@ -10992,7 +11012,7 @@ window.METODISTLAR = [
     const months = {}; ob.forEach(z => { (months[z.day.slice(0, 7)] = months[z.day.slice(0, 7)] || []).push(z); });
     const mk = Object.keys(months).sort();
     if (mk.length) body += D.h2("Oylar bo'yicha") + D.tableX([{ h: "Oy", w: 2600 }, { h: "Ko'rildi / reja", w: 2000, al: "center" }, ...(isB ? [] : [{ h: `Intizomiy (${IB_MAX} dan)`, w: 2400, al: "center" }]), ...(g === OTHER_GRP ? [] : [{ h: `Akademik (${amx} dan)`, w: 2400, al: "center" }]), ...(ak ? [{ h: `Jami (${jm} dan)`, w: 2400, al: "center" }] : [])].map((c, i, a) => i === a.length - 1 ? { ...c, w: c.w + 15000 - a.reduce((s, x) => s + x.w, 0) } : c),
-      mk.map(k => { const l = months[k], pf = tPlanFor(t, k + "-01"), n = new Set(l.map(z => z.day)).size, mi = isB ? null : mean(l.map(z => z.ib)), ma = g === OTHER_GRP ? null : mean(l.map(z => z.ab)), mj = jOf(mi, ma);
+      mk.map(k => { const l = months[k], pf = tPlanFor(t, k + "-01"), n = lessonN(l), mi = isB ? null : mean(l.map(z => z.ib)), ma = g === OTHER_GRP ? null : mean(l.map(z => z.ab)), mj = jOf(mi, ma);
         return { cells: [{ v: mLabel(k + "-01"), b: 1 }, { v: `${n} / ${pf.plan}`, b: 1, ...(n >= pf.plan ? { c: "1B6E36" } : n ? { c: "8A5A00" } : { c: "A62626" }) }, ...(isB ? [] : [fx(mi)]), ...(g === OTHER_GRP ? [] : [fx(ma)]), ...(ak ? [{ v: fx(mj), b: 1, ...col(mj) }] : [])] }; }));
     // dinamika: oxirgi 3 va oldingi 3
     if (ob.length >= 2) { const key = isB ? "ab" : g === OTHER_GRP ? "ib" : null;
