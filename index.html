@@ -2417,6 +2417,7 @@ window.LESSONS = [
       async listSkips(ms) { const r = await sb.from("teacher_skip").select("*, teachers(full_name, subject, filial)").gte("month", ms); return r.error ? [] : r.data; },
       async skipRequest(tid, ms, choice, txt) { return chk(await sb.rpc("skip_request", { tid, ms, choice, txt })); },
       async skipDecide(sid, ok, msg) { chk(await sb.rpc("skip_decide", { sid, ok, msg: msg || "" })); return true; },
+      async kunCmp(d) { const r = await sb.rpc("kun_cmp", { d }); if (r.error) throw r.error; return r.data; },
       async listObsExtra() { const r = await sb.from("obs_extra").select("teacher_id,day,extra"); return r.error ? [] : r.data; },
       async listTeacherPlans() { const r = await sb.from("teacher_plan").select("*").gte("month", new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10)); return r.error ? [] : r.data; },
       async setTeacherPlan(teacher_id, month, plan, note) { if (plan === null || plan === undefined) { chk(await sb.from("teacher_plan").delete().eq("teacher_id", teacher_id).eq("month", month)); return true; }
@@ -6694,6 +6695,21 @@ window.METODISTLAR = [
         <tr class="ku-tot"><td><b>Jami</b></td>${TR.map(r => `<td><b>${pc(r.all.pT)}</b> <span class="small muted">· ${r.all.kun}</span></td>`).join("")}</tr></tbody></table></div></div>
       <details class="card" style="margin-top:16px"><summary><b>🏅 ${mLabel(ms)} kun ustozlari — ${K.names.length} ta</b></summary>
         ${K.names.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Necha marta</th><th>Oxirgi</th></tr></thead><tbody>${K.names.map((z, i) => `<tr><td>${i + 1}</td><td><b class="click" data-tid="${z.t.id}">${esc(z.t.full_name)}</b></td><td>${esc(kunFan(z.t))}</td><td>${esc(z.t.filial || "—")}</td><td>${z.n}</td><td>${fmtDate(z.last)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Bu oyda kun ustozi yo'q</div>`}</details>`;
+    // 2026-11-27: «Kun o'qituvchisi» guruhi (bot) bilan solishtiruv — faqat ko'rsatadi, hech narsani o'zgartirmaydi
+    if (isManager() && db.kunCmp) { const box = document.createElement("div"); box.className = "card"; box.style.marginTop = "16px"; root.appendChild(box);
+      const KC = { mos: "ok", "mos (amaliyot)": "ok", "guruhga chiqmagan": "warn", "portalda yo'q": "bad", "portalda yo'q (amaliyot)": "bad", "ism topilmadi": "bad", "farqli (filial)": "warn", takror: "warn" };
+      const draw = async d => { box.innerHTML = `<div class="card-head"><h2>🔎 Guruh bilan solishtiruv</h2><span class="spacer"></span><input type="date" id="kc-d" value="${d}" max="${today()}" style="width:auto"></div><div class="empty">Yuklanmoqda…</div>`;
+        $("#kc-d", box).onchange = e => { S.ui.kcD = e.target.value; draw(e.target.value); };
+        let R = []; try { R = (await db.kunCmp(d)) || []; } catch (x) { box.querySelector(".empty").textContent = x.message || "Xatolik"; return; }
+        const cnt = {}; R.forEach(r => cnt[r.holat] = (cnt[r.holat] || 0) + 1);
+        box.innerHTML = `<div class="card-head"><h2>🔎 Guruh bilan solishtiruv</h2><span class="spacer"></span><input type="date" id="kc-d" value="${d}" max="${today()}" style="width:auto"></div>
+          <p class="small muted" style="margin:-4px 0 10px">Portaldagi 25/25 (kun ustozi) va «Kun o'qituvchisi» guruhidagi postlar (@kun_oqituvchisi_bot o'qigan) solishtiriladi. Faqat ma'lumot — hech narsa o'zgartirilmaydi.</p>
+          <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${Object.entries(cnt).map(([h, c]) => `<span class="kpi-badge ${KC[h] || ""}">${esc(h)}: ${c}</span>`).join("") || `<span class="muted small">Bu kunda ma'lumot yo'q</span>`}</div>
+          ${R.length ? `<div class="table-wrap"><table><thead><tr><th>Holat</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Portalda</th><th>Guruhda</th><th>Kiritgan</th><th>Post tashlagan</th></tr></thead><tbody>
+          ${R.map(r => `<tr><td><span class="kpi-badge ${KC[r.holat] || ""}">${esc(r.holat)}</span></td><td><b>${esc(r.teacher)}</b></td><td>${esc(r.subject || "—")}</td><td>${esc(r.filial || "—")}</td><td>${esc(r.portal || "—")}</td>
+            <td>${r.link ? `<a href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.guruh || "post")}</a>` : esc(r.guruh || "—")}</td><td class="small">${esc(r.kiritgan || "—")}</td><td class="small">${esc(r.tashlagan || "—")}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+        $("#kc-d", box).onchange = e => { S.ui.kcD = e.target.value; draw(e.target.value); }; };
+      draw(S.ui.kcD || today()); }
     $("#ku-m", root).onchange = e => { S.ui.kuM = e.target.value; kunStatView(root); };
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; kunStatView(root); };
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
