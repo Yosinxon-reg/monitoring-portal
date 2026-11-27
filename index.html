@@ -1968,6 +1968,10 @@ window.LESSONS = [
       async answerHelpReq(rid, okk, msg) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) { h.status = okk ? "qabul" : "rad"; h.reply = msg || ""; h.answered_at = new Date().toISOString(); } save(); return ok(true); },
       async cancelHelpReq(rid) { const d = load(); const h = (d.helpreq || []).find(x => x.id === rid); if (h) h.status = "bekor"; save(); return ok(true); },
       // ---- 43: amaliyot fanlari (demo) — umumiy jadval amallari
+      async hrLoad() { const d = load(); return ok({ people: d.hr_people || [], imports: d.hr_imports || [], moves: d.person_moves || [] }); },
+      async hrImport() { return fail("Demo rejimida HR yuklash yo'q"); },
+      async hrSetLink() { return fail("Demo rejimida mavjud emas"); },
+      async teacherMove() { return fail("Demo rejimida mavjud emas"); },
       async amalLoad() { const d = load(); const T = k => d["amal_" + k] || [];
         if (!d.amal_access) { d.amal_access = [{ user_id: "u-x1", can_eval: true }]; save(); }
         return ok({ acc: T("access"), teachers: T("teachers"), videos: T("videos"), months: T("months"), notes: T("notes"), awards: T("awards"), groups: T("groups"), tg: T("tg") }); },
@@ -2374,6 +2378,12 @@ window.LESSONS = [
       async sendHelpReq(to_user, tids, due_date, msg) { return chk(await sb.rpc("send_help_request", { to_user, tids, due_date, msg: msg || "" })); },
       async answerHelpReq(rid, ok, msg) { chk(await sb.rpc("answer_help_request", { rid, ok, msg: msg || "" })); return true; },
       async cancelHelpReq(rid) { chk(await sb.rpc("cancel_help_request", { rid })); return true; },
+      // ---- 82: HR ro'yxati (yagona «bu odam kim» manbasi)
+      async hrLoad() { const q = t => pageSoft(() => sb.from(t).select("*").order("id"));
+        const [people, imports, moves] = await Promise.all([q("hr_people"), q("hr_imports"), q("person_moves")]); return { people, imports, moves }; },
+      async hrImport(rows, apply) { return chk(await sb.rpc("hr_import", { p_rows: rows, p_apply: !!apply })); },
+      async hrSetLink(kind, id, hr) { return chk(await sb.rpc("hr_set_link", { p_kind: kind, p_id: id, p_hr: hr || null })); },
+      async teacherMove(to, id, subject, reason) { return chk(await sb.rpc("teacher_move", { p_to: to, p_id: id, p_subject: subject, p_reason: reason })); },
       // ---- 43: amaliyot fanlari
       async amalLoad() {
         const since = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
@@ -3156,7 +3166,7 @@ window.METODISTLAR = [
     "hisob-reyting": { tabs: grpTabs },
     ustozlar: { tabs: () => { if (!S.me || !isStaff()) return []; const o = [{ id: "yordam", label: "Ustozlarim" }];
       if (canPlan()) o.push({ id: "oylik-reja", label: "Oylik reja" }); if (canMetAdmin()) o.push({ id: "oqituvchilar", label: "Barcha ustozlar va reyting" });
-      if (canSeeBog()) o.push({ id: "bogcha", label: "Bog'chalar" }); if (amalSee()) o.push({ id: "amaliyot", label: "Amaliyot fanlari" }); return o; } },
+      if (canSeeBog()) o.push({ id: "bogcha", label: "Bog'chalar" }); if (amalSee()) o.push({ id: "amaliyot", label: "Amaliyot fanlari" }); if (S.me.role === "asoschi" || canMetAdmin()) o.push({ id: "hr-royxat", label: "HR ro'yxati" }); return o; } },
     tahlil: { tabs: () => { if (!S.me || !isStaff()) return []; const r = S.me.role, o = [{ id: "statistika", label: "Statistika" }];
       if (canIntzStat()) o.push({ id: "intizomiy-tahlil", label: "Intizomiy tahlil" }); if (r === "asoschi" || r === "ceo") o.push({ id: "filiallar", label: "Filiallar" }); return o; } },
     shaxsiy: { tabs: () => { const o = [{ id: "profil", label: "Profilim" }]; if (S.me && isStaff()) o.push({ id: "organish", label: "O'rganish" }); o.push({ id: "portal-haqida", label: "Portal haqida" }); return o; } },
@@ -11852,6 +11862,157 @@ window.METODISTLAR = [
       await amalReload(); toast("Saqlandi"); } catch (e) { toast(e.message, true); x.checked = !x.checked; } });
   }
 
+  // ---- 82: HR ro'yxati — yagona «bu odam kim» manbasi. Akademik va amaliyot ma'lumotlari alohida qoladi, faqat bog'lanadi.
+  const hrKey = s => String(s || "").toLowerCase().replace(/[‘’ʻʼ`´]/g, "'").replace(/\s+/g, " ").trim();
+  const hrCan = () => !!S.me && (S.me.role === "asoschi" || canMetAdmin());
+  const hrBoss = () => !!S.me && S.me.role === "asoschi";
+  async function hrReload() { if (!db.hrLoad) return; try { S.hr = await db.hrLoad(); } catch (e) { console.warn("hr", e); S.hr = S.hr || { people: [], imports: [], moves: [] }; } }
+  const hrById = () => { const m = {}; ((S.hr && S.hr.people) || []).forEach(h => m[h.id] = h); return m; };
+  // bog'lanish holati: aniq / ism farqli / filial farqli / HRda ketgan / HRda yo'q
+  function hrState(x, H) {
+    const h = x.hr_id ? H[x.hr_id] : null;
+    if (!h) return { k: "none", h: null, txt: "HRda yo'q", cls: "missing" };
+    if (!h.active) return { k: "gone", h, txt: "HRda ketgan", cls: "overdue" };
+    if (h.filial !== x.filial) return { k: "fil", h, txt: "Filial farqli", cls: "jarayonda" };
+    const a = hrKey(x.full_name), b = hrKey(h.full_name);
+    if (!(a === b || b.startsWith(a + " ") || a.startsWith(b + " "))) return { k: "nm", h, txt: "Ism yozilishi farqli", cls: "jarayonda" };
+    return { k: "ok", h, txt: "Bog'langan", cls: "tasdiqlandi" };
+  }
+  PAGES["hr-royxat"] = async page => {
+    if (!hrCan()) return PAGES.bosh(page);
+    const rr = () => { if (curRoute() === "hr-royxat") PAGES["hr-royxat"](page); };
+    if (!S.hr || !S.teachers || (amalSee() && !S.amal)) {
+      page.innerHTML = `<div class="empty" style="padding:40px">Yuklanmoqda…</div>`;
+      await Promise.all([S.hr ? 0 : hrReload(), S.teachers ? 0 : teachReload(), amalSee() && !S.amal ? amalReload() : 0]); return rr();
+    }
+    const H = hrById(), boss = hrBoss();
+    const fil = S.ui.hrF || "", q = hrKey(S.ui.hrQ || ""), v = S.ui.hrV || "ak";
+    const inF = x => !fil || x.filial === fil, inQ = x => !q || hrKey(x.full_name).includes(q) || (x.hr_id && H[x.hr_id] && hrKey(H[x.hr_id].full_name).includes(q));
+    const AK = (S.teachers || []).filter(x => !tArch(x)), BOGN = AK.filter(isBogT).length, AKs = AK.filter(x => !isBogT(x));
+    const AM = S.amal ? amLive() : [];
+    const used = new Set([...AK, ...AM].map(x => x.hr_id).filter(Boolean));
+    const people = (S.hr.people || []);
+    const free = people.filter(h => h.active && !used.has(h.id)), gone = [...AKs, ...AM].filter(x => hrState(x, H).k === "gone");
+    const akSt = AKs.map(x => ({ x, s: hrState(x, H) })), amSt = AM.map(x => ({ x, s: hrState(x, H) }));
+    const cnt = (L, k) => L.filter(r => r.s.k === k).length, okN = L => L.filter(r => r.s.k !== "none").length;
+    const lastImp = (S.hr.imports || []).slice().sort((a, b) => a.at < b.at ? 1 : -1)[0];
+    const tab = (k, l, n) => `<button type="button" class="chip-btn ${v === k ? "on" : ""}" data-hrv="${k}">${l} <b>${n}</b></button>`;
+    const fils = FILIALLAR;
+    page.innerHTML = head("HR ro'yxati", "Xodimlarning yagona ro'yxati (HR fayllaridan). Akademik va amaliyot ustozlarining ma'lumotlari alohida yuritiladi — har biri faqat shu ro'yxatga bog'lanadi. Telefon va tug'ilgan sana olinmaydi.",
+      boss ? `<div class="row" style="gap:8px"><button class="btn primary" id="hr-up">📥 HR fayllarini yuklash</button><input type="file" id="hr-file" accept=".xlsx,.xls" multiple hidden></div>` : "") + `
+      <div class="stats">${stat("HR ro'yxatida faol", people.filter(h => h.active).length)}
+        ${stat("Akademik ustozlar bog'langan", `${okN(akSt)}/${AKs.length}`, okN(akSt) === AKs.length ? "ok" : "warn")}
+        ${stat("Amaliyot ustozlari bog'langan", `${okN(amSt)}/${AM.length}`, okN(amSt) === AM.length ? "ok" : "warn")}
+        ${stat("HRda ketgan, portalda faol", gone.length, gone.length ? "bad" : "ok")}</div>
+      <div class="note" style="margin:0 0 12px">${lastImp ? `Oxirgi yuklash: <b>${fmtDate(String(lastImp.at).slice(0, 10))}</b>${lastImp.summary && lastImp.summary.izoh ? " — " + esc(lastImp.summary.izoh) : ""}. ` : ""}Bog'cha ustozlari (${BOGN} ta) HR fayllarida alohida yuritiladi — bu ro'yxatda hisobga olinmaydi.</div>
+      <div class="chips" style="margin-bottom:10px">${tab("ak", "🎓 Akademik ustozlar", AKs.length)}${tab("am", "🤸 Amaliyot fanlari", AM.length)}${tab("free", "HRda bor, portalda yo'q", free.length)}${tab("gone", "HRda ketgan", gone.length)}${tab("log", "Jurnal", (S.hr.moves || []).length + (S.hr.imports || []).length)}</div>
+      <div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <select id="hr-f" style="width:auto"><option value="">Barcha filiallar</option>${fils.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
+        <input id="hr-q" placeholder="Ism bo'yicha qidirish" value="${esc(S.ui.hrQ || "")}" style="max-width:260px"></div>
+      <div id="hr-body"></div>`;
+    const body = $("#hr-body", page);
+    const tbl = (hd, rows) => rows.length ? `<div class="card" style="padding:0"><div class="table-wrap"><table class="mt-tbl"><thead><tr>${hd.map(x => `<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div></div>` : `<div class="card empty">Ro'yxat bo'sh</div>`;
+    const sortN = (a, b) => (a.filial || "").localeCompare(b.filial || "") || a.full_name.localeCompare(b.full_name);
+    if (v === "ak" || v === "am") {
+      const L = (v === "ak" ? akSt : amSt).filter(r => inF(r.x) && inQ(r.x));
+      const stf = S.ui.hrS || "", L2 = L.filter(r => !stf || r.s.k === stf).sort((a, b) => sortN(a.x, b.x));
+      const sc = (k, l) => { const n = cnt(L, k); return n || k === "" ? `<button type="button" class="chip-btn sm ${stf === k ? "on" : ""}" data-hrs="${k}">${l} <b>${k ? n : L.length}</b></button>` : ""; };
+      body.innerHTML = `<div class="chips" style="margin-bottom:10px">${sc("", "Hammasi")}${sc("ok", "Bog'langan")}${sc("nm", "Ism yozilishi farqli")}${sc("fil", "Filial farqli")}${sc("gone", "HRda ketgan")}${sc("none", "HRda yo'q")}</div>` +
+        tbl(["Ustoz (portalda)", "Filial", "Fan", "HR bo'yicha", "Holat", boss ? "" : null].filter(x => x !== null), L2.map(({ x, s }) => `<tr>
+          <td><b>${esc(x.full_name)}</b></td><td>${esc(x.filial || "—")}</td><td>${esc(v === "ak" ? canonSubj(x.subject) || "—" : x.subject || "—")}</td>
+          <td>${s.h ? `${esc(s.h.full_name)}<div class="small muted">${esc([s.h.lavozim, s.h.filial !== x.filial ? s.h.filial : ""].filter(Boolean).join(" · "))}</div>` : `<span class="muted">—</span>`}</td>
+          <td>${pill(s.cls, s.txt)}</td>
+          ${boss ? `<td style="white-space:nowrap"><button class="btn sm" data-hrl="${v}|${x.id}">${s.h ? "Bog'lanish" : "Bog'lash"}</button> <button class="btn sm ghost" data-hrm="${v}|${x.id}" title="Turini o'zgartirish">${v === "ak" ? "→ Amaliyot" : "→ Akademik"}</button></td>` : ""}</tr>`));
+      $$("[data-hrs]", body).forEach(b => b.onclick = () => { S.ui.hrS = b.dataset.hrs; rr(); });
+    } else if (v === "free") {
+      const L = free.filter(h => inF(h) && inQ(h)).sort(sortN);
+      body.innerHTML = `<p class="small muted" style="margin:0 0 8px">HR faylida bor, lekin portalda hech bir ustozga bog'lanmagan xodimlar. Ular orasida sinf rahbarlari, tarbiyachilar, psixolog va boshqa lavozimlar ham bor — hammasi ham kuzatiladigan ustoz emas.</p>` +
+        tbl(["F.I.Sh. (HR)", "Filial", "Bo'lim", "Lavozim", "Fan (lavozimdan)"], L.map(h => `<tr><td><b>${esc(h.full_name)}</b></td><td>${esc(h.filial)}</td><td>${esc(h.bolim || "—")}</td><td>${esc(h.lavozim || "—")}</td><td>${esc(h.subject || "—")}</td></tr>`));
+    } else if (v === "gone") {
+      const L = gone.filter(x => inF(x) && inQ(x)).sort(sortN);
+      body.innerHTML = `<p class="small muted" style="margin:0 0 8px">So'nggi HR faylida yo'q, lekin portalda hali faol. Portal ularni o'zi arxivlamaydi — tekshirib, «Ustozlarim» bo'limidan «ishdan ketdi» so'rovi orqali arxivlang.</p>` +
+        tbl(["Ustoz", "Filial", "Tur", "HRdan chiqqan sana"], L.map(x => { const h = H[x.hr_id]; return `<tr><td><b>${esc(x.full_name)}</b></td><td>${esc(x.filial)}</td><td>${AK.includes(x) ? "Akademik" : "Amaliyot"}</td><td>${h && h.left_seen ? fmtDate(h.left_seen) : "—"}</td></tr>`; }));
+    } else {
+      const M = (S.hr.moves || []).slice().sort((a, b) => a.at < b.at ? 1 : -1), I = (S.hr.imports || []).slice().sort((a, b) => a.at < b.at ? 1 : -1);
+      const kn = k => k === "akademik" ? "Akademik" : "Amaliyot";
+      body.innerHTML = `<h3 style="margin:4px 0 8px">Turini o'zgartirish (akademik ↔ amaliyot)</h3>` +
+        tbl(["Sana", "Ustoz", "Filial", "O'tkazildi", "Fan", "Sabab", "Kim"], M.map(m => `<tr><td>${fmtDate(String(m.at).slice(0, 10))}</td><td><b>${esc(m.full_name)}</b></td><td>${esc(m.filial)}</td><td>${kn(m.from_kind)} → ${kn(m.to_kind)}</td><td>${esc(m.subject)}</td><td>${esc(m.reason)}</td><td>${esc(m.by ? nameOf(m.by) : "—")}</td></tr>`)) +
+        `<h3 style="margin:18px 0 8px">HR yuklashlari</h3>` +
+        tbl(["Sana", "Filiallar", "Jami", "Yangi", "Ketgan", "Qaytgan", "Lavozimi o'zgargan", "Bog'landi"], I.map(i => { const s = i.summary || {}; return `<tr><td>${fmtDate(String(i.at).slice(0, 10))}</td><td>${esc((i.filials || []).join(", "))}</td><td>${s.jami ?? "—"}</td><td>${s.yangi ?? "—"}</td><td>${s.ketgan ?? "—"}</td><td>${s.qaytgan ?? "—"}</td><td>${s.ozgargan ?? "—"}</td><td>${s.boglandi ?? "—"}</td></tr>`; }));
+    }
+    $$("[data-hrv]", page).forEach(b => b.onclick = () => { S.ui.hrV = b.dataset.hrv; S.ui.hrS = ""; rr(); });
+    $("#hr-f", page).onchange = e => { S.ui.hrF = e.target.value; rr(); };
+    const qi = $("#hr-q", page); let qt; qi.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { S.ui.hrQ = qi.value; rr(); setTimeout(() => { const n = $("#hr-q"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 0); }, 300); };
+    const after = async msg => { toast(msg); await Promise.all([hrReload(), teachReload(true), amalSee() ? amalReload() : 0]); rr(); };
+    const findX = (k, id) => k === "ak" ? AK.find(x => x.id === id) : AM.find(x => x.id === id);
+    $$("[data-hrl]", body).forEach(b => b.onclick = () => { const [k, id] = b.dataset.hrl.split("|"); hrLinkModal(k, findX(k, id), free, H, after); });
+    $$("[data-hrm]", body).forEach(b => b.onclick = () => { const [k, id] = b.dataset.hrm.split("|"); hrMoveModal(k, findX(k, id), after); });
+    if (boss) { const fi = $("#hr-file", page); $("#hr-up", page).onclick = () => fi.click(); fi.onchange = () => { const fs = [...fi.files]; fi.value = ""; if (fs.length) hrUpload(fs, after); }; }
+  };
+  function hrLinkModal(k, x, free, H, after) {
+    if (!x) return; const cur = x.hr_id ? H[x.hr_id] : null;
+    const key = hrKey(x.full_name).split(" ")[0];
+    const L = free.slice().sort((a, b) => (b.filial === x.filial) - (a.filial === x.filial) || (hrKey(b.full_name).startsWith(key)) - (hrKey(a.full_name).startsWith(key)) || a.full_name.localeCompare(b.full_name));
+    const m = openModal(`HR bog'lanishi — ${esc(x.full_name)}`, `
+      <p class="small muted" style="margin-top:0">${k === "ak" ? "Akademik" : "Amaliyot"} ustoz · ${esc(x.filial || "—")}. ${cur ? `Hozir: <b>${esc(cur.full_name)}</b> (${esc(cur.filial)}, ${esc(cur.lavozim || "—")}).` : "Hozir HR ro'yxatiga bog'lanmagan."}</p>
+      <div class="field"><label>HR ro'yxatidagi xodim (bog'lanmaganlar; shu filialdagilar tepada)</label>
+        <select id="hl-s"><option value="">— tanlang —</option>${L.map(h => `<option value="${h.id}">${esc(h.full_name)} — ${esc(h.filial)}${h.lavozim ? ", " + esc(h.lavozim) : ""}</option>`).join("")}</select></div>`,
+      `${cur ? `<button class="btn ghost" id="hl-x">Bog'lanishni uzish</button>` : ""}<span class="spacer"></span><button class="btn" data-close>Bekor</button><button class="btn primary" id="hl-ok">Bog'lash</button>`);
+    const kind = k === "ak" ? "akademik" : "amaliyot";
+    $("#hl-ok", m).onclick = async e => { const hid = $("#hl-s", m).value; if (!hid) return toast("Xodimni tanlang", true); e.target.disabled = true;
+      try { await db.hrSetLink(kind, x.id, hid); closeModal(); after("Bog'landi"); } catch (er) { toast(er.message, true); e.target.disabled = false; } };
+    if (cur) $("#hl-x", m).onclick = async e => { e.target.disabled = true; try { await db.hrSetLink(kind, x.id, null); closeModal(); after("Bog'lanish uzildi"); } catch (er) { toast(er.message, true); e.target.disabled = false; } };
+  }
+  function hrMoveModal(k, x, after) {
+    if (!x) return; const to = k === "ak" ? "amaliyot" : "akademik";
+    const subs = [...new Set(AMAL_SUBJ.concat(amT().map(a => a.subject)))].filter(Boolean).sort();
+    const m = openModal(`Turini o'zgartirish — ${esc(x.full_name)}`, `
+      <p style="margin-top:0">${esc(x.full_name)} (${esc(x.filial || "—")}) <b>${k === "ak" ? "akademik ustozlardan amaliyot fanlariga" : "amaliyot fanlaridan akademik ustozlarga"}</b> o'tkaziladi.</p>
+      <p class="small muted">${k === "ak" ? "Akademik ro'yxatda arxivga o'tadi — kuzatuvlari va ballari saqlanadi, lekin oylik reja va reytingga kirmaydi. Amaliyot fanlarida yangi yozuv ochiladi." : "Amaliyot ro'yxatida arxivga o'tadi — videolari va baholari saqlanadi. Akademik ro'yxatga qo'shiladi va oylik rejaga kiradi."} Bir odam bir vaqtda faqat bitta turda turadi.</p>
+      <div class="field"><label>Fani</label>${to === "amaliyot" ? `<select id="mv-s"><option value="">— fan —</option>${subs.map(s => `<option>${esc(s)}</option>`).join("")}</select>` : `<select id="mv-s">${subjOptions("")}</select>`}</div>
+      <div class="field"><label>Sababi (majburiy)</label><textarea id="mv-r" rows="3" placeholder="Masalan: suzish fani o'qituvchisi, boshlang'ich emas"></textarea></div>`,
+      `<span class="spacer"></span><button class="btn" data-close>Bekor</button><button class="btn primary" id="mv-ok">O'tkazish</button>`);
+    $("#mv-ok", m).onclick = async e => { const s = $("#mv-s", m).value, r = $("#mv-r", m).value.trim();
+      if (!s) return toast("Fanini tanlang", true); if (r.length < 5) { $("#mv-r", m).focus(); return toast("Sababini yozing", true); }
+      e.target.disabled = true; try { await db.teacherMove(to, x.id, s, r); closeModal(); after(to === "amaliyot" ? "Amaliyot fanlariga o'tkazildi" : "Akademik ustozlarga o'tkazildi"); } catch (er) { toast(er.message, true); e.target.disabled = false; } };
+  }
+  // HR Excel fayllari: faqat F.I.O, Filial, Bo'lim, Lavozim, Turi, Status ustunlari o'qiladi (telefon va boshqalar olinmaydi)
+  async function hrParse(files) {
+    await loadXlsx(); const X = window.XLSX, out = [], bad = [];
+    const norm = s => String(s ?? "").replace(/[‘’ʻʼ`´]/g, "'").replace(/\s+/g, " ").trim();
+    const hk = s => norm(s).toLowerCase().replace(/'/g, "");
+    for (const f of files) {
+      const wb = X.read(await f.arrayBuffer(), { type: "array" }); const ws = wb.Sheets[wb.SheetNames[0]];
+      const A = X.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      const hi = A.findIndex(r => r.some(c => /^f\.?\s*i\.?\s*(o|sh)\.?$/i.test(norm(c))));
+      if (hi < 0) { bad.push(f.name); continue; }
+      const hdr = A[hi].map(hk), col = re => hdr.findIndex(h => re.test(h));
+      const ci = { fio: col(/^f\.?\s*i\.?\s*(o|sh)\.?$/), filial: col(/^filial/), bolim: col(/^bolim/), lavozim: col(/^lavozim/), turi: col(/^turi/), status: col(/^status/) };
+      if (ci.filial < 0) { bad.push(f.name); continue; }
+      A.slice(hi + 1).forEach(r => { const fio = norm(r[ci.fio]).replace(/\s+XXX$/i, ""); if (fio.length < 5) return;
+        if (ci.status >= 0 && norm(r[ci.status]) && !/^aktiv|^faol|^active/i.test(norm(r[ci.status]))) return;
+        out.push({ fio, filial: norm(r[ci.filial]), bolim: ci.bolim >= 0 ? norm(r[ci.bolim]) : "", lavozim: ci.lavozim >= 0 ? norm(r[ci.lavozim]) : "", turi: ci.turi >= 0 ? norm(r[ci.turi]) : "" }); });
+    }
+    return { rows: out, bad };
+  }
+  async function hrUpload(files, after) {
+    toast("Fayllar o'qilmoqda…");
+    let P; try { P = await hrParse(files); } catch (e) { return toast("Faylni o'qib bo'lmadi: " + e.message, true); }
+    if (!P.rows.length) return toast("Fayllarda «F.I.O» va «Filial» ustunlari topilmadi", true);
+    let R; try { R = await db.hrImport(P.rows, false); } catch (e) { return toast(e.message, true); }
+    const sec = (t, L, f, open) => L && L.length ? `<details class="card" style="margin:8px 0" ${open ? "open" : ""}><summary><b>${t}</b> <span class="badge">${L.length}</span></summary><div style="margin-top:8px;max-height:260px;overflow:auto">${L.map(f).join("")}</div></details>` : "";
+    const li = x => `<div class="list-item"><div style="flex:1"><b>${esc(x.ism)}</b> <span class="small muted">${esc([x.filial, x.lavozim].filter(Boolean).join(" · "))}</span></div>${x.portal ? pill("overdue", "portalda faol — " + x.portal) : ""}</div>`;
+    const m = openModal("HR yuklash — farqlar", `
+      <p style="margin-top:0">${files.length} ta fayl, <b>${R.jami}</b> ta xodim · filiallar: ${esc((R.filiallar || []).join(", "))}${P.bad.length ? `<br><span class="small" style="color:var(--bad)">O'qilmagan fayllar: ${esc(P.bad.join(", "))}</span>` : ""}</p>
+      ${(R.nomalum_filial || []).length ? `<div class="note" style="border-color:var(--bad)">⚠ Ma'lumotnomada yo'q filial nomi: <b>${esc(R.nomalum_filial.join(", "))}</b> — bu xodimlar alohida filial bo'lib yoziladi.</div>` : ""}
+      <p class="small muted">Faqat yuklangan filiallar solishtiriladi. Tasdiqlasangiz HR ro'yxati yangilanadi va yangi xodimlar portal ustozlariga avtomatik bog'lanadi. Portaldagi ustozlar o'zi arxivlanmaydi.</p>
+      ${sec("Yangi xodimlar", R.yangi, li, true)}${sec("HR faylidan chiqib ketganlar", R.ketgan, li, true)}${sec("Qaytganlar", R.qaytgan, li)}
+      ${sec("Lavozimi o'zgarganlar", R.ozgargan, x => `<div class="list-item"><div style="flex:1"><b>${esc(x.ism)}</b> <span class="small muted">${esc(x.filial)}</span><div class="small">${esc(x.oldin || "—")} → <b>${esc(x.endi || "—")}</b></div></div></div>`)}
+      ${!(R.yangi.length + R.ketgan.length + R.qaytgan.length + R.ozgargan.length) ? `<div class="card empty">O'zgarish yo'q — ro'yxat amaldagisi bilan bir xil.</div>` : ""}`,
+      `<span class="spacer"></span><button class="btn" data-close>Bekor</button><button class="btn primary" id="hu-ok">✅ Tasdiqlash va qo'llash</button>`);
+    $("#hu-ok", m).onclick = async e => { e.target.disabled = true;
+      try { const r = await db.hrImport(P.rows, true); closeModal(); after(`HR ro'yxati yangilandi${r.boglandi ? ` — ${r.boglandi} ta ustoz bog'landi` : ""}`); } catch (er) { toast(er.message, true); e.target.disabled = false; } };
+  }
   PAGES.bogcha = page => {
     if (!canSeeBog()) return PAGES.bosh(page);
     const fil = S.ui.bgF || "", t = today(), ms = mStart(S.ui.bgM || t);
