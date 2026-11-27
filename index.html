@@ -7134,6 +7134,52 @@ window.METODISTLAR = [
     $("#ox-tgp", md).onclick = e => tg(e.currentTarget, pagesPdf([R.c]), base() + ".pdf");
     $("#ox-ct", md).onclick = async () => { try { await navigator.clipboard.writeText(YA($("#ox-t", md).value)); toast("E'lon matni nusxalandi"); } catch (e) { $("#ox-t", md).select(); document.execCommand("copy"); toast("E'lon matni nusxalandi"); } };
   }
+  // 2026-11-27: filiallar natijasi — to'plangan ball ÷ olish mumkin bo'lgan ball (barcha darslar yig'indisi), joriy davr bo'yicha
+  function filCalc(obs) {
+    const F = {};
+    (obs || []).forEach(o => { const t = teacherById(o.teacher_id), grp = subjGroup((t && t.subject) || o.subject); if (grp === BOG) return;
+      const f = o.filial || (t && t.filial) || "—", x = F[f] = F[f] || { f, n: 0, ib: 0, ibM: 0, ab: 0, abM: 0, T: {} };
+      const tt = x.T[o.teacher_id] = x.T[o.teacher_id] || { t: t || { id: o.teacher_id, full_name: "—", subject: o.subject }, n: 0, ib: 0, ibM: 0, ab: 0, abM: 0 };
+      const hasIb = o.ib !== null && o.ib !== undefined && o.ib !== "", hasAb = grp !== OTHER_GRP && o.ab !== null && o.ab !== undefined && o.ab !== "";
+      if (!hasIb && !hasAb) return;
+      x.n++; tt.n++;
+      if (hasIb) { x.ib += +o.ib; x.ibM += IB_MAX; tt.ib += +o.ib; tt.ibM += IB_MAX; }
+      if (hasAb) { const m = abMax(o.subject); x.ab += +o.ab; x.abM += m; tt.ab += +o.ab; tt.abM += m; } });
+    const pc = (a, b) => b ? Math.round(a / b * 1000) / 10 : null;
+    return Object.values(F).map(x => ({ ...x, tot: pc(x.ib + x.ab, x.ibM + x.abM), ibP: pc(x.ib, x.ibM), abP: pc(x.ab, x.abM),
+      T: Object.values(x.T).filter(z => z.n).map(z => ({ ...z, tot: pc(z.ib + z.ab, z.ibM + z.abM), share: x.ibM + x.abM ? Math.round((z.ib + z.ab) / (x.ib + x.ab || 1) * 1000) / 10 : 0 })) }))
+      .filter(x => x.n).sort((a, b) => (b.tot ?? -1) - (a.tot ?? -1));
+  }
+  function filCard(P) {
+    const cur = filCalc(buildRating(P.from, P.to, "").obs), prev = filCalc(buildRating(P.pFrom, P.pTo, "").obs);
+    if (!cur.length) return "";
+    const all = cur.reduce((a, x) => ({ ib: a.ib + x.ib, ibM: a.ibM + x.ibM, ab: a.ab + x.ab, abM: a.abM + x.abM, n: a.n + x.n }), { ib: 0, ibM: 0, ab: 0, abM: 0, n: 0 });
+    const pc = (a, b) => b ? Math.round(a / b * 1000) / 10 : null, f1 = v => v === null || v === undefined ? "—" : String(v).replace(".", ",") + "%";
+    const dl = x => { const p = prev.find(y => y.f === x.f); if (!p || p.tot === null || x.tot === null) return `<span class="muted small">—</span>`; const d = Math.round((x.tot - p.tot) * 10) / 10;
+      return d > 0 ? `<span class="rk-up">▲ ${String(d).replace(".", ",")}</span>` : d < 0 ? `<span class="rk-down">▼ ${String(-d).replace(".", ",")}</span>` : `<span class="rk-eq">=</span>`; };
+    const bar = v => `<span class="ku-bar"><i style="width:${Math.min(100, v || 0)}%"></i></span>`;
+    return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>🏫 Filiallar natijasi · ${esc(P.label)}</h2><span class="spacer"></span>
+        <span class="small muted">Maktab bo'yicha: <b>${f1(pc(all.ib + all.ab, all.ibM + all.abM))}</b> · intizomiy ${f1(pc(all.ib, all.ibM))} · akademik ${f1(pc(all.ab, all.abM))} · ${all.n} dars</span></div>
+      <p class="small muted" style="margin:-4px 0 10px">Foiz = filialdagi barcha darslarda to'plangan ball ÷ olish mumkin bo'lgan ball. Akademik foizga faqat akademik ball qo'yiladigan fanlar kiradi; bog'cha kirmaydi. Kuzatuv qo'shilishi bilan yangilanadi, har oy noldan boshlanadi. Filialni bosing — ustozlar ro'yxati.</p>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>Filial</th><th>Umumiy natija</th><th>Intizomiy</th><th>Akademik</th><th>${esc(P.pLabel)}ga nisbatan</th><th>Darslar</th><th>Ustozlar</th></tr></thead><tbody>
+      ${cur.map((x, i) => `<tr class="click" data-filc="${esc(x.f)}"><td>${i + 1}</td><td><b>${esc(x.f)}</b></td><td><b style="color:#1f9d55">${f1(x.tot)}</b> ${bar(x.tot)}</td>
+        <td>${f1(x.ibP)} <span class="small muted">${x.ib}/${x.ibM}</span></td><td>${f1(x.abP)} <span class="small muted">${x.abM ? x.ab + "/" + x.abM : ""}</span></td><td>${dl(x)}</td><td>${x.n}</td><td>${x.T.length}</td></tr>`).join("")}</tbody></table></div></div>`;
+  }
+  function filTeachersModal(P, f) {
+    const x = filCalc(buildRating(P.from, P.to, "").obs).find(y => y.f === f); if (!x) return;
+    const f1 = v => v === null || v === undefined ? "—" : String(v).replace(".", ",") + "%";
+    let ord = "low";
+    const md = openModal(`🏫 ${esc(f)} — ${esc(P.label)}`, `<div id="fc-b"></div>`);
+    const draw = () => { const L = x.T.slice().sort((a, b) => ord === "low" ? (a.tot ?? 999) - (b.tot ?? 999) : (b.tot ?? -1) - (a.tot ?? -1));
+      $("#fc-b", md).innerHTML = `<p class="small muted" style="margin-top:0">Umumiy: <b>${f1(x.tot)}</b> · intizomiy ${f1(x.ibP)} · akademik ${f1(x.abP)} · ${x.n} dars · ${x.T.length} ustoz</p>
+        <div class="seg" style="margin-bottom:10px"><button data-fo="low" class="${ord === "low" ? "active" : ""}">Eng pastdan</button><button data-fo="high" class="${ord === "high" ? "active" : ""}">Eng yuqoridan</button></div>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Darslar</th><th>Intizomiy</th><th>Akademik</th><th>Natija</th><th>Filial balidagi ulushi</th></tr></thead><tbody>
+        ${L.map((z, i) => `<tr><td>${i + 1}</td><td><b class="click" data-tid="${z.t.id}">${esc(z.t.full_name)}</b></td><td>${esc(canonSubj(z.t.subject) || "—")}</td><td>${z.n}</td>
+          <td>${z.ib}/${z.ibM}</td><td>${z.abM ? z.ab + "/" + z.abM : "—"}</td><td><b style="color:${(z.tot ?? 0) < 65 ? "var(--bad)" : "#1f9d55"}">${f1(z.tot)}</b></td><td class="small">${String(z.share).replace(".", ",")}%</td></tr>`).join("")}</tbody></table></div>`;
+      $$("[data-fo]", md).forEach(b => b.onclick = () => { ord = b.dataset.fo; draw(); });
+      $$("[data-tid]", md).forEach(el => el.onclick = () => teacherModal(el.dataset.tid)); };
+    draw(); const mm = $(".modal", $("#modal-root")); if (mm) mm.style.maxWidth = "980px";
+  }
   function teachRating(root) {
     const P = ratingPeriod(); const fil = S.ui.tfil || "";
     const { out, obs } = buildRating(P.from, P.to, fil);
@@ -7182,6 +7228,7 @@ window.METODISTLAR = [
           : `<input type="date" id="rk-f" value="${P.from}" max="${t}" style="width:auto"><span class="muted">–</span><input type="date" id="rk-t" value="${P.to}" max="${t}" style="width:auto">`}
         <select id="tx-f" style="width:auto"><option value="">Barcha filiallar</option>${FILIALLAR.map(f => `<option ${f === fil ? "selected" : ""}>${esc(f)}</option>`).join("")}</select>
         <span class="small muted">${esc(P.label)} · ${obs.length} ta kuzatuv · taqqoslash: ${esc(P.pLabel)}</span></div>
+      ${filCard(P)}
       ${oyCard()}
       <div class="rk-counts">${RK_GROUPS.map(g => `<button class="rk-cnt ${g === grp ? "on" : ""} ${g === BOG ? "bog" : ""}" data-rg="${esc(g)}"><b>${cnt[g] || 0}</b><span>${esc(g)}</span><i>${out[g].filter(x => x.rank).length} reytingda</i></button>`).join("")}
         <div class="rk-cnt total"><b>${(S.teachers || []).filter(t => !isBogT(t)).length}</b><span>Jami ustoz</span><i>${cnt["Fani kiritilmagan"] ? cnt["Fani kiritilmagan"] + " tasi fani kiritilmagan" : "bazada"}</i></div></div>
@@ -7210,6 +7257,7 @@ window.METODISTLAR = [
     const rt = $("#rk-t", root); if (rt) rt.onchange = e => { S.ui.rto = e.target.value; teachRating(root); };
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachRating(root); };
     $$("[data-rg]", root).forEach(b => b.onclick = () => { S.ui.rgrp = b.dataset.rg; teachRating(root); });
+    $$("[data-filc]", root).forEach(b => b.onclick = () => filTeachersModal(P, b.dataset.filc));
     const oyx = $("#oy-exp", root); if (oyx) oyx.onclick = () => oyExport({ from: P.from, to: P.to, m: P.m, cur: isCur, fil });
     $$("[data-oyp]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const w = winners.find(z => z.g === b.dataset.oyp); const x = w && w.xs.find(z => z.t.id === b.dataset.oyt); if (!x) return; const r = oyWord(x, w.g, P.m); wDeliver(r.blob, r.name, r.cap); });
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
