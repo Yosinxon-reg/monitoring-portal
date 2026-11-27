@@ -6906,11 +6906,16 @@ window.METODISTLAR = [
   // ===== Oy o'qituvchisi: nomzodlar va infografika (rasm / PDF / e'lon matni) =====
   const OY_MIN = 98;
   // har fan bo'yicha: 98–100% natijalilar + (98% ga yetmasa ham) fan bo'yicha oyning eng yuqori natijasi egasi (best)
-  const oyWinners = out => RK_GROUPS.map(g => { const L = (out[g] || []).filter(z => z.n >= 1 && z.total !== null && z.total !== undefined);
+  // 2026-11-27: «Boshqa fanlar» guruhida har bir fan alohida — 98% ga hech kim yetmasa ham, shu fan bo'yicha barcha filiallar ichidagi eng yuqori natija egasi
+  const oyPick = (g, L) => { L = L.filter(z => z.n >= 1 && z.total !== null && z.total !== undefined);
     const xs = L.filter(z => +z.total >= OY_MIN).map(z => ({ ...z, best: false }));
-    const top = L.filter(z => z.rank === 1)[0] || L.slice().sort((a, b) => b.total - a.total || b.n - a.n)[0];
-    if (top && !xs.length) xs.push({ ...top, best: true });   // faqat shu fanda 98–100% natija hech kimda bo'lmasa
-    return { g, xs: xs.sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) }; }).filter(w => w.xs.length);
+    if (!xs.length && L.length) { const srt = L.slice().sort((a, b) => b.total - a.total || b.n - a.n), t0 = srt[0];
+      srt.filter(z => +z.total === +t0.total && z.n === t0.n).forEach(z => xs.push({ ...z, best: true })); }   // teng bo'lsa — hammasi
+    return { g, xs: xs.sort((a, b) => b.total - a.total || b.n - a.n || a.t.full_name.localeCompare(b.t.full_name)) }; };
+  const oyWinners = out => RK_GROUPS.flatMap(g => { const L = out[g] || [];
+    if (g !== OTHER_GRP) return [{ ...oyPick(g, L), grp: g }];
+    const by = {}; L.forEach(z => { const f = canonSubj(z.t.subject) || (z.obs && z.obs[0] && canonSubj(z.obs[0].subject)) || OTHER_GRP; (by[f] = by[f] || []).push(z); });
+    return Object.keys(by).sort((a, b) => a.localeCompare(b)).map(f => ({ ...oyPick(f, by[f]), grp: g })); }).filter(w => w.xs.length);
   // Filial kesimi: fan bo'yicha «eng yuqori natija» butun maktab bo'yicha olinadi — boshqa filialda yaxshiroq natija bo'lsa, bu filialdagisi chiqmaydi
   const oyFil = (ws, ok) => ws.map(w => ({ ...w, xs: w.xs.filter(ok) })).filter(w => w.xs.length);
   const YA = v => window.yA ? window.yA(String(v)) : String(v);
@@ -7035,7 +7040,7 @@ window.METODISTLAR = [
     const st = { g: new Set(o.fil ? allG : allG), f: new Set(o.fil ? [o.fil] : allF) };
     const lbl = (set, all, word) => set.size === all.length ? `barcha ${word}` : [...set].join(", ");
     // g'oliblar barcha filiallar bo'yicha aniqlanadi, keyin tanlangan filial(lar)dagilari ko'rsatiladi
-    const build = () => { const ws = oyFil(oyWinners(full).filter(w => st.g.has(w.g)), x => st.f.has(x.t.filial)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
+    const build = () => { const ws = oyFil(oyWinners(full).filter(w => st.g.has(w.grp || w.g)), x => st.f.has(x.t.filial)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
       return { ws, label, c: oyLand(ws, o.m, o.cur, label), text: oyAnnounce(ws, o.m, o.cur, st.f.size === allF.length ? "" : [...st.f].join(", ")) }; };
     const chips = (k, all) => `<div class="chips ox-ch" data-k="${k}"><button type="button" class="chip-btn sm ${st[k].size === all.length ? "on" : ""}" data-all="1">Hammasi</button>${all.map(v => `<button type="button" class="chip-btn sm ${st[k].has(v) && st[k].size !== all.length ? "on" : ""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
     const md = openModal(`🖼 ${o.cur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} — ${esc(monthLabel(o.m))}`, `<div id="ox-f"></div><div class="oy-prev" style="margin-top:10px"><img id="ox-img" alt=""></div>
@@ -7089,7 +7094,7 @@ window.METODISTLAR = [
     const isCur = P.mode === "oy" && P.m === monthOf(t);
     const oyCard = () => P.mode !== "oy" ? "" : `<div class="card oy-card"><div class="card-head"><h2>🏅 ${isCur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} · ${esc(monthLabel(P.m))}${nWin ? ` <span class="badge">${nWin}</span>` : ""}</h2><span class="spacer"></span>
         ${nWin ? `<button class="btn sm" id="oy-exp" title="Infografika: rasm, PDF va e'lon matni">🖼 Rasm / PDF / e'lon</button>` : ""}</div>
-      <p class="small muted" style="margin:-4px 0 10px">${isCur ? `Oy davomida <b>${OY_MIN}–100%</b> natija qayd etgan ustozlar (1 marta ko'rilgan bo'lsa ham). Oy oxirigacha shu natijani saqlab qolganlar <b>«Oy o'qituvchisi»</b> bo'ladi — soni cheklanmagan. ${OY_MIN}% ga hech kim yetmagan fanda — fan bo'yicha oyning eng yuqori natijasi egasi 🥇.` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlar va har fan bo'yicha oyning eng yuqori natijasi egalari 🥇.`}${fil ? " Filial: " + esc(fil) + "." : ""} Ustoz ustiga bosing — tahlillari ochiladi.</p>
+      <p class="small muted" style="margin:-4px 0 10px">${isCur ? `Oy davomida <b>${OY_MIN}–100%</b> natija qayd etgan ustozlar (1 marta ko'rilgan bo'lsa ham). Oy oxirigacha shu natijani saqlab qolganlar <b>«Oy o'qituvchisi»</b> bo'ladi — soni cheklanmagan. ${OY_MIN}% ga hech kim yetmagan fanda — fan bo'yicha (barcha filiallar ichida) oyning eng yuqori natijasi egasi 🥇. «Boshqa fanlar»da har bir fan alohida.` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlar va har fan bo'yicha oyning eng yuqori natijasi egalari 🥇.`}${fil ? " Filial: " + esc(fil) + "." : ""} Ustoz ustiga bosing — tahlillari ochiladi.</p>
       ${winners.length ? winners.map(w => `<div class="oy-g"><div class="oy-gh">${esc(w.g)} <span class="small muted">· ${w.xs.length} ta</span></div><div class="oy-grid">${w.xs.map(x => `<div class="oy-w click ${w.g === BOG ? "bog" : ""}" data-tid="${x.t.id}" title="Tahlillarni ko'rish"><div class="oy-m">${x.best ? "🥇" : "🏅"}</div><div style="min-width:0;flex:1"><b>${esc(x.t.full_name)}</b>${x.best ? ` <span class="kpi-badge warn" title="${OY_MIN}% ga yetmagan, lekin shu fan bo'yicha oyning eng yuqori natijasi">fan bo'yicha eng yuqori</span>` : ""}
           <div class="small">${esc(canonSubj(x.t.subject) || w.g)} · <b>${esc(x.t.filial || "—")}</b></div>
           <div class="small muted">${x.n} ta kuzatuv${x.ib !== null && x.ib !== undefined ? ` · I ${x.ib}/${IB_MAX}` : ""}${x.ab !== null && x.ab !== undefined ? ` · A ${x.ab}/${abMax(x.t.subject)}` : ""} · <b style="color:#1f9d55">${x.total}%</b></div></div>
