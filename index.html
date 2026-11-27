@@ -6907,7 +6907,7 @@ window.METODISTLAR = [
   const OY_MIN = 98;
   // har fan bo'yicha: 98–100% natijalilar + (98% ga yetmasa ham) fan bo'yicha oyning eng yuqori natijasi egasi (best)
   // 2026-11-27: «Boshqa fanlar» guruhida har bir fan alohida — 98% ga hech kim yetmasa ham, shu fan bo'yicha barcha filiallar ichidagi eng yuqori natija egasi
-  const oyPick = (g, L) => { L = L.filter(z => z.n >= 1 && z.total !== null && z.total !== undefined);
+  const oyPick = (g, L) => { L = L.filter(z => z.n >= 1 && z.total !== null && z.total !== undefined && !(z.t.status === "arxiv" && /amaliyot/i.test(z.t.off_reason || "")));
     // 2026-11-27: oy davomida 3 marta ko'rilib, 98–100% natija qayd etganlar — nomzod emas, «Oy o'qituvchisi»
     const xs = L.filter(z => +z.total >= OY_MIN).map(z => ({ ...z, best: false, done: lessonN(z.obs) >= 3 }));
     if (!xs.length && L.length) { const srt = L.slice().sort((a, b) => b.total - a.total || b.n - a.n), t0 = srt[0];
@@ -6921,7 +6921,7 @@ window.METODISTLAR = [
   const oyFil = (ws, ok) => ws.map(w => ({ ...w, xs: w.xs.filter(ok) })).filter(w => w.xs.length);
   const YA = v => window.yA ? window.yA(String(v)) : String(v);
   function oyAnnounce(winners, m, cur, fil) {
-    const L = [cur ? `🏅 ${monthLabel(m)} — «Oy o'qituvchisi» nomzodlari${fil ? " (" + fil + ")" : ""}` : `🏆 ${monthLabel(m)} — Oy o'qituvchilari${fil ? " (" + fil + ")" : ""}`, "",
+    const L = [cur ? `🏅 ${monthLabel(m)} — «Oy o'qituvchisi»${winners.some(w => w.xs.some(x => x.done)) ? " va nomzodlar" : " nomzodlari"}${fil ? " (" + fil + ")" : ""}` : `🏆 ${monthLabel(m)} — Oy o'qituvchilari${fil ? " (" + fil + ")" : ""}`, "",
       cur ? `Oy davomida dars kuzatuvlarida ${OY_MIN}–100% natija ko'rsatgan ustozlarimiz:` : `Oy yakunida ${OY_MIN}–100% natija bilan qolgan ustozlarimiz — tabriklaymiz!`];
     winners.forEach(w => { L.push("", `📚 ${w.g}`); w.xs.forEach((x, i) => L.push(`${i + 1}. ${cur && x.done ? "🏆 " : ""}${x.t.full_name} — ${canonSubj(x.t.subject) || w.g}, ${x.t.filial || "—"} (${x.total}%)${x.best ? " — fan bo'yicha oyning eng yuqori natijasi" : cur && x.done ? " — Oy o'qituvchisi (3 marta ko'rildi)" : ""}`)); });
     L.push("", cur ? `💪 Oy oxirigacha shu natijani saqlab qolganlar «Oy o'qituvchisi» unvoni bilan taqdirlanadi! Har bir dars muhim — natijangizni saqlang. Qolgan ustozlarimiz, sizda ham imkoniyat bor: ro'yxatga kirish uchun harakat qiling!` : `👏 Mehnatingiz uchun rahmat! Keyingi oyda yanada ko'p ustozlarimizni shu ro'yxatda ko'rishni istaymiz.`,
@@ -6992,46 +6992,62 @@ window.METODISTLAR = [
   const dlBlob = (blob, name) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); };
   // Bitta gorizontal A4 (2339×1654) rasm: barcha nomzodlar sig'adigan qilib avtomatik joylashtiriladi
   function oyLand(winners, m, cur, label) {
+    // 2026-11-27: ism va yozuvlar kesilmaydi (2 qatorgacha o'raladi); har ustozda holat belgisi: 🏆 Oy o'qituvchisi / 🏅 nomzod / 🥇 fan bo'yicha eng yuqori
     const W = 2339, H = 1654, PAD = 80, c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
     const font = (sz, b) => `${b ? "800" : "500"} ${Math.round(sz)}px Inter, "Segoe UI", Arial, sans-serif`;
     const txt = (s0, x, y, sz, col, b, al) => { ctx.font = font(sz, b); ctx.fillStyle = col; ctx.textAlign = al || "left"; ctx.fillText(YA(s0), x, y); };
-    const fit = (s0, maxW, sz, b) => { let s1 = YA(s0); ctx.font = font(sz, b); if (ctx.measureText(s1).width <= maxW) return s1; while (ctx.measureText(s1 + "…").width > maxW && s1.length > 3) s1 = s1.slice(0, -1); return s1 + "…"; };
+    const wrap = (s0, maxW, sz, b) => { ctx.font = font(sz, b); const ws = YA(s0).split(/\s+/), L = []; let cur0 = "";
+      ws.forEach(w => { const t = cur0 ? cur0 + " " + w : w; if (ctx.measureText(t).width <= maxW || !cur0) cur0 = t; else { L.push(cur0); cur0 = w; } }); if (cur0) L.push(cur0);
+      return L.map(l => ctx.measureText(l).width <= maxW ? l : null); };
+    const fits = (s0, maxW, sz, b, n) => { const L = wrap(s0, maxW, sz, b); return L.length <= n && L.every(l => l !== null); };
     const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    const all = winners.flatMap(w => w.xs), total = all.length, nDone = cur ? all.filter(x => x.done).length : total, nBest = all.filter(x => x.best).length;
+    const stOf = X => X.best ? "best" : !cur || X.done ? "done" : "cand";
+    const ST = { done: { bg: "#eaf7ee", bd: "#1f9d55", pill: "#1f9d55", t: "🏆 OY O'QITUVCHISI" }, cand: { bg: "#ffffff", bd: "#c9d6e8", pill: "#5d6f88", t: "🏅 NOMZOD" },
+      best: { bg: "#fff8e6", bd: "#c9a227", pill: "#b8860b", t: "🥇 FAN BO'YICHA ENG YUQORI" } };
     ctx.fillStyle = "#f5f8fc"; ctx.fillRect(0, 0, W, H);
-    const HB = 300, g0 = ctx.createLinearGradient(0, 0, W, HB); g0.addColorStop(0, "#0b1f3f"); g0.addColorStop(0.6, "#123a73"); g0.addColorStop(1, "#1565d8"); ctx.fillStyle = g0; ctx.fillRect(0, 0, W, HB);
-    const total = winners.reduce((a, w) => a + w.xs.length, 0);
-    txt("REGISTON MAKTABI · MONITORING BO'LIMI", PAD, 78, 28, "rgba(255,255,255,.85)", 1);
-    txt(cur ? "🏅 OY O'QITUVCHISI NOMZODLARI" : "🏆 OY O'QITUVCHILARI", PAD, 165, 76, "#ffffff", 1);
-    txt(`${monthLabel(m)} · ${total} nafar`, W - PAD, 165, 54, "#ffd772", 1, "right");
-    txt(fit(label, W - 2 * PAD, 30), PAD, 218, 30, "rgba(255,255,255,.9)");
-    txt(cur ? `💪 ${OY_MIN}–100% natija. Oy oxirigacha shu natijani saqlaganlar «Oy o'qituvchisi» bo'ladi — qolganlar ham harakat qiling!` : "👏 Tabriklaymiz! Mehnatingiz uchun rahmat!", PAD, 270, 30, "#ffffff", 1);
-    // joylashuv: guruh sarlavhasi (0.7 qator) + ustozlar
+    const HB = 320, g0 = ctx.createLinearGradient(0, 0, W, HB); g0.addColorStop(0, "#0b1f3f"); g0.addColorStop(0.6, "#123a73"); g0.addColorStop(1, "#1565d8"); ctx.fillStyle = g0; ctx.fillRect(0, 0, W, HB);
+    txt("REGISTON MAKTABI · MONITORING BO'LIMI", PAD, 74, 28, "rgba(255,255,255,.85)", 1);
+    txt(!cur ? "🏆 OY O'QITUVCHILARI" : nDone ? "🏆 OY O'QITUVCHILARI VA NOMZODLAR" : "🏅 OY O'QITUVCHISI NOMZODLARI", PAD, 158, 70, "#ffffff", 1);
+    txt(`${monthLabel(m)} · ${total} nafar`, W - PAD, 158, 52, "#ffd772", 1, "right");
+    txt(label, PAD, 210, 28, "rgba(255,255,255,.9)");
+    if (cur) { let x0 = PAD; const leg = (t, col) => { ctx.font = font(26, 1); const w0 = ctx.measureText(YA(t)).width + 36; rr(x0, 236, w0, 46, 23); ctx.fillStyle = col; ctx.fill(); txt(t, x0 + 18, 268, 26, "#ffffff", 1); x0 += w0 + 16; };
+      leg(`🏆 Oy o'qituvchisi — ${nDone} nafar (3 marta ko'rilib, ${OY_MIN}–100%)`, ST.done.pill);
+      leg(`🏅 Nomzod — ${total - nDone - nBest} nafar (oy oxirigacha natijani saqlasa)`, ST.cand.pill);
+      if (nBest) leg(`🥇 Fan bo'yicha eng yuqori — ${nBest}`, ST.best.pill);
+    } else txt("👏 Tabriklaymiz! Mehnatingiz uchun rahmat!", PAD, 270, 30, "#ffffff", 1);
     const rows = []; winners.forEach(w => { rows.push({ g: w.g, n: w.xs.length }); w.xs.forEach((x, k) => rows.push({ x, k, g: w.g })); });
-    const top = HB + 40, bottom = H - 70, CW = W - 2 * PAD, CH = bottom - top, GAP = 26;
-    const place = (cols, rh) => { const cw = (CW - (cols - 1) * GAP) / cols; let col = 0, y = 0; const out = [];
-      for (let i = 0; i < rows.length; i++) { const r = rows[i], h = r.x ? rh : rh * 0.62;
-        const need = r.x ? h : h + rh; // sarlavha ustun oxirida qolib ketmasin
+    const top = HB + 36, bottom = H - 64, CW = W - 2 * PAD, CH = bottom - top, GAP = 24;
+    const meta = X => `${canonSubj(X.t.subject) || "—"} · ${X.t.filial || "—"} · ${lessonN(X.obs || []) || X.n} marta ko'rildi`;
+    // karta o'lchami: s = masshtab; ism 2 qatorgacha, ma'lumot 1 qator, pastda holat belgisi
+    const geo = (cw, s) => ({ nx: 92 * s, rw: 150 * s, h: 196 * s, nameW: cw - 92 * s - 150 * s - 20 * s, metaW: cw - 92 * s - 20 * s });
+    const okAt = (cw, s) => { const g = geo(cw, s); return rows.every(r => !r.x || (fits(r.x.t.full_name, g.nameW, 29 * s, 1, 2) && fits(meta(r.x), g.metaW, 21 * s, 0, 1))); };
+    const place = (cols, s) => { const cw = (CW - (cols - 1) * GAP) / cols, ch = geo(cw, s).h, hh = 58 * s; let col = 0, y = 0; const out = [];
+      for (const r of rows) { const h = r.x ? ch : hh, need = r.x ? h : h + ch;
         if (y + need > CH + 1) { col++; y = 0; if (col >= cols) return null; }
-        out.push({ r, x: PAD + col * (cw + GAP), y: top + y, w: cw, h: r.x ? rh - 12 : h }); y += h; }
+        out.push({ r, x: PAD + col * (cw + GAP), y: top + y, w: cw, h: r.x ? ch - 12 * s : h }); y += h; }
       return out; };
     let best = null;
     for (let cols = 1; cols <= 6; cols++) { const cw = (CW - (cols - 1) * GAP) / cols;
-      for (let rh = 132; rh >= 34; rh -= 2) { if (cw < rh * 5.2) break; const pl = place(cols, rh); if (pl) { if (!best || rh > best.rh) best = { cols, rh, pl }; break; } } }
-    if (!best) { const pl = place(6, 34) || []; best = { cols: 6, rh: 34, pl }; }
-    const rh = best.rh, s = rh / 100;
+      for (let s = 1.1; s >= 0.42; s -= 0.02) { if (!okAt(cw, s)) continue; const pl = place(cols, s); if (pl) { if (!best || s > best.s) best = { cols, s, pl }; break; } } }
+    if (!best) { const s = 0.42; best = { cols: 6, s, pl: place(6, s) || [] }; }
+    const s = best.s;
     best.pl.forEach(({ r, x, y, w, h }) => {
-      if (!r.x) { txt(`📚 ${r.g}`, x + 4, y + h * 0.78, Math.max(18, 34 * s), "#1565d8", 1); txt(`${r.n} nafar`, x + w - 4, y + h * 0.78, Math.max(14, 24 * s), "#5d6f88", 0, "right"); return; }
-      const X = r.x;
-      ctx.save(); ctx.shadowColor = "rgba(17,43,82,.10)"; ctx.shadowBlur = 14 * s; ctx.shadowOffsetY = 4 * s; rr(x, y, w, h, 16 * s); ctx.fillStyle = X.best ? "#fff8e6" : "#ffffff"; ctx.fill(); ctx.restore();
-      const cx = x + 46 * s, cy = y + h / 2, rad = Math.min(30 * s, h * 0.34);
+      if (!r.x) { txt(`📚 ${r.g}`, x + 4, y + h * 0.75, 34 * s, "#1565d8", 1); txt(`${r.n} nafar`, x + w - 4, y + h * 0.75, 24 * s, "#5d6f88", 0, "right"); return; }
+      const X = r.x, st = ST[stOf(X)], g = geo(w, s);
+      ctx.save(); ctx.shadowColor = "rgba(17,43,82,.10)"; ctx.shadowBlur = 14 * s; ctx.shadowOffsetY = 4 * s; rr(x, y, w, h, 16 * s); ctx.fillStyle = st.bg; ctx.fill(); ctx.restore();
+      rr(x, y, w, h, 16 * s); ctx.lineWidth = Math.max(2, 3 * s); ctx.strokeStyle = st.bd; ctx.stroke();
+      const cx = x + 46 * s, cy = y + 52 * s, rad = 30 * s;
       ctx.fillStyle = X.best ? "#c9a227" : r.k < 3 ? ["#c9a227", "#9aa7b8", "#c27c3a"][r.k] : "#e9f1fc"; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
       txt(X.best ? "1" : String(r.k + 1), cx, cy + rad * 0.36, rad * 0.95, X.best || r.k < 3 ? "#ffffff" : "#1565d8", 1, "center");
-      const nx = x + 92 * s, pw = 150 * s, nw = w - (nx - x) - pw - 16 * s;
-      txt(fit(X.t.full_name, nw, 30 * s, 1), nx, y + h * 0.45, 30 * s, "#0b1f3f", 1);
-      txt(fit(`${canonSubj(X.t.subject) || r.g} · ${X.t.filial || "—"} · ${X.n} ta kuzatuv${X.best ? " · fan bo'yicha eng yuqori" : cur && X.done ? " · 🏆 Oy o'qituvchisi" : ""}`, nw, 21 * s), nx, y + h * 0.8, 21 * s, X.best ? "#9a6b00" : "#5d6f88");
-      txt(`${X.total}%`, x + w - 18 * s, y + h * 0.64, 40 * s, "#1f9d55", 1, "right");
+      const nx = x + g.nx; const NL = wrap(X.t.full_name, g.nameW, 29 * s, 1);
+      NL.forEach((l, i) => txt(l || "", nx, y + 40 * s + i * 34 * s, 29 * s, "#0b1f3f", 1));
+      const my = y + 40 * s + NL.length * 34 * s + 2 * s; txt(meta(X), nx, my, 21 * s, "#5d6f88");
+      txt(`${X.total}%`, x + w - 18 * s, y + 52 * s, 42 * s, "#1f9d55", 1, "right");
+      ctx.font = font(20 * s, 1); const pt = YA(st.t), pw = ctx.measureText(pt).width + 28 * s, ph = 34 * s, py = Math.min(my + 14 * s, y + h - ph - 10 * s);
+      rr(nx, py, pw, ph, ph / 2); ctx.fillStyle = st.pill; ctx.fill(); txt(st.t, nx + 14 * s, py + ph * 0.7, 20 * s, "#ffffff", 1);
     });
-    txt(`Registon maktabi · Monitoring bo'limi · ${fmtDate(today())}`, PAD, H - 28, 22, "#8a9ab0");
+    txt(`Registon maktabi · Monitoring bo'limi · ${fmtDate(today())}`, PAD, H - 26, 22, "#8a9ab0");
     return c;
   }
   // Oy o'qituvchisi: fan va filial kesimida tanlab — rasm (1 ta gorizontal A4), PDF, nusxalash, Telegramga yuborish
@@ -7044,7 +7060,7 @@ window.METODISTLAR = [
     const build = () => { const ws = oyFil(oyWinners(full).filter(w => st.g.has(w.grp || w.g)), x => st.f.has(x.t.filial)); const label = `Fan: ${lbl(st.g, allG, "fanlar")} · Filial: ${lbl(st.f, allF, "filiallar")}`;
       return { ws, label, c: oyLand(ws, o.m, o.cur, label), text: oyAnnounce(ws, o.m, o.cur, st.f.size === allF.length ? "" : [...st.f].join(", ")) }; };
     const chips = (k, all) => `<div class="chips ox-ch" data-k="${k}"><button type="button" class="chip-btn sm ${st[k].size === all.length ? "on" : ""}" data-all="1">Hammasi</button>${all.map(v => `<button type="button" class="chip-btn sm ${st[k].has(v) && st[k].size !== all.length ? "on" : ""}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
-    const md = openModal(`🖼 ${o.cur ? "Oy o'qituvchisi nomzodlari" : "Oy o'qituvchilari"} — ${esc(monthLabel(o.m))}`, `<div id="ox-f"></div><div class="oy-prev" style="margin-top:10px"><img id="ox-img" alt=""></div>
+    const md = openModal(`🖼 ${o.cur ? "Oy o'qituvchilari va nomzodlar" : "Oy o'qituvchilari"} — ${esc(monthLabel(o.m))}`, `<div id="ox-f"></div><div class="oy-prev" style="margin-top:10px"><img id="ox-img" alt=""></div>
       <div class="small muted" id="ox-n" style="margin:8px 0"></div>
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="ox-png">⬇ Rasm</button><button class="btn" id="ox-pdf">⬇ PDF</button><button class="btn" id="ox-cimg">📋 Rasmni nusxalash</button>
         <button class="btn primary" id="ox-tgi">📤 Rasmni Telegramga</button><button class="btn primary" id="ox-tgp">📤 PDFni Telegramga</button></div>
@@ -7064,7 +7080,7 @@ window.METODISTLAR = [
     draw();
     const pngBlob = () => new Promise(r => R.c.toBlob(r, "image/png"));
     const msg = (ok, e) => { $("#ox-ok", md).textContent = ok || ""; $("#ox-e", md).textContent = e || ""; };
-    const cap = () => YA(`${o.cur ? "🏅 Oy o'qituvchisi nomzodlari" : "🏆 Oy o'qituvchilari"} — ${monthLabel(o.m)}\n${R.label}`);
+    const cap = () => YA(`${o.cur ? "🏆 Oy o'qituvchilari va 🏅 nomzodlar" : "🏆 Oy o'qituvchilari"} — ${monthLabel(o.m)}\n${R.label}`);
     $("#ox-png", md).onclick = async () => dlBlob(await pngBlob(), base() + ".png");
     $("#ox-pdf", md).onclick = () => dlBlob(pagesPdf([R.c]), base() + ".pdf");
     $("#ox-cimg", md).onclick = async () => { try { await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob() })]); toast("Rasm nusxalandi — Telegramga Ctrl+V bilan qo'ying"); } catch (e) { toast("Brauzer rasmni nusxalashga ruxsat bermadi — «⬇ Rasm»dan foydalaning", true); } };
