@@ -7159,11 +7159,112 @@ window.METODISTLAR = [
       return d > 0 ? `<span class="rk-up">▲ ${String(d).replace(".", ",")}</span>` : d < 0 ? `<span class="rk-down">▼ ${String(-d).replace(".", ",")}</span>` : `<span class="rk-eq">=</span>`; };
     const bar = v => `<span class="ku-bar"><i style="width:${Math.min(100, v || 0)}%"></i></span>`;
     return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>🏫 Filiallar natijasi · ${esc(P.label)}</h2><span class="spacer"></span>
+        <button class="btn sm" id="fil-exp" title="Dashboard: rasm, PDF, Telegram">🖼 Rasm / PDF</button>
         <span class="small muted">Maktab bo'yicha: <b>${f1(pc(all.ib + all.ab, all.ibM + all.abM))}</b> · intizomiy ${f1(pc(all.ib, all.ibM))} · akademik ${f1(pc(all.ab, all.abM))} · ${all.n} dars</span></div>
       <p class="small muted" style="margin:-4px 0 10px">Foiz = filialdagi barcha darslarda to'plangan ball ÷ olish mumkin bo'lgan ball. Akademik foizga faqat akademik ball qo'yiladigan fanlar kiradi; bog'cha kirmaydi. Kuzatuv qo'shilishi bilan yangilanadi, har oy noldan boshlanadi. Filialni bosing — ustozlar ro'yxati.</p>
       <div class="table-wrap"><table><thead><tr><th>#</th><th>Filial</th><th>Umumiy natija</th><th>Intizomiy</th><th>Akademik</th><th>${esc(P.pLabel)}ga nisbatan</th><th>Darslar</th><th>Ustozlar</th></tr></thead><tbody>
       ${cur.map((x, i) => `<tr class="click" data-filc="${esc(x.f)}"><td>${i + 1}</td><td><b>${esc(x.f)}</b></td><td><b style="color:#1f9d55">${f1(x.tot)}</b> ${bar(x.tot)}</td>
         <td>${f1(x.ibP)} <span class="small muted">${x.ib}/${x.ibM}</span></td><td>${f1(x.abP)} <span class="small muted">${x.abM ? x.ab + "/" + x.abM : ""}</span></td><td>${dl(x)}</td><td>${x.n}</td><td>${x.T.length}</td></tr>`).join("")}</tbody></table></div></div>`;
+  }
+  // 2026-11-27: Filiallar natijasi — dashboard (rasm / PDF / Telegram): filial kesimida yoki filiallar aro; faqat filiallar yoki + ustozlar; umumiy / intizomiy / akademik
+  function filExport(P) {
+    const cur = filCalc(buildRating(P.from, P.to, "").obs), prev = filCalc(buildRating(P.pFrom, P.pTo, "").obs);
+    const allF = cur.map(x => x.f), st = { f: new Set(allF), tk: "fil", m: "tot" };
+    const MN = { tot: "Umumiy natija", ib: "Intizomiy", ab: "Akademik" };
+    const val = (x, m) => m === "tot" ? x.tot : m === "ib" ? (x.ibP !== undefined ? x.ibP : (x.ibM ? Math.round(x.ib / x.ibM * 1000) / 10 : null)) : (x.abP !== undefined ? x.abP : (x.abM ? Math.round(x.ab / x.abM * 1000) / 10 : null));
+    const f1 = v => v === null || v === undefined ? "—" : String(v).replace(".", ",") + "%";
+    const W = 2339, H = 1654, PAD = 80;
+    const mk = () => { const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d"); ctx.fillStyle = "#f5f8fc"; ctx.fillRect(0, 0, W, H); return { c, ctx }; };
+    const font = (sz, b) => `${b ? "800" : "500"} ${Math.round(sz)}px Inter, "Segoe UI", Arial, sans-serif`;
+    const T = (ctx, s0, x, y, sz, col, b, al) => { ctx.font = font(sz, b); ctx.fillStyle = col; ctx.textAlign = al || "left"; ctx.fillText(YA(String(s0)), x, y); };
+    const fit = (ctx, s0, maxW, sz, b) => { ctx.font = font(sz, b); let t = YA(String(s0)); if (ctx.measureText(t).width <= maxW) return [t]; const ws = t.split(" "), L = [""];
+      ws.forEach(w => { const c0 = L[L.length - 1] ? L[L.length - 1] + " " + w : w; if (ctx.measureText(c0).width <= maxW || !L[L.length - 1]) L[L.length - 1] = c0; else L.push(w); }); return L.slice(0, 2); };
+    const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    const colOf = v => v === null || v === undefined ? "#9aa7b8" : v >= 90 ? "#1f9d55" : v >= 75 ? "#2f7fd8" : v >= 65 ? "#d08a00" : "#d64545";
+    const head = (ctx, title, sub) => { const g = ctx.createLinearGradient(0, 0, W, 250); g.addColorStop(0, "#0b1f3f"); g.addColorStop(0.6, "#123a73"); g.addColorStop(1, "#1565d8"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, 250);
+      T(ctx, "REGISTON MAKTABI · MONITORING BO'LIMI", PAD, 72, 28, "rgba(255,255,255,.85)", 1); T(ctx, title, PAD, 150, 64, "#fff", 1); T(ctx, sub, PAD, 208, 30, "rgba(255,255,255,.92)");
+      T(ctx, P.label, W - PAD, 150, 44, "#ffd772", 1, "right"); };
+    const foot = (ctx, pg, n) => T(ctx, `Registon maktabi · Monitoring bo'limi · ${fmtDate(today())}${n > 1 ? ` · ${pg}/${n}` : ""}`, PAD, H - 30, 22, "#8a9ab0");
+    const build = () => {
+      const sel = cur.filter(x => st.f.has(x.f)), m = st.m, one = sel.length === 1, pages = [];
+      const sum = sel.reduce((a, x) => ({ ib: a.ib + x.ib, ibM: a.ibM + x.ibM, ab: a.ab + x.ab, abM: a.abM + x.abM, n: a.n + x.n, t: a.t + x.T.length }), { ib: 0, ibM: 0, ab: 0, abM: 0, n: 0, t: 0 });
+      const pc = (a, b) => b ? Math.round(a / b * 1000) / 10 : null, S0 = { tot: pc(sum.ib + sum.ab, sum.ibM + sum.abM), ibP: pc(sum.ib, sum.ibM), abP: pc(sum.ab, sum.abM) };
+      // 1-sahifa: dashboard
+      { const { c, ctx } = mk(); const title = one ? `${sel[0].f.toUpperCase()} FILIALI NATIJASI` : "FILIALLAR NATIJASI";
+        head(ctx, title, `${MN[m]} bo'yicha · to'plangan ball ÷ olish mumkin bo'lgan ball${one ? "" : ` · ${sel.length} ta filial`}`);
+        const tiles = [[one ? "Filial natijasi" : "Umumiy natija", S0.tot, m === "tot"], ["Intizomiy", S0.ibP, m === "ib"], ["Akademik", S0.abP, m === "ab"], ["Darslar", sum.n, false, 1], ["Ustozlar", sum.t, false, 1]];
+        const tw = (W - 2 * PAD - 4 * 28) / 5;
+        tiles.forEach(([l, v, on, raw], i) => { const x = PAD + i * (tw + 28), y = 290; ctx.save(); ctx.shadowColor = "rgba(17,43,82,.10)"; ctx.shadowBlur = 14; rr(ctx, x, y, tw, 170, 20); ctx.fillStyle = on ? "#eaf2fd" : "#fff"; ctx.fill(); ctx.restore();
+          if (on) { rr(ctx, x, y, tw, 170, 20); ctx.lineWidth = 4; ctx.strokeStyle = "#1565d8"; ctx.stroke(); }
+          T(ctx, l, x + 30, y + 56, 30, "#5d6f88", 1); T(ctx, raw ? v : f1(v), x + 30, y + 135, 64, raw ? "#0b1f3f" : colOf(v), 1); });
+        if (one) { const rk = cur.slice().sort((a, b) => (val(b, m) ?? -1) - (val(a, m) ?? -1)).findIndex(x => x.f === sel[0].f) + 1;
+          T(ctx, `${MN[m]} bo'yicha filiallar orasida ${rk}-o'rin (${cur.length} tadan)`, PAD, 520, 34, "#0b1f3f", 1); }
+        // filiallar grafigi (barchasi; tanlanganlar ajratiladi)
+        const rows = (one ? cur : sel).slice().sort((a, b) => (val(b, m) ?? -1) - (val(a, m) ?? -1));
+        const top = one ? 620 : 520, bh = Math.min(120, (H - 90 - top) / Math.max(rows.length, 1)), lx = PAD, bx = PAD + 420, bw = W - PAD - bx - 380;
+        T(ctx, `${MN[m]} — filiallar kesimida`, PAD, top - 10, 32, "#1565d8", 1);
+        rows.forEach((x, i) => { const y = top + 20 + i * bh, v = val(x, m), p = prev.find(z => z.f === x.f), pv = p ? val(p, m) : null, hl = one && x.f === sel[0].f;
+          if (hl) { rr(ctx, PAD - 16, y - 6, W - 2 * PAD + 32, bh - 8, 14); ctx.fillStyle = "#fff4d6"; ctx.fill(); }
+          T(ctx, `${i + 1}. ${x.f}`, lx, y + bh * 0.55, Math.min(36, bh * 0.38), "#0b1f3f", 1);
+          rr(ctx, bx, y + bh * 0.2, bw, bh * 0.45, bh * 0.2); ctx.fillStyle = "#e6edf6"; ctx.fill();
+          if (v !== null) { rr(ctx, bx, y + bh * 0.2, Math.max(bh * 0.45, bw * v / 100), bh * 0.45, bh * 0.2); ctx.fillStyle = colOf(v); ctx.fill(); }
+          T(ctx, f1(v), bx + bw + 24, y + bh * 0.58, Math.min(44, bh * 0.45), colOf(v), 1);
+          if (pv !== null && v !== null) { const d = Math.round((v - pv) * 10) / 10; T(ctx, d > 0 ? `▲ ${String(d).replace(".", ",")}` : d < 0 ? `▼ ${String(-d).replace(".", ",")}` : "=", W - PAD, y + bh * 0.58, Math.min(32, bh * 0.34), d > 0 ? "#1f9d55" : d < 0 ? "#d64545" : "#8a9ab0", 1, "right"); }
+          T(ctx, `${x.n} dars · ${x.T.length} ustoz`, lx, y + bh * 0.88, Math.min(24, bh * 0.22), "#5d6f88"); });
+        T(ctx, `▲▼ — ${P.pLabel}ga nisbatan`, W - PAD, top - 10, 24, "#8a9ab0", 0, "right");
+        pages.push(c); }
+      // ustozlar sahifalari
+      if (st.tk === "ust") sel.forEach(x => {
+        const L = x.T.map(z => ({ ...z, ibP: z.ibM ? Math.round(z.ib / z.ibM * 1000) / 10 : null, abP: z.abM ? Math.round(z.ab / z.abM * 1000) / 10 : null }))
+          .filter(z => val(z, m) !== null).sort((a, b) => (val(b, m) ?? -1) - (val(a, m) ?? -1) || a.t.full_name.localeCompare(b.t.full_name));
+        const cols = L.length > 14 ? 2 : 1, perCol = 15, PER = perCol * cols;
+        for (let k = 0; k < L.length; k += PER) { const { c, ctx } = mk(), chunk = L.slice(k, k + PER);
+          head(ctx, `${x.f.toUpperCase()} — USTOZLAR NATIJASI`, `${MN[m]} bo'yicha · filial: ${f1(val(x, m))} · ${L.length} ustoz${L.length > PER ? ` · ${k + 1}–${k + chunk.length}` : ""}`);
+          const cw = (W - 2 * PAD - 40 * (cols - 1)) / cols, rh = (H - 330 - 70) / perCol;
+          chunk.forEach((z, i) => { const col = Math.floor(i / perCol), r = i % perCol, x0 = PAD + col * (cw + 40), y = 300 + r * rh, v = val(z, m);
+            if (r % 2 === 0) { rr(ctx, x0, y, cw, rh - 4, 10); ctx.fillStyle = "#ffffff"; ctx.fill(); }
+            T(ctx, String(k + i + 1), x0 + 20, y + rh * 0.62, 24, "#8a9ab0", 1);
+            const nmL = fit(ctx, z.t.full_name, cw - 470, 26, 1), two = nmL.length > 1;
+            nmL.forEach((l, j) => T(ctx, l, x0 + 70, y + (two ? rh * 0.3 + j * 25 : rh * 0.47), two ? 22 : 26, "#0b1f3f", 1));
+            T(ctx, `${canonSubj(z.t.subject) || "—"} · ${z.n} dars`, x0 + 70, y + rh * (two ? 0.9 : 0.82), 19, "#5d6f88");
+            const det = m === "ib" ? `${z.ib}/${z.ibM}` : m === "ab" ? `${z.ab}/${z.abM}` : `I ${z.ib}/${z.ibM}${z.abM ? ` · A ${z.ab}/${z.abM}` : ""}`;
+            T(ctx, det, x0 + cw - 190, y + rh * 0.62, 21, "#5d6f88", 0, "right");
+            T(ctx, f1(v), x0 + cw - 20, y + rh * 0.64, 30, colOf(v), 1, "right"); });
+          pages.push(c); } });
+      pages.forEach((c, i) => foot(c.getContext("2d"), i + 1, pages.length));
+      const label = `${MN[m]} · ${one ? sel[0].f : st.f.size === allF.length ? "barcha filiallar" : [...st.f].join(", ")}${st.tk === "ust" ? " · ustozlar bilan" : ""}`;
+      return { pages, label };
+    };
+    const chip = (k, v, l, on) => `<button type="button" class="chip-btn sm ${on ? "on" : ""}" data-${k}="${esc(v)}">${esc(l)}</button>`;
+    const md = openModal(`🏫 Filiallar natijasi — ${esc(P.label)}`, `<div id="fx-f"></div><div class="oy-prev" id="fx-p" style="margin-top:10px;display:grid;gap:10px"></div>
+      <div class="small muted" id="fx-n" style="margin:8px 0"></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="fx-png">⬇ Rasm</button><button class="btn" id="fx-pdf">⬇ PDF</button>
+        <button class="btn primary" id="fx-tgi">📤 Rasmni Telegramga</button><button class="btn primary" id="fx-tgp">📤 PDFni Telegramga</button></div>
+      <div class="ok-text" id="fx-ok"></div><div class="err-text" id="fx-e"></div>`, `<button class="btn" data-close>Yopish</button>`);
+    $(".modal", $("#modal-root")).style.maxWidth = "980px";
+    let R = null;
+    const base = () => `Filiallar-natijasi_${(P.m || P.from)}_${st.m}${st.tk === "ust" ? "_ustozlar" : ""}${st.f.size === allF.length ? "" : "_" + [...st.f].join("-").replace(/[\s']+/g, "")}`.slice(0, 120);
+    const draw = () => {
+      $("#fx-f", md).innerHTML = `<div class="small muted" style="margin:0 0 4px">Filiallar (bittasini tanlasangiz — filial kesimida, bir nechtasi — filiallar aro):</div>
+        <div class="chips">${chip("fa", "1", "Hammasi", st.f.size === allF.length)}${allF.map(f => chip("ff", f, f, st.f.has(f) && st.f.size !== allF.length)).join("")}</div>
+        <div class="small muted" style="margin:10px 0 4px">Tarkibi:</div><div class="chips">${chip("tk", "fil", "Faqat filiallar natijasi", st.tk === "fil")}${chip("tk", "ust", "Filiallar + ustozlar natijasi", st.tk === "ust")}</div>
+        <div class="small muted" style="margin:10px 0 4px">Kesim:</div><div class="chips">${Object.entries(MN).map(([k, l]) => chip("mm", k, l, st.m === k)).join("")}</div>`;
+      R = build(); $("#fx-p", md).innerHTML = R.pages.map(c => `<img src="${c.toDataURL("image/jpeg", 0.8)}" alt="" style="width:100%;border-radius:8px;border:1px solid var(--line)">`).join("");
+      $("#fx-n", md).textContent = YA(`${R.pages.length} ta gorizontal A4 sahifa · ${R.label}${R.pages.length > 1 ? " · «⬇ Rasm» har sahifani alohida yuklaydi, Telegramga 1-sahifa (PDFda hammasi)" : ""}`);
+      $$("[data-fa]", md).forEach(b => b.onclick = () => { st.f = new Set(allF); draw(); });
+      $$("[data-ff]", md).forEach(b => b.onclick = () => { const v = b.dataset.ff; if (st.f.size === allF.length) st.f = new Set([v]); else if (st.f.has(v)) { st.f.delete(v); if (!st.f.size) st.f = new Set(allF); } else st.f.add(v); draw(); });
+      $$("[data-tk]", md).forEach(b => b.onclick = () => { st.tk = b.dataset.tk; draw(); });
+      $$("[data-mm]", md).forEach(b => b.onclick = () => { st.m = b.dataset.mm; draw(); }); };
+    draw();
+    const msg = (ok, e) => { $("#fx-ok", md).textContent = ok || ""; $("#fx-e", md).textContent = e || ""; };
+    const cap = () => YA(`🏫 Filiallar natijasi — ${P.label}\n${R.label}`);
+    const blobOf = (c, t, q) => new Promise(r => c.toBlob(r, t, q));
+    $("#fx-png", md).onclick = async () => { for (let i = 0; i < R.pages.length; i++) dlBlob(await blobOf(R.pages[i], "image/png"), base() + (R.pages.length > 1 ? `_${i + 1}` : "") + ".png"); };
+    $("#fx-pdf", md).onclick = () => dlBlob(pagesPdf(R.pages), base() + ".pdf");
+    const tg = async (b, blob, name) => { msg(); b.disabled = true; const t0 = b.textContent; b.textContent = "Yuborilmoqda…";
+      try { await db.sendDoc(blob, name, cap()); msg("✓ Telegramingizga yuborildi — u yerdan «Uzatish» bilan guruhga yuborasiz"); } catch (e) { msg("", e.message || "Yuborilmadi"); } finally { b.disabled = false; b.textContent = t0; } };
+    $("#fx-tgi", md).onclick = async e => tg(e.currentTarget, await blobOf(R.pages[0], "image/jpeg", 0.92), base() + ".jpg");
+    $("#fx-tgp", md).onclick = e => tg(e.currentTarget, pagesPdf(R.pages), base() + ".pdf");
   }
   function filTeachersModal(P, f) {
     const x = filCalc(buildRating(P.from, P.to, "").obs).find(y => y.f === f); if (!x) return;
@@ -7258,6 +7359,7 @@ window.METODISTLAR = [
     $("#tx-f", root).onchange = e => { S.ui.tfil = e.target.value; teachRating(root); };
     $$("[data-rg]", root).forEach(b => b.onclick = () => { S.ui.rgrp = b.dataset.rg; teachRating(root); });
     $$("[data-filc]", root).forEach(b => b.onclick = () => filTeachersModal(P, b.dataset.filc));
+    { const fe = $("#fil-exp", root); if (fe) fe.onclick = () => filExport(P); }
     const oyx = $("#oy-exp", root); if (oyx) oyx.onclick = () => oyExport({ from: P.from, to: P.to, m: P.m, cur: isCur, fil });
     $$("[data-oyp]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const w = winners.find(z => z.g === b.dataset.oyp); const x = w && w.xs.find(z => z.t.id === b.dataset.oyt); if (!x) return; const r = oyWord(x, w.g, P.m); wDeliver(r.blob, r.name, r.cap); });
     $$("[data-tid]", root).forEach(el => el.onclick = () => teacherModal(el.dataset.tid));
