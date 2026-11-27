@@ -5976,6 +5976,27 @@ window.METODISTLAR = [
         if (S.ui.plQ !== "all") { const L = $("#pl-list", root); if (L) L.scrollIntoView({ behavior: "smooth", block: "start" }); } };
       b.onclick = go; b.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }; });
     const rl = $(".pl-rec-line[data-plr]", root); if (rl && canMetAdmin()) { rl.onclick = () => planRecModal(P, t); rl.onkeydown = e => { if (e.key === "Enter") planRecModal(P, t); }; }
+    // 2026-11-27: bu oy kam ko'riladigan / ko'rilmaydigan / ishdan ketgan ustozlar — sababi bilan
+    { const me = mEndOf(ms), baseOf = x => canonSubj(x.subject) === BOG ? PLAN_BOG : PLAN_BASE;
+      const ok = x => !tPool(x) && inSubs(subs, x.subject) && (!fil || x.filial === fil) && (!subj || canonSubj(x.subject) === subj);
+      const seen = x => lessonN((S.tobs || []).filter(o => o.teacher_id === x.id && o.day >= ms && o.day <= me));
+      const L = [];
+      (S.teachers || []).filter(ok).forEach(x => {
+        if (tArch(x)) { if (x.left_at && x.left_at >= ms && x.left_at <= me) L.push({ x, k: "left", plan: null, why: `${x.off_reason || "Ishdan bo'shagan"} · ${fmtDate(x.left_at)}` }); return; }
+        const pf = tPlanFor(x, ms), b0 = baseOf(x); if (pf.plan >= b0) return;
+        const why = pf.ov ? (pf.note ? `«${esc(pf.note)}»` : `<span style="color:var(--bad)">sababi yozilmagan</span>`) + (pf.by ? ` <span class="muted">· ${esc(shortName(pf.by))}${pf.at ? ", " + fmtDate(String(pf.at).slice(0, 10)) : ""}</span>` : "")
+          : pf.off ? `⏸ ${esc(x.off_reason || "Vaqtincha ishlamaydi")} · ${fmtDate(x.off_from)} – ${fmtDate(x.off_to)}` : "";
+        L.push({ x, k: pf.plan === 0 ? "zero" : "low", plan: pf.plan, base: b0, why, html: true }); });
+      const KN = { low: ["Kam ko'riladi", "warn"], zero: ["Ko'rilmaydi", "bad"], left: ["Ishdan ketgan", ""] }, ord = { zero: 0, low: 1, left: 2 };
+      L.sort((a, b) => ord[a.k] - ord[b.k] || (a.x.filial || "").localeCompare(b.x.filial || "") || a.x.full_name.localeCompare(b.x.full_name));
+      const n = k => L.filter(z => z.k === k).length, box = document.createElement("details"); box.className = "card"; box.style.marginTop = "16px"; box.open = S.ui.plExOpen !== false;
+      box.innerHTML = `<summary><b>📉 Bu oy kam ko'riladigan va ko'rilmaydigan ustozlar — ${L.length} ta</b> <span class="small muted">· kam: ${n("low")} · ko'rilmaydi: ${n("zero")} · ishdan ketgan: ${n("left")}</span></summary>
+        ${L.length ? `<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>#</th><th>Ustoz</th><th>Fan</th><th>Filial</th><th>Holat</th><th>Reja</th><th>Ko'rildi</th><th>Sababi</th></tr></thead><tbody>
+        ${L.map((z, i) => `<tr><td>${i + 1}</td><td><b class="click" data-tid="${z.x.id}">${esc(z.x.full_name)}</b></td><td>${esc(canonSubj(z.x.subject) || "—")}</td><td>${esc(z.x.filial || "—")}</td>
+          <td><span class="kpi-badge ${KN[z.k][1]}">${KN[z.k][0]}</span></td><td>${z.plan === null ? "—" : `${z.base} → <b>${z.plan}</b>`}</td><td>${seen(z.x)}${z.plan ? ` / ${z.plan}` : ""}</td>
+          <td class="small">${z.html ? z.why : esc(z.why)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Bu oy hamma ustoz to'liq rejada ✓</div>`}`;
+      box.ontoggle = () => { S.ui.plExOpen = box.open; };
+      root.appendChild(box); $$("[data-tid]", box).forEach(el => el.onclick = () => teacherModal(el.dataset.tid)); }
     $$("[data-tst]", root).forEach(b => b.onclick = ev => { ev.stopPropagation(); const tt = teacherById(b.dataset.tst); if (tt) tStatusModal(tt, rerun); });
     $$("[data-skback]", root).forEach(b => b.onclick = async () => { const tid = b.dataset.skback; b.disabled = true;
       try { const rows = await skipLoad(true); const sk = rows.find(x => x.teacher_id === tid && x.month === ms && x.kind === "kormaymiz");
