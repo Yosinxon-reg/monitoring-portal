@@ -7150,9 +7150,12 @@ window.METODISTLAR = [
       T: Object.values(x.T).filter(z => z.n).map(z => ({ ...z, tot: pc(z.ib + z.ab, z.ibM + z.abM), share: x.ibM + x.abM ? Math.round((z.ib + z.ab) / (x.ib + x.ab || 1) * 1000) / 10 : 0 })) }))
       .filter(x => x.n).sort((a, b) => (b.tot ?? -1) - (a.tot ?? -1));
   }
+  // oylik reja bajarilishi (bog'chasiz) — faqat oylik rejimda
+  const filPlan = (P, f) => { if (P.mode !== "oy") return null; const R = planCalc(mStart(P.from), { fil: f, subs: [] }); return R.sumPlan ? { pct: R.pct, got: R.got, plan: R.sumPlan } : null; };
   function filCard(P) {
     const cur = filCalc(buildRating(P.from, P.to, "").obs), prev = filCalc(buildRating(P.pFrom, P.pTo, "").obs);
     if (!cur.length) return "";
+    const PL = {}; cur.forEach(x => PL[x.f] = filPlan(P, x.f)); const PLall = filPlan(P, "");
     const all = cur.reduce((a, x) => ({ ib: a.ib + x.ib, ibM: a.ibM + x.ibM, ab: a.ab + x.ab, abM: a.abM + x.abM, n: a.n + x.n }), { ib: 0, ibM: 0, ab: 0, abM: 0, n: 0 });
     const pc = (a, b) => b ? Math.round(a / b * 1000) / 10 : null, f1 = v => v === null || v === undefined ? "—" : String(v).replace(".", ",") + "%";
     const dl = x => { const p = prev.find(y => y.f === x.f); if (!p || p.tot === null || x.tot === null) return `<span class="muted small">—</span>`; const d = Math.round((x.tot - p.tot) * 10) / 10;
@@ -7160,11 +7163,11 @@ window.METODISTLAR = [
     const bar = v => `<span class="ku-bar"><i style="width:${Math.min(100, v || 0)}%"></i></span>`;
     return `<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>🏫 Filiallar natijasi · ${esc(P.label)}</h2><span class="spacer"></span>
         <button class="btn sm" id="fil-exp" title="Dashboard: rasm, PDF, Telegram">🖼 Rasm / PDF</button>
-        <span class="small muted">Maktab bo'yicha: <b>${f1(pc(all.ib + all.ab, all.ibM + all.abM))}</b> · intizomiy ${f1(pc(all.ib, all.ibM))} · akademik ${f1(pc(all.ab, all.abM))} · ${all.n} dars</span></div>
+        <span class="small muted">Maktab bo'yicha: <b>${f1(pc(all.ib + all.ab, all.ibM + all.abM))}</b> · intizomiy ${f1(pc(all.ib, all.ibM))} · akademik ${f1(pc(all.ab, all.abM))} · ${all.n} dars${PLall ? ` · reja bajarilishi <b>${f1(PLall.pct)}</b>` : ""}</span></div>
       <p class="small muted" style="margin:-4px 0 10px">Foiz = filialdagi barcha darslarda to'plangan ball ÷ olish mumkin bo'lgan ball. Akademik foizga faqat akademik ball qo'yiladigan fanlar kiradi; bog'cha kirmaydi. Kuzatuv qo'shilishi bilan yangilanadi, har oy noldan boshlanadi. Filialni bosing — ustozlar ro'yxati.</p>
-      <div class="table-wrap"><table><thead><tr><th>#</th><th>Filial</th><th>Umumiy natija</th><th>Intizomiy</th><th>Akademik</th><th>${esc(P.pLabel)}ga nisbatan</th><th>Darslar</th><th>Ustozlar</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>Filial</th><th>Umumiy natija</th><th>Intizomiy</th><th>Akademik</th><th>${esc(P.pLabel)}ga nisbatan</th><th>Darslar</th><th>Ustozlar</th>${P.mode === "oy" ? `<th title="Oylik reja: ko'rilgan / rejadagi (har ustoz 3 marta, bog'chasiz)">Reja bajarilishi</th>` : ""}</tr></thead><tbody>
       ${cur.map((x, i) => `<tr class="click" data-filc="${esc(x.f)}"><td>${i + 1}</td><td><b>${esc(x.f)}</b></td><td><b style="color:#1f9d55">${f1(x.tot)}</b> ${bar(x.tot)}</td>
-        <td>${f1(x.ibP)} <span class="small muted">${x.ib}/${x.ibM}</span></td><td>${f1(x.abP)} <span class="small muted">${x.abM ? x.ab + "/" + x.abM : ""}</span></td><td>${dl(x)}</td><td>${x.n}</td><td>${x.T.length}</td></tr>`).join("")}</tbody></table></div></div>`;
+        <td>${f1(x.ibP)} <span class="small muted">${x.ib}/${x.ibM}</span></td><td>${f1(x.abP)} <span class="small muted">${x.abM ? x.ab + "/" + x.abM : ""}</span></td><td>${dl(x)}</td><td>${x.n}</td><td>${x.T.length}</td>${P.mode === "oy" ? `<td>${PL[x.f] ? `<b style="color:${PL[x.f].pct >= 90 ? "#1f9d55" : PL[x.f].pct >= 70 ? "#2f7fd8" : "#d08a00"}">${f1(PL[x.f].pct)}</b> <span class="small muted">${PL[x.f].got}/${PL[x.f].plan}</span>` : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div></div>`;
   }
   // 2026-11-27: Filiallar natijasi — dashboard (rasm / PDF / Telegram): filial kesimida yoki filiallar aro; faqat filiallar yoki + ustozlar; umumiy / intizomiy / akademik
   function filExport(P) {
@@ -7210,7 +7213,7 @@ window.METODISTLAR = [
           if (v !== null) { rr(ctx, bx, y + bh * 0.2, Math.max(bh * 0.45, bw * v / 100), bh * 0.45, bh * 0.2); ctx.fillStyle = colOf(v); ctx.fill(); }
           T(ctx, f1(v), bx + bw + 24, y + bh * 0.58, Math.min(44, bh * 0.45), colOf(v), 1);
           if (pv !== null && v !== null) { const d = Math.round((v - pv) * 10) / 10; T(ctx, d > 0 ? `▲ ${String(d).replace(".", ",")}` : d < 0 ? `▼ ${String(-d).replace(".", ",")}` : "=", W - PAD, y + bh * 0.58, Math.min(32, bh * 0.34), d > 0 ? "#1f9d55" : d < 0 ? "#d64545" : "#8a9ab0", 1, "right"); }
-          T(ctx, `${x.n} dars · ${x.T.length} ustoz`, lx, y + bh * 0.88, Math.min(24, bh * 0.22), "#5d6f88"); });
+          const pl = filPlan(P, x.f); T(ctx, `${x.n} dars · ${x.T.length} ustoz${pl ? ` · reja ${f1(pl.pct)}` : ""}`, lx, y + bh * 0.88, Math.min(24, bh * 0.22), "#5d6f88"); });
         T(ctx, `▲▼ — ${P.pLabel}ga nisbatan`, W - PAD, top - 10, 24, "#8a9ab0", 0, "right");
         pages.push(c); }
       // ustozlar sahifalari
